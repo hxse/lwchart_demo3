@@ -1,0 +1,48 @@
+<script lang="ts">
+  import { type GridTemplateConfig } from "./gridTemplates";
+  import { getCurrentConfig, extractAllAreas } from "./utils";
+
+  // 定义组件项类型
+  interface ComponentItem {
+    component: any; // 组件类型
+    props: Record<string, any>; // 组件参数
+  }
+
+  // 定义Props接口
+  interface Props {
+    items: ComponentItem[]; // 组件数组
+    templateConfig: GridTemplateConfig | string; // 模板配置或配置键名
+    gap?: string; // 网格间距
+  }
+
+  // 接收props
+  let { items, templateConfig, gap = "10px" }: Props = $props();
+
+  // 获取当前模板配置 - 直接计算变量，而不是函数
+  const currentConfig = $derived(getCurrentConfig(templateConfig));
+
+  // 获取所有唯一的区域名称 - 直接计算变量，而不是函数
+  const allAreas = $derived(extractAllAreas(currentConfig.gridTemplateAreas));
+</script>
+
+<div
+  class="grid-container"
+  style="
+  display: grid;
+  grid-template-areas: {currentConfig.gridTemplateAreas};
+  grid-template-columns: {currentConfig.gridTemplateColumns};
+  grid-template-rows: {currentConfig.gridTemplateRows};
+  gap: {gap};
+  width: 100%;
+  height: 100%;
+"
+>
+  {#each items.slice(0, allAreas.length) as item, index}
+    {#if item.component}
+      {@const Component = item.component}
+      <div class="grid-item" style="grid-area: {allAreas[index] || 'a'};">
+        <Component {...item.props} />
+      </div>
+    {/if}
+  {/each}
+</div>

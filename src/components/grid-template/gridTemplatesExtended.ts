@@ -3,6 +3,7 @@ export interface GridTemplateConfig {
     gridTemplateAreas: string;
     gridTemplateColumns: string;
     gridTemplateRows: string;
+    slots: number;
 }
 
 // 导入原始模板类型
@@ -40,6 +41,7 @@ export function addBottomRow(
     return {
         gridTemplateAreas: newAreas,
         gridTemplateColumns: originalTemplate.gridTemplateColumns,
-        gridTemplateRows: newRows
+        gridTemplateRows: newRows,
+        slots: originalTemplate.slots
     };
 }

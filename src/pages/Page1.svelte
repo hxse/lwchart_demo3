@@ -9,22 +9,27 @@
   // 准备组件数组
   const gridItems = [
     {
+      id: "item-1",
       component: HelloWorld,
       props: { name: "组件1" },
     },
     {
+      id: "item-2",
       component: HelloWorld,
       props: { name: "组件2" },
     },
     {
+      id: "item-3",
       component: HelloWorld,
       props: { name: "组件3" },
     },
     {
+      id: "item-4",
       component: HelloWorld,
       props: { name: "组件4" },
     },
     {
+      id: "item-5",
       component: HelloWorld,
       props: { name: "组件5" },
     },

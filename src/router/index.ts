@@ -30,7 +30,7 @@ const routes = [
         path: '/page3',
         action: async (): Promise<RouteResult> => {
             // 动态导入页面3组件，实现按需加载
-            const module = await import('../pages/Page3.svelte');
+            const module = await import('../pages/page3/Page3.svelte');
             return module.default as unknown as PageComponent;
         }
     },

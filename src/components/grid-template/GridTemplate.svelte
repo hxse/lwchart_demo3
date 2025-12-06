@@ -4,6 +4,7 @@
 
   // 定义组件项类型
   interface ComponentItem {
+    id: string; // Unique ID for keying
     component: any; // 组件类型
     props: Record<string, any>; // 组件参数
   }
@@ -25,24 +26,24 @@
   const allAreas = $derived(extractAllAreas(currentConfig.gridTemplateAreas));
 </script>
 
-<div
-  class="grid-container"
-  style="
-  display: grid;
-  grid-template-areas: {currentConfig.gridTemplateAreas};
-  grid-template-columns: {currentConfig.gridTemplateColumns};
-  grid-template-rows: {currentConfig.gridTemplateRows};
-  gap: {gap};
-  width: 100%;
-  height: 100%;
-"
->
-  {#each items.slice(0, allAreas.length) as item, index}
-    {#if item.component}
-      {@const Component = item.component}
-      <div class="grid-item" style="grid-area: {allAreas[index] || 'a'};">
-        <Component {...item.props} />
-      </div>
-    {/if}
-  {/each}
-</div>
+{#key currentConfig}
+  <div
+    class="grid-container"
+    style:display="grid"
+    style:grid-template-areas={currentConfig.gridTemplateAreas}
+    style:grid-template-columns={currentConfig.gridTemplateColumns}
+    style:grid-template-rows={currentConfig.gridTemplateRows}
+    style:gap
+    style:width="100%"
+    style:height="100%"
+  >
+    {#each items.slice(0, allAreas.length) as item, index (item.id)}
+      {#if item.component}
+        {@const Component = item.component}
+        <div class="grid-item" style="grid-area: {allAreas[index] || 'a'};">
+          <Component {...item.props} />
+        </div>
+      {/if}
+    {/each}
+  </div>
+{/key}

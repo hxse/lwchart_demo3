@@ -24,27 +24,27 @@ export interface ChartConfig {
 export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
     if (!Array.isArray(file.data) || file.data.length === 0) return [];
 
-    if (!Array.isArray(file.data) || file.data.length === 0) return [];
-
 
     const seriesConfigs: SeriesConfig[] = [];
-    const firstRow = file.data[0];
+
+    // User requested to scan only the first row.
+    // This assumes data merging ensures all keys are present in row 0 (as nulls if needed).
+    const firstRow = file.data[0] || {};
     const keys = Object.keys(firstRow);
+    const keysSet = new Set(keys);
+    console.log(`[SeriesMatcher] Keys in Row 0 for ${file.filename || "unknown"}:`, keys);
 
     // 1. Check for OHLCV (Main Chart)
     const hasOHLCV =
-        "open" in firstRow &&
-        "high" in firstRow &&
-        "low" in firstRow &&
-        "close" in firstRow;
+        keysSet.has("open") &&
+        keysSet.has("high") &&
+        keysSet.has("low") &&
+        keysSet.has("close");
 
     if (hasOHLCV) {
         seriesConfigs.push({
             type: "Candlestick",
-            data: file.data, // The full data is passed, LWChart should extract properties or we map it here? 
-            // LWChart usually expects {time, open, high, low, close}. 
-            // If data has extra props it's usually fine for LWChart but for performance might be better to map.
-            // For now we pass reference to avoid copying.
+            data: file.data,
             pane: 0,
             options: {
                 upColor: "#26a69a",
@@ -58,12 +58,29 @@ export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
     }
 
     // 2. Indicators
+    // Helper to match keys case-insensitively
+    const getKeys = (prefix: string) => keys.filter((k) => k.toLowerCase().startsWith(prefix));
+
+    // Helper to create clean line data (filtering nulls)
+    const createLineData = (key: string) => {
+        return file.data
+            .map((row: any) => {
+                const val = row[key];
+                // Strict null check: if val is null, undefined, or NaN, return null value marker
+                if (val === null || val === undefined) return { time: row.time, value: null };
+                const num = parseFloat(val);
+                if (isNaN(num)) return { time: row.time, value: null };
+                return { time: row.time, value: num };
+            })
+            .filter((p: any) => p.value !== null); // Filter out nulls for LWC to avoid leading-nan issues
+    };
+
     // SMA (Main Pane)
-    const smaKeys = keys.filter((k) => k.startsWith("sma"));
+    const smaKeys = getKeys("sma");
     smaKeys.forEach((key) => {
         seriesConfigs.push({
             type: "Line",
-            data: file.data.map((row: any) => ({ time: row.time, value: parseFloat(row[key]) || 0 })),
+            data: createLineData(key),
             pane: 0,
             options: { params: { title: key }, color: "#2962FF", lineWidth: 2 },
             name: key,
@@ -71,45 +88,53 @@ export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
     });
 
     // BBands (Main Pane)
-    // Typically BBands has upper, lower, middle. We treat each as a line.
-    const bbandsKeys = keys.filter((k) => k.startsWith("bbands"));
+    const bbandsKeys = getKeys("bbands");
     bbandsKeys.forEach((key) => {
+        const lowerKey = key.toLowerCase();
+        if (!lowerKey.includes("upper") && !lowerKey.includes("lower") && !lowerKey.includes("middle")) {
+            return;
+        }
+
         let color = "#B71C1C"; // default dark red
-        if (key.includes("upper")) color = "#00BFA5";
-        if (key.includes("lower")) color = "#00BFA5";
-        if (key.includes("middle")) color = "#FF9800";
+        if (lowerKey.includes("upper")) color = "#00BFA5";
+        if (lowerKey.includes("lower")) color = "#00BFA5";
+        if (lowerKey.includes("middle")) color = "#FF9800";
 
         seriesConfigs.push({
             type: "Line",
-            data: file.data.map((row: any) => ({ time: row.time, value: parseFloat(row[key]) || 0 })),
-            pane: 0, // Main pane
+            data: createLineData(key),
+            pane: 0,
             options: { params: { title: key }, color, lineWidth: 1 },
             name: key,
         });
     });
 
     // RSI (Pane 1)
-    const rsiKeys = keys.filter((k) => k.startsWith("rsi"));
+    const rsiKeys = getKeys("rsi");
     rsiKeys.forEach((key) => {
         seriesConfigs.push({
             type: "Line",
-            data: file.data.map((row: any) => ({ time: row.time, value: parseFloat(row[key]) || 0 })),
-            pane: 1, // Separate pane
+            data: createLineData(key),
+            pane: 1,
             options: { params: { title: key }, color: "#9C27B0" },
             name: key,
         });
     });
 
     // 3. Balance & Equity (Main Pane for Backtest Chart)
-    const balanceKeys = keys.filter((k) => k === "balance" || k === "equity");
+    const balanceKeys = keys.filter((k) => {
+        const lower = k.toLowerCase();
+        return lower === "balance" || lower === "equity";
+    });
     balanceKeys.forEach((key) => {
+        const lower = key.toLowerCase();
         seriesConfigs.push({
             type: "Line",
-            data: file.data.map((row: any) => ({ time: row.time, value: parseFloat(row[key]) || 0 })),
+            data: createLineData(key),
             pane: 0,
             options: {
                 params: { title: key },
-                color: key === "balance" ? "#2962FF" : "#FF6D00",
+                color: lower === "balance" ? "#2962FF" : "#FF6D00",
                 lineWidth: 2
             },
             name: key,

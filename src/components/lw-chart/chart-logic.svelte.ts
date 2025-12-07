@@ -60,6 +60,7 @@ export function updateSeries(
         }
 
         // Set Data
+
         series.setData(config.data);
 
         // Handle Panes

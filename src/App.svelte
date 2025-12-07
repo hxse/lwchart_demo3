@@ -83,7 +83,7 @@
 
   .component-container {
     flex: 1;
-    overflow: auto;
+    overflow: hidden;
   }
 
   .home-panel {

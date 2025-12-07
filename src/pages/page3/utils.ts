@@ -9,7 +9,11 @@ export function calculateGridItems(
     showBottomRow: boolean,
     baseChartItems: GridItem[],
     backtestSeriesConfig: SeriesConfig[],
-    bottomRowData: ParsedFileContent | null
+    bottomRowData: ParsedFileContent | null,
+    syncHandlers?: {
+        onRegister: (id: string, api: any) => void;
+        onSync: (id: string, param: any) => void;
+    }
 ): GridItem[] {
     const config = finalTemplate as any;
     let mainSlotCount = config.slots;
@@ -45,9 +49,11 @@ export function calculateGridItems(
                         handleScroll: false,
                         handleScale: false,
                         timeScale: {
-                            minBarSpacing: 0,
+                            minBarSpacing: 0.001,
                         },
                     },
+                    onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister("bottom-row-chart", api) : undefined,
+                    onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync("bottom-row-chart", p) : undefined,
                 },
             });
         } else if (bottomRowData) {

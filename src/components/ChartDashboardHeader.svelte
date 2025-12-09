@@ -22,6 +22,9 @@
         onTemplateChange: (event: Event) => void;
         onShowBottomRowChange: (event: Event) => void;
         onViewModeChange: (mode: "chart" | "table") => void; // New callback
+
+        // Notebook Mode Flag
+        isNotebookMode?: boolean;
     }
 
     let {
@@ -40,17 +43,24 @@
         onTemplateChange,
         onShowBottomRowChange,
         onViewModeChange,
+        isNotebookMode = false,
     }: Props = $props();
 </script>
 
 <div class="actions">
-    <!-- ZIP Selection -->
-    <select value={selectedZipIndex} onchange={onZipChange} disabled={loading}>
-        <option value="-1">选择 ZIP 文件...</option>
-        {#each zipFiles as file, index}
-            <option value={index.toString()}>{file.filename}</option>
-        {/each}
-    </select>
+    <!-- ZIP Selection (Hidden in Notebook Mode) -->
+    {#if !isNotebookMode}
+        <select
+            value={selectedZipIndex}
+            onchange={onZipChange}
+            disabled={loading}
+        >
+            <option value="-1">选择 ZIP 文件...</option>
+            {#each zipFiles as file, index}
+                <option value={index.toString()}>{file.filename}</option>
+            {/each}
+        </select>
+    {/if}
 
     <!-- Internal File Selection -->
     <select
@@ -112,9 +122,11 @@
 
     <div class="separator"></div>
 
-    <button class="settings-btn" onclick={() => navigate("/settings")}>
-        设置
-    </button>
+    {#if !isNotebookMode}
+        <button class="settings-btn" onclick={() => navigate("/settings")}>
+            设置
+        </button>
+    {/if}
 </div>
 
 <style>
@@ -123,12 +135,15 @@
         gap: 10px;
         align-items: center;
         flex-wrap: wrap;
+        color: #333; /* Force text color */
     }
     select {
         padding: 5px;
         border-radius: 4px;
         border: 1px solid #ccc;
         min-width: 150px;
+        color: #333; /* Force text color */
+        background-color: white; /* Force background */
     }
     .settings-btn {
         padding: 5px 10px;
@@ -151,6 +166,7 @@
         font-size: 14px;
         cursor: pointer;
         user-select: none;
+        color: #333; /* Force text color */
     }
     .view-toggle {
         display: flex;
@@ -163,10 +179,12 @@
         border: none;
         background: white;
         cursor: pointer;
+        color: #333; /* Force text color */
     }
     .view-toggle button.active {
         background: #e0e0e0;
         font-weight: bold;
+        color: #000; /* Darker for active */
     }
     .view-toggle button:hover:not(.active) {
         background: #f5f5f5;

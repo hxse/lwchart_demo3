@@ -1,4 +1,4 @@
-import type { GridItem } from "./types";
+import type { GridItem } from "./chartDashboard.types";
 import EmptyGridItem from "../../components/EmptyGridItem.svelte";
 import LWChart from "../../components/lw-chart/LWChart.svelte";
 import type { ParsedFileContent } from "../../utils/zipParser";
@@ -45,9 +45,10 @@ export function calculateGridItems(
                 props: {
                     series: backtestSeriesConfig,
                     fitContent: true,
+                    fitContentOnDblClick: true,
                     chartOptions: {
-                        handleScroll: false,
-                        handleScale: false,
+                        handleScroll: true,
+                        handleScale: true,
                         timeScale: {
                             minBarSpacing: 0.001,
                         },

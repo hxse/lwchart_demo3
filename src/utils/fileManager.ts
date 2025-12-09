@@ -50,3 +50,23 @@ export async function fetchFileList(): Promise<FileItem[]> {
         throw error;
     }
 }
+
+/**
+ * 仅下载文件 Blob
+ */
+export async function downloadFileBlob(file: FileItem): Promise<Blob> {
+    try {
+        const response = await api.fetch(
+            `/file/download?filename=${encodeURIComponent(file.filename)}&path=${encodeURIComponent(file.path)}`
+        );
+
+        if (!response.ok) {
+            throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        return await response.blob();
+    } catch (error) {
+        console.error("Error in downloadFileBlob:", error);
+        throw error;
+    }
+}

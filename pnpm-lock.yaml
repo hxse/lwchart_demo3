@@ -14,6 +14,9 @@ importers:
       hyparquet:
         specifier: ^1.22.1
         version: 1.22.1
+      hyparquet-compressors:
+        specifier: ^1.1.1
+        version: 1.1.1
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
@@ -268,8 +271,17 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
+  fzstd@0.1.1:
+    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
+
+  hyparquet-compressors@1.1.1:
+    resolution: {integrity: sha512-yx7aA3Rhj0YycbdV71+XznQSLAefa4cT0urpgNXy4aM6eSeCknaVDNne8y45Uz74Fb15yyXUzOStlceOJBan7A==}
+
   hyparquet@1.22.1:
     resolution: {integrity: sha512-7oUPZKLw+07E7GwI/rElhSepxdjBpeS01SA19+1FxYOprTRSffoC9zR2vTZA/0xpMUQ/iZVFfsxI5AhO0omLoQ==}
+
+  hysnappy@1.0.0:
+    resolution: {integrity: sha512-MNrC4NfwDGPb889O6gIfEtbvEZCSWUsSEhsz4Oq2FRcpGtXHfeVz3KciSPp5Pnnz1NjFMgDQNfxdJozymJEDDA==}
 
   immediate@3.0.6:
     resolution: {integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==}
@@ -682,7 +694,16 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
+  fzstd@0.1.1: {}
+
+  hyparquet-compressors@1.1.1:
+    dependencies:
+      fzstd: 0.1.1
+      hysnappy: 1.0.0
+
   hyparquet@1.22.1: {}
+
+  hysnappy@1.0.0: {}
 
   immediate@3.0.6: {}
 

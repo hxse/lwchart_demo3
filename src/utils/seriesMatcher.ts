@@ -6,11 +6,18 @@ export interface SeriesConfig {
     pane: number; // 0 for main, 1+ for extra panes
     options?: any;
     name?: string;
+    priceLines?: any[];
 }
 
 export interface ChartConfig {
     id: string;
     series: SeriesConfig[];
+}
+
+export interface RsiThresholds {
+    upper?: number;
+    lower?: number;
+    center?: number;
 }
 
 /**
@@ -21,7 +28,7 @@ export interface ChartConfig {
  * - bbands* -> Line (Main Pane 0)
  * - rsi* -> Line (Pane 1)
  */
-export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
+export function matchColumnsToSeries(file: ParsedFileContent, rsiThresholds?: RsiThresholds): SeriesConfig[] {
     if (!Array.isArray(file.data) || file.data.length === 0) return [];
 
 
@@ -32,7 +39,6 @@ export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
     const firstRow = file.data[0] || {};
     const keys = Object.keys(firstRow);
     const keysSet = new Set(keys);
-    console.log(`[SeriesMatcher] Keys in Row 0 for ${file.filename || "unknown"}:`, keys);
 
     // 1. Check for OHLCV (Main Chart)
     const hasOHLCV =
@@ -112,12 +118,47 @@ export function matchColumnsToSeries(file: ParsedFileContent): SeriesConfig[] {
     // RSI (Pane 1)
     const rsiKeys = getKeys("rsi");
     rsiKeys.forEach((key) => {
+        const priceLines: any[] = [];
+        if (rsiThresholds) {
+            if (rsiThresholds.upper !== undefined) {
+                priceLines.push({
+                    price: rsiThresholds.upper,
+                    color: '#FF9800', // Orange
+                    lineWidth: 2,
+                    lineStyle: 0, // Solid
+                    axisLabelVisible: true,
+                    title: 'Upper',
+                });
+            }
+            if (rsiThresholds.lower !== undefined) {
+                priceLines.push({
+                    price: rsiThresholds.lower,
+                    color: '#FF9800', // Orange
+                    lineWidth: 2,
+                    lineStyle: 0, // Solid
+                    axisLabelVisible: true,
+                    title: 'Lower',
+                });
+            }
+            if (rsiThresholds.center !== undefined) {
+                priceLines.push({
+                    price: rsiThresholds.center,
+                    color: '#FF9800', // Orange
+                    lineWidth: 2,
+                    lineStyle: 0, // Solid
+                    axisLabelVisible: false,
+                    title: 'Bsline',
+                });
+            }
+        }
+
         seriesConfigs.push({
             type: "Line",
             data: createLineData(key),
             pane: 1,
             options: { params: { title: key }, color: "#9C27B0" },
             name: key,
+            priceLines: priceLines.length > 0 ? priceLines : undefined
         });
     });
 

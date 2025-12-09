@@ -47,25 +47,48 @@
 
 <div class="display-area" class:hidden={!file}>
     {#if file}
-        <h3>{file.filename}</h3>
-        {#if file.type === "csv" || file.type === "parquet"}
-            <div bind:this={tableContainer}></div>
-        {:else}
-            <pre class="text-preview">{file.preview ||
-                    (typeof file.data === "string"
-                        ? file.data
-                        : JSON.stringify(file.data, null, 2))}</pre>
-        {/if}
+        <div class="header">
+            <h3>{file.filename}</h3>
+        </div>
+        <div class="content-wrapper">
+            {#if file.type === "csv" || file.type === "parquet"}
+                <div class="table-container" bind:this={tableContainer}></div>
+            {:else}
+                <pre class="text-preview">{file.preview ||
+                        (typeof file.data === "string"
+                            ? file.data
+                            : JSON.stringify(file.data, null, 2))}</pre>
+            {/if}
+        </div>
     {/if}
 </div>
 
 <style>
     .display-area {
-        margin-top: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
         background: white;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+    .header {
+        padding: 10px 15px;
+        border-bottom: 1px solid #eee;
+        flex-shrink: 0;
+    }
+    .header h3 {
+        margin: 0;
+        font-size: 1.1em;
+        color: #333;
+    }
+    .content-wrapper {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+    }
+    .table-container {
+        height: 100%;
+        width: 100%;
     }
     .hidden {
         display: none;
@@ -76,8 +99,9 @@
         font-family: monospace;
         background: #f5f5f5;
         padding: 10px;
-        border-radius: 4px;
-        max-height: 500px;
+        margin: 0;
+        height: 100%;
         overflow-y: auto;
+        box-sizing: border-box;
     }
 </style>

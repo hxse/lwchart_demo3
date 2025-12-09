@@ -47,3 +47,19 @@
     {/each}
   </div>
 {/key}
+
+<style>
+  /* Ensure the grid container respects parent size */
+  .grid-container {
+    box-sizing: border-box;
+  }
+
+  /* Critical for allowing charts (nested flex/grid) to shrink below content size */
+  .grid-item {
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+</style>

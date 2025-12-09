@@ -17,9 +17,15 @@ import { GridTemplateType, gridTemplates } from "./gridTemplates";
  */
 export function addBottomRow(
     templateType: GridTemplateType,
-    bottomRowHeight: string = "20vh"
+    bottomRowHeight: string = "20%"
 ): GridTemplateConfig {
-    const originalTemplate = gridTemplates[templateType];
+    let originalTemplate = gridTemplates[templateType];
+
+    if (!originalTemplate) {
+        console.warn(`[GridTemplate] Template type '${templateType}' not found. Fallback to '${GridTemplateType.HORIZONTAL_1x1}'.`);
+        originalTemplate = gridTemplates[GridTemplateType.HORIZONTAL_1x1];
+    }
+
 
     // 解析原始的 gridTemplateAreas
     const originalAreas = originalTemplate.gridTemplateAreas.split('"').filter(area => area.trim() !== '');

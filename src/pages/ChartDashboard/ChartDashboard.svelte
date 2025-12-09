@@ -1,18 +1,23 @@
 <script lang="ts">
   import Header from "../../components/Header.svelte";
   import GridTemplate from "../../components/grid-template/GridTemplate.svelte";
-  import Page3HeaderControls from "../../components/Page3HeaderControls.svelte";
+  import ChartDashboardHeader from "../../components/ChartDashboardHeader.svelte";
   import FileContentViewer from "../../components/FileContentViewer.svelte";
   import { navigate } from "../../router/utils";
-  import { Page3State } from "./hooks.svelte";
+  import {
+    ChartDashboardState,
+    type DashboardProps,
+  } from "./chartDashboard.state.svelte";
 
-  const state = new Page3State();
+  let { zipData, config }: DashboardProps = $props();
+
+  const state = new ChartDashboardState({ zipData, config });
 </script>
 
 <div class="page-container">
-  <Header onBack={() => navigate("/")}>
+  <Header onBack={() => navigate("/")} showBackButton={!state.isNotebookMode}>
     {#snippet children()}
-      <Page3HeaderControls
+      <ChartDashboardHeader
         zipFiles={state.zipFiles}
         internalFiles={state.internalFiles}
         selectedZipIndex={state.selectedZipIndex}
@@ -28,14 +33,28 @@
         onTemplateChange={state.handleTemplateChange}
         onShowBottomRowChange={state.handleShowBottomRowChange}
         onViewModeChange={state.handleViewModeChange}
+        isNotebookMode={state.isNotebookMode}
       />
     {/snippet}
   </Header>
 
   <div class="content">
-    <div style="height: 100%; width: 100%; display: {state.viewMode === 'chart' ? 'block' : 'none'};">
+    <div
+      style="height: 100%; width: 100%; display: {state.viewMode === 'chart'
+        ? 'block'
+        : 'none'};"
+    >
       {#if state.gridItems.length > 0}
-        <GridTemplate items={state.gridItems} templateConfig={state.finalTemplate} />
+        <GridTemplate
+          items={state.gridItems}
+          templateConfig={state.finalTemplate}
+        />
+      {:else if state.loading || state.parsing}
+        <div class="empty-state">
+          {state.parsing ? "正在解析..." : "正在加载..."}
+        </div>
+      {:else if state.isNotebookMode}
+        <div class="empty-state">Notebook模式: 未找到可显示的图表数据</div>
       {:else if !state.loading && state.selectedZipIndex !== "-1"}
         <div class="empty-state">未找到图表数据</div>
       {:else if state.selectedZipIndex === "-1"}
@@ -43,9 +62,16 @@
       {/if}
     </div>
 
-    <div class="manual-viewer" style="height: 100%; display: {state.viewMode === 'table' ? 'block' : 'none'};">
+    <div
+      class="manual-viewer"
+      style="height: 100%; display: {state.viewMode === 'table'
+        ? 'block'
+        : 'none'};"
+    >
       {#if state.selectedInternalIndex !== "-1"}
-        <FileContentViewer file={state.internalFiles[parseInt(state.selectedInternalIndex)]} />
+        <FileContentViewer
+          file={state.internalFiles[parseInt(state.selectedInternalIndex)]}
+        />
       {:else}
         <div class="empty-state">请选择要查看的文件</div>
       {/if}

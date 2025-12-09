@@ -12,6 +12,15 @@ export function parseChartData(data: any[]): any[] {
         const new_data = data.map((row) => {
             let time: number | string = row.time;
 
+            // 0. Handle BigInt (often from Parquet)
+            if (typeof time === "bigint") {
+                // Determine if we need to scale down (e.g. nanoseconds to seconds)
+                // BigInt doesn't support decimals, so divide first then Number, or Number then divide.
+                // Number(time) might lose precision if > 2^53, but for timestamps (13-19 digits) it's usually fine for "seconds" precision.
+                // Let's safe cast.
+                time = Number(time);
+            }
+
             // 1. String -> Number
             if (typeof time === "string") {
                 const numTime = Number(time);
@@ -20,9 +29,23 @@ export function parseChartData(data: any[]): any[] {
                 }
             }
 
-            // 2. Milliseconds -> Seconds (if > 10 digits)
-            if (typeof time === "number" && time > 10000000000) {
-                time = Math.floor(time / 1000);
+            // 2. Milliseconds/Nanoseconds -> Seconds
+            // Standard unix timestamp (seconds) is ~1.7e9 (10 digits)
+            // Milliseconds is ~1.7e12 (13 digits)
+            // Microseconds is ~1.7e15 (16 digits)
+            // Nanoseconds is ~1.7e18 (19 digits)
+
+            if (typeof time === "number") {
+                if (time > 10000000000000000) {
+                    // Likely Nanoseconds (19 digits), divide by 1e9
+                    time = Math.floor(time / 1000000000);
+                } else if (time > 10000000000000) {
+                    // Likely Microseconds (16 digits), divide by 1e6
+                    time = Math.floor(time / 1000000);
+                } else if (time > 10000000000) {
+                    // Likely Milliseconds (13 digits), divide by 1e3
+                    time = Math.floor(time / 1000);
+                }
             }
 
             const newRow: any = { ...row, time };
@@ -30,7 +53,14 @@ export function parseChartData(data: any[]): any[] {
             // Convert other numeric fields
             Object.keys(row).forEach(key => {
                 if (key === 'time') return;
-                const val = row[key];
+                let val = row[key];
+
+                // Handle BigInt for values
+                if (typeof val === 'bigint') {
+                    val = Number(val);
+                    newRow[key] = val;
+                    return;
+                }
 
                 // Handle explicit number conversion
                 if (typeof val === 'number') {
@@ -48,14 +78,12 @@ export function parseChartData(data: any[]): any[] {
                         return;
                     }
 
-                    // Try parse float
-                    const num = parseFloat(val);
+                    // Try strict number conversion
+                    const num = Number(val);
                     if (!isNaN(num)) {
                         newRow[key] = num;
-                    } else {
-                        // If it's a string that can't be parsed
-                        newRow[key] = null;
                     }
+                    // Else: keep as original string (e.g. date usually)
                 }
             });
 

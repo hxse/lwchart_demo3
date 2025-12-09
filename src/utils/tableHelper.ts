@@ -23,7 +23,7 @@ export function createTable(container: HTMLElement, data: any[]): Tabulator | nu
         data: data,
         columns: columns,
         layout: "fitColumns",
-        height: "500px",
+        height: "100%",
         pagination: true,
         paginationSize: 20,
         paginationSizeSelector: [10, 20, 50, 100],

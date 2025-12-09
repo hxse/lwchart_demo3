@@ -35,7 +35,6 @@ export function extractAllAreas(gridTemplateAreas: string): string[] {
                     areaNames.add(name);
                 });
         });
-    console.log(Array.from(areaNames));
 
     return Array.from(areaNames);
 }

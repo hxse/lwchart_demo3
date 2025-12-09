@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { parquetReadObjects } from "hyparquet";
+import { compressors } from "hyparquet-compressors";
 
 /**
  * 解析后的文件内容
@@ -105,10 +106,13 @@ async function parseParquetContent(buffer: ArrayBuffer): Promise<any[]> {
             },
         };
 
-        // 使用hyparquet解析
-        const data = await parquetReadObjects({ file: asyncBuffer });
+        // 使用hyparquet解析，传入compressors以支持 ZSTD/Snappy 等
+        const data = await parquetReadObjects({
+            file: asyncBuffer,
+            compressors
+        });
         return data;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Parquet parsing error:", error);
         throw error;
     }
@@ -195,10 +199,34 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                 try {
                     const lowerFilename = filename.toLowerCase();
 
-                    // 根据文件扩展名判断类型
-                    if (lowerFilename.endsWith(".csv")) {
+                    // Pre-read first 4 bytes to check for Parquet magic number "PAR1"
+                    // This handles cases where file is named .csv but contains Parquet data
+                    const headBuffer = await file.async("arraybuffer");
+                    // Note: downloading whole file as arraybuffer is expensive if we only want 4 bytes, 
+                    // but JSZip file.async doesn't support partial read easily without internals.
+                    // Given these are small files, it's acceptable.
+
+                    const magic = new Uint8Array(headBuffer.slice(0, 4));
+                    const isParquetMagic =
+                        magic[0] === 0x50 && // P
+                        magic[1] === 0x41 && // A
+                        magic[2] === 0x52 && // R
+                        magic[3] === 0x31;   // 1
+
+                    if (isParquetMagic || lowerFilename.endsWith(".parquet")) {
+                        // Parquet文件
+                        const data = await parseParquetContent(headBuffer);
+                        const preview = formatPreview(data, "parquet");
+                        // If checking magic, use original filename but treat as parquet
+                        return {
+                            filename,
+                            type: "parquet" as const,
+                            data,
+                            preview,
+                        };
+                    } else if (lowerFilename.endsWith(".csv")) {
                         // CSV文件
-                        const text = await file.async("text");
+                        const text = new TextDecoder().decode(headBuffer);
                         const data = await parseCsvContent(text);
                         const preview = formatPreview(data, "csv");
                         return {
@@ -207,20 +235,9 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                             data,
                             preview,
                         };
-                    } else if (lowerFilename.endsWith(".parquet")) {
-                        // Parquet文件
-                        const arrayBuffer = await file.async("arraybuffer");
-                        const data = await parseParquetContent(arrayBuffer);
-                        const preview = formatPreview(data, "parquet");
-                        return {
-                            filename,
-                            type: "parquet" as const,
-                            data,
-                            preview,
-                        };
                     } else if (lowerFilename.endsWith(".json")) {
                         // JSON文件
-                        const text = await file.async("text");
+                        const text = new TextDecoder().decode(headBuffer);
                         const data = await parseJsonContent(text);
                         const preview = formatPreview(data, "json");
                         return {
@@ -231,7 +248,7 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                         };
                     } else {
                         // 其他文件类型，作为纯文本处理
-                        const text = await file.async("text");
+                        const text = new TextDecoder().decode(headBuffer);
                         const preview =
                             text.length > 1000 ? text.substring(0, 997) + "..." : text;
                         return {

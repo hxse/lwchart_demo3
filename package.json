@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lib": "vite build --config vite.config.lib.ts && xcopy /E /Y /I dist-lib \\\\wsl.localhost\\Ubuntu\\home\\hxse\\pyo3-quant\\data\\lwchart",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
@@ -25,6 +26,7 @@
   },
   "dependencies": {
     "hyparquet": "^1.22.1",
+    "hyparquet-compressors": "^1.1.1",
     "jszip": "^3.10.1",
     "lightweight-charts": "^5.0.9",
     "tabulator-tables": "^6.3.1",

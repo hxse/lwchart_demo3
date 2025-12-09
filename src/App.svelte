@@ -60,8 +60,9 @@
           <button class="nav-button" onclick={() => navigateTo("/page2")}
             >页面 2</button
           >
-          <button class="nav-button" onclick={() => navigateTo("/page3")}
-            >页面 3</button
+          <button
+            class="nav-button"
+            onclick={() => navigateTo("/chart-dashboard")}>图表看板</button
           >
         </div>
       </div>

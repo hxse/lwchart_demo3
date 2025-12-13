@@ -2,6 +2,10 @@ import {
     createChart,
     CandlestickSeries,
     LineSeries,
+    BarSeries,
+    HistogramSeries,
+    AreaSeries,
+    BaselineSeries,
     ColorType,
     type IChartApi,
     type ISeriesApi,
@@ -43,10 +47,27 @@ export class ChartController {
             let series: ISeriesApi<any>;
 
             // Define series type
-            if (config.type === "Candlestick") {
-                series = this.chart!.addSeries(CandlestickSeries, config.options);
-            } else {
-                series = this.chart!.addSeries(LineSeries, config.options);
+            switch (config.type) {
+                case "Candlestick":
+                    series = this.chart!.addSeries(CandlestickSeries, config.options);
+                    break;
+                case "Bar":
+                    series = this.chart!.addSeries(BarSeries, config.options);
+                    break;
+                case "Line":
+                    series = this.chart!.addSeries(LineSeries, config.options);
+                    break;
+                case "Area":
+                    series = this.chart!.addSeries(AreaSeries, config.options);
+                    break;
+                case "Baseline":
+                    series = this.chart!.addSeries(BaselineSeries, config.options);
+                    break;
+                case "Histogram":
+                    series = this.chart!.addSeries(HistogramSeries, config.options);
+                    break;
+                default:
+                    series = this.chart!.addSeries(LineSeries, config.options);
             }
 
             // Set Data
@@ -57,6 +78,18 @@ export class ChartController {
             if (typeof series.moveToPane === 'function') {
                 // @ts-ignore
                 series.moveToPane(config.pane);
+            }
+
+            // Apply price scale margins if specified
+            if (config.options?.scaleMargins) {
+                try {
+                    series.priceScale().applyOptions({
+                        scaleMargins: config.options.scaleMargins
+                    });
+                    // ScaleMargins应用完成（静默）
+                } catch (e) {
+                    console.warn('[ScaleMargins] Failed to apply:', e);
+                }
             }
 
             // Handle Price Lines

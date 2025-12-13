@@ -1,7 +1,7 @@
 import type { ParsedFileContent } from "./zipParser";
 
 export interface SeriesConfig {
-    type: "Candlestick" | "Line";
+    type: "Candlestick" | "Line" | "Area" | "Baseline" | "Histogram" | "Bar";
     data: any[];
     pane: number; // 0 for main, 1+ for extra panes
     options?: any;

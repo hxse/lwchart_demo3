@@ -1,4 +1,4 @@
-import { onMount } from "svelte";
+import { onMount, onDestroy } from "svelte";
 import { GridTemplateType } from "../../components/grid-template/gridTemplates";
 import { addBottomRow } from "../../components/grid-template/gridTemplatesExtended";
 import {
@@ -6,13 +6,11 @@ import {
     fetchFileList,
     type FileItem,
 } from "../../utils/fileManager";
-import type { GridItem, DashboardProps } from "./chartDashboard.types";
-import { calculateGridItems } from "./chartDashboard.utils";
+import type { GridItem, DashboardProps, ChartConfigJSON, DashboardOverride } from "./chartDashboard.types";
+import { generateGridItemsFromConfig } from "./chartDashboard.utils";
 import type { ParsedFileContent } from "../../utils/zipParser";
-import type { SeriesConfig } from "../../utils/seriesMatcher";
 
 import { ChartSyncManager } from "./logic/ChartSyncManager";
-import { normalizeConfig } from "./logic/ConfigNormalizer";
 import { ChartDataProcessor } from "./logic/ChartDataProcessor";
 
 export class ChartDashboardState {
@@ -24,74 +22,69 @@ export class ChartDashboardState {
     zipBlob: Blob | null = null;
     isNotebookMode = $state(false);
 
-    selectedZipIndex: string = $state("-1");
-    internalFiles: ParsedFileContent[] = $state.raw([]);
-    selectedInternalIndex: string = $state("-1");
+    selectedZipIndex: string = $state("-1"); // UI State for Zip Selector
 
+    // Core Data & Config State
+    files: ParsedFileContent[] = $state.raw([]); // Raw Data
+    config: ChartConfigJSON | null = $state(null); // Refined Config
+
+    // UI Feedback
     loading = $state(false);
     parsing = $state(false);
+    errorString: string | null = $state(null);
 
-    // View State
-    viewMode = $state<"chart" | "table">("chart");
+    // Derived States
+    viewMode = $derived((this.config?.viewMode ?? "chart") as "chart" | "table"); // Driven by Config
 
-    // Grid State
-    gridItems: GridItem[] = $state.raw([]);
-    baseChartItems: GridItem[] = $state.raw([]);
-    backtestSeriesConfig: SeriesConfig[] = $state.raw([]);
-    showBottomRow = $state(true);
-    selectedTemplate = $state<string>(GridTemplateType.HORIZONTAL_1x1);
-    finalTemplate = $derived(
-        this.showBottomRow
-            ? addBottomRow(this.selectedTemplate as GridTemplateType)
-            : this.selectedTemplate,
-    );
-    bottomRowData: ParsedFileContent | null = null;
+    // Template derivation
+    finalTemplate = $derived.by(() => {
+        if (!this.config) return GridTemplateType.SINGLE;
 
-    // Logic Managers
-    syncManager = new ChartSyncManager();
+        let tmpl = this.config.template as GridTemplateType;
+        // Basic mapping backup if string doesn't match enum perfectly (though strict config implies it should)
+        if (!Object.values(GridTemplateType).includes(tmpl)) {
+            // Fallback map? e.g. "single" -> GridTemplateType.SINGLE is direct match if string values align. 
+            // In gridTemplates.ts, SINGLE = 'single', GRID_2x2 = 'grid-2x2'.
+            // If user config "2x2", we might need mapping.
+            if ((tmpl as string) === '2x2') tmpl = GridTemplateType.GRID_2x2;
+        }
+
+        return this.config.showBottomRow ? addBottomRow(tmpl) : tmpl;
+    });
+
+    // Grid Items Derivation
+    gridItems: GridItem[] = $derived.by(() => {
+        if (!this.config || this.files.length === 0) return [];
+        return generateGridItemsFromConfig(this.config, this.files, {
+            onRegister: (id, api) => this.syncManager.register(id, api),
+            onSync: (id, p) => this.syncManager.sync(id, p)
+        });
+    });
+
+    // View State (Manual Table View)
+    selectedInternalIndex: string = $state("-1"); // For the manual file viewer
+    // We can auto-select based on config
 
     availableTemplates = Object.values(GridTemplateType);
-
-    // User Config Overrides
-    userProvidedTemplate: string | null = null;
-    userProvidedInternalFileName: string | null = null;
+    syncManager = new ChartSyncManager();
 
     constructor(props?: DashboardProps) {
-        // --- Initialization ---
         if (props?.zipData) {
             this.isNotebookMode = true;
         }
 
-        // --- Lifecycle ---
         onMount(async () => {
             const startTime = performance.now();
 
-            // 1. Check for Notebook Mode (Props)
             if (props?.zipData) {
+                // Notebook Mode
                 this.isNotebookMode = true;
-
-                // Handle Config Defaults
-                if (props.config) {
-                    const normalized = normalizeConfig(props.config, this.selectedTemplate);
-
-                    if (props.config.template) {
-                        this.selectedTemplate = normalized.template;
-                        this.userProvidedTemplate = normalized.template;
-                    }
-
-                    this.showBottomRow = normalized.showBottomRow;
-                    this.viewMode = normalized.viewMode;
-                    this.userProvidedInternalFileName = normalized.selectedInternalFileName;
-                }
-
                 try {
                     this.loading = true;
                     this.parsing = true;
 
-                    // Convert zipData to Blob
                     let blob: Blob;
                     if (typeof props.zipData === 'string') {
-                        // Base64 string -> Blob
                         const byteCharacters = atob(props.zipData);
                         const byteNumbers = new Array(byteCharacters.length);
                         for (let i = 0; i < byteCharacters.length; i++) {
@@ -102,99 +95,123 @@ export class ChartDashboardState {
                     } else if (props.zipData instanceof ArrayBuffer) {
                         blob = new Blob([props.zipData], { type: 'application/zip' });
                     } else {
-                        blob = props.zipData; // Assuming it's already a Blob
+                        blob = props.zipData;
                     }
                     this.zipBlob = blob;
-                    await this.loadZipFromBlob(this.zipBlob);
-                } catch (e) {
-                    console.error("[ChartDashboard] Failed to load from props:", e);
+
+                    await this.loadZipFromBlob(blob, props.config);
+
+                    // Overrides already applied in loadZipFromBlob
+
+                } catch (e: any) {
+                    this.errorString = e.message;
+                    console.error("Notebook Init Error:", e);
                 } finally {
                     this.loading = false;
                     this.parsing = false;
                 }
             } else {
-                // 2. Browser Mode (Fetch File List)
+                // Browser Mode
                 try {
                     this.fileList = await fetchFileList();
+
+                    // Check for selectedZipFileName in URL params
+                    if (typeof window !== "undefined") {
+                        const params = new URLSearchParams(window.location.search);
+                        const zipName = params.get("selectedZipFileName");
+
+                        if (zipName && this.zipFiles.length > 0) {
+                            const foundIndex = this.zipFiles.findIndex(f => f.filename === zipName || f.path.endsWith(zipName));
+                            if (foundIndex !== -1) {
+                                // Auto-load found zip
+                                await this.loadZipByIndex(foundIndex);
+                            }
+                        }
+                    }
+
                 } catch (e) {
-                    console.error("获取文件列表失败:", e);
+                    console.error("Fetch file list failed:", e);
                 }
             }
-
-            console.log(`[Performance] Total initialization: ${(performance.now() - startTime).toFixed(2)}ms`);
         });
 
-
+        // Auto-select internal file from config when files/config change
         $effect(() => {
-            this.gridItems = calculateGridItems(
-                this.finalTemplate,
-                this.showBottomRow,
-                this.baseChartItems,
-                this.backtestSeriesConfig,
-                this.bottomRowData,
-                {
-                    onRegister: (id, api) => this.syncManager.register(id, api),
-                    onSync: (id, p) => this.syncManager.sync(id, p)
+            if (this.config && this.files.length > 0 && this.selectedInternalIndex === "-1") {
+                let target = this.config.selectedInternalFileName;
+                if (target) {
+                    const idx = this.files.findIndex(f => f.filename === target);
+                    if (idx !== -1) this.selectedInternalIndex = idx.toString();
                 }
-            );
+            }
         });
     }
 
-    // --- Core Logic ---
-    loadZipFromBlob = async (blob: Blob) => {
+    loadZipFromBlob = async (blob: Blob, propsOverride?: DashboardOverride) => {
         try {
-            // Clear Sync Manager before loading new charts
             this.syncManager.clear();
+            this.errorString = null;
 
-            const result = await ChartDataProcessor.processZipBlob(blob, {
-                onRegister: (id, api) => this.syncManager.register(id, api),
-                onSync: (id, p) => this.syncManager.sync(id, p)
-            });
+            const result = await ChartDataProcessor.processZipBlob(blob);
 
-            this.internalFiles = result.internalFiles;
-            this.baseChartItems = result.baseChartItems;
-            this.backtestSeriesConfig = result.backtestSeriesConfig;
-            this.bottomRowData = result.bottomRowData;
+            this.files = result.files;
 
-            // --- File Selection Override ---
-            if (this.userProvidedInternalFileName) {
-                // Try strict match
-                let targetIdx = this.internalFiles.findIndex(f => f.filename === this.userProvidedInternalFileName);
-                if (targetIdx !== -1) {
-                    this.selectedInternalIndex = targetIdx.toString();
-                } else {
-                    console.warn(`[ChartDashboard] Configured file '${this.userProvidedInternalFileName}' not found.`);
+            // Assign sequential IDX to all series items
+            let enumerator = 0;
+            if (result.config && result.config.chart) {
+                result.config.chart.forEach(slotPanes => {
+                    slotPanes.forEach(paneSeriesList => {
+                        paneSeriesList.forEach(item => {
+                            item.idx = enumerator++;
+                        });
+                    });
+                });
+            }
+
+            // Apply URL overrides BEFORE setting this.config to avoid double render
+            if (typeof window !== "undefined" && !this.isNotebookMode) {
+                const params = new URLSearchParams(window.location.search);
+
+                // Apply show overrides directly to result.config
+                if (params.has("show") && result.config?.chart) {
+                    const showArray = params.getAll("show");
+                    showArray.forEach(showStr => {
+                        const parts = showStr.split(",");
+                        if (parts.length === 4) {
+                            const [s, p, i, show] = parts.map(x => parseInt(x.trim()));
+                            if (!isNaN(s) && !isNaN(p) && !isNaN(i) && !isNaN(show)) {
+                                const series = result.config.chart[s]?.[p]?.[i];
+                                if (series) series.show = show === 1;
+                            }
+                        }
+                    });
                 }
             }
 
-            // Template Logic: Respect user config OR auto-detect
-            if (!this.userProvidedTemplate && result.recommendedTemplate) {
-                this.selectedTemplate = result.recommendedTemplate;
-            }
+            this.config = result.config;
 
-        } catch (e) {
-            console.error("处理 ZIP Blob 失败:", e);
-            throw e;
+        } catch (e: any) {
+            console.error("Load XML Error:", e);
+            this.errorString = e.message;
+            this.files = [];
+            this.config = null;
+            throw e; // Re-throw to caller
         }
     }
 
+    // Core logic to load a zip by index in the fileList
+    loadZipByIndex = async (index: number) => {
+        // Validation
+        if (index < 0 || index >= this.zipFiles.length) return;
 
-    handleZipSelect = async (event: Event) => {
-        const select = event.target as HTMLSelectElement;
-        const index = parseInt(select.value);
-        this.selectedZipIndex = select.value;
-
-        this.internalFiles = [];
-        this.selectedInternalIndex = "-1";
-        this.baseChartItems = [];
-        this.backtestSeriesConfig = [];
-        this.bottomRowData = null;
-        this.gridItems = [];
-
-        if (index === -1 || isNaN(index)) return;
-
+        this.selectedZipIndex = index.toString();
         const selectedFile = this.zipFiles[index];
-        if (!selectedFile) return;
+
+        // Reset
+        this.files = [];
+        this.config = null;
+        this.errorString = null;
+        this.selectedInternalIndex = "-1";
 
         this.loading = true;
         this.parsing = true;
@@ -203,11 +220,139 @@ export class ChartDashboardState {
             this.zipBlob = await downloadFileBlob(selectedFile);
             await this.loadZipFromBlob(this.zipBlob);
 
-        } catch (e) {
-            console.error("处理 ZIP 失败:", e);
+            // Apply URL Param Overrides (Browser Mode) - moved inside loadZipFromBlob to avoid double render
+            // Do NOT call applyUrlOverrides here
+
+        } catch (e: any) {
+            this.errorString = e.message;
         } finally {
             this.loading = false;
             this.parsing = false;
+        }
+    }
+
+    // Helper: Apply overrides directly to a config object (without triggering reactivity)
+    private applyOverridesToConfig(config: ChartConfigJSON, overrideConfig: DashboardOverride) {
+        if (overrideConfig.template) config.template = overrideConfig.template;
+        if (overrideConfig.showBottomRow !== undefined) config.showBottomRow = overrideConfig.showBottomRow;
+        if (overrideConfig.viewMode) config.viewMode = overrideConfig.viewMode;
+        if (overrideConfig.selectedInternalFileName) config.selectedInternalFileName = overrideConfig.selectedInternalFileName;
+
+        // Handle show visibility overrides
+        if (overrideConfig.show && config.chart) {
+            overrideConfig.show.forEach(coordStr => {
+                const parts = coordStr.split(',').map(s => s.trim());
+                if (parts.length === 4) {
+                    const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p));
+                    if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                        const series = config.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
+                        if (series) series.show = showVal === 1;
+                    }
+                }
+            });
+        }
+    }
+
+    applyOverrides(overrideConfig: DashboardOverride) {
+        if (!this.config) return;
+
+        // Shallow merge overrides
+        // We trigger reactivity by creating new object
+        const nextConfig = { ...this.config };
+
+        if (overrideConfig.template) nextConfig.template = overrideConfig.template;
+        if (overrideConfig.showBottomRow !== undefined) nextConfig.showBottomRow = overrideConfig.showBottomRow;
+        if (overrideConfig.viewMode) nextConfig.viewMode = overrideConfig.viewMode;
+        if (overrideConfig.selectedInternalFileName) nextConfig.selectedInternalFileName = overrideConfig.selectedInternalFileName;
+
+        // Handle show visibility overrides (三维坐标格式)
+        // 格式: "slotIdx,paneIdx,seriesIdx,show" 例如 "0,1,2,1"
+        if (overrideConfig.show && nextConfig.chart) {
+            overrideConfig.show.forEach(coordStr => {
+                const parts = coordStr.split(',').map(s => s.trim());
+                if (parts.length === 4) {
+                    const slotIdx = parseInt(parts[0]);
+                    const paneIdx = parseInt(parts[1]);
+                    const seriesIdx = parseInt(parts[2]);
+                    const showVal = parseInt(parts[3]);
+
+                    if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                        const slot = nextConfig.chart[slotIdx];
+                        if (slot) {
+                            const pane = slot[paneIdx];
+                            if (pane) {
+                                const series = pane[seriesIdx];
+                                if (series) {
+                                    series.show = showVal === 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        this.config = nextConfig;
+    }
+
+    // --- Actions ---
+
+    handleZipSelect = async (event: Event) => {
+        const select = event.target as HTMLSelectElement;
+        const index = parseInt(select.value);
+        if (index === -1 || isNaN(index)) return;
+
+        await this.loadZipByIndex(index);
+    }
+
+    applyUrlOverrides() {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+
+        const override: DashboardOverride = {};
+
+        if (params.has("template")) {
+            override.template = params.get("template")!;
+        }
+        if (params.has("selectedInternalFileName")) {
+            override.selectedInternalFileName = params.get("selectedInternalFileName")!;
+        }
+
+        if (params.has("viewMode")) {
+            const vm = params.get("viewMode");
+            if (vm === "chart" || vm === "table") override.viewMode = vm;
+        }
+
+        // Handle showBottomRow (0 or 1)
+        if (params.has("showBottomRow")) {
+            const val = params.get("showBottomRow");
+            if (val === "0" || val === "false") override.showBottomRow = false;
+            if (val === "1" || val === "true") override.showBottomRow = true;
+        }
+
+        // Handle show=slotIdx,paneIdx,seriesIdx,show (multiple allowed)
+        // 例: &show=0,0,0,1&show=0,1,0,0
+        // 格式: slotIdx,paneIdx,seriesIdx,show(0/1)
+        if (params.has("show")) {
+            const showArray: string[] = [];
+            const shows = params.getAll("show");
+            shows.forEach(val => {
+                const parts = val.split(',');
+                if (parts.length === 4) {
+                    // 验证格式
+                    const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p.trim()));
+                    if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                        showArray.push(val);
+                    }
+                }
+            });
+            if (showArray.length > 0) {
+                override.show = showArray;
+            }
+        }
+
+        if (Object.keys(override).length > 0) {
+            this.applyOverrides(override);
         }
     }
 
@@ -216,29 +361,25 @@ export class ChartDashboardState {
         this.selectedInternalIndex = select.value;
     }
 
+    // View Mode Toggle (Manually, if UI element exists to toggle it)
+    handleViewModeChange = (mode: "chart" | "table") => {
+        if (this.config) {
+            this.config.viewMode = mode;
+        }
+    }
+
+    // Config updates via Header
     handleTemplateChange = (event: Event) => {
         const select = event.target as HTMLSelectElement;
-        this.selectedTemplate = select.value;
+        if (this.config) {
+            this.config.template = select.value; // Reactivity via $state proxy
+        }
     }
 
     handleShowBottomRowChange = (event: Event) => {
         const checkbox = event.target as HTMLInputElement;
-        this.showBottomRow = checkbox.checked;
-    }
-
-    handleViewModeChange = (mode: "chart" | "table") => {
-        this.viewMode = mode;
-        if (
-            mode === "table" &&
-            this.selectedInternalIndex === "-1" &&
-            this.internalFiles.length > 0
-        ) {
-            const backtestIdx = this.internalFiles.findIndex((f) =>
-                f.filename.includes("backtest_result"),
-            );
-            if (backtestIdx !== -1) {
-                this.selectedInternalIndex = backtestIdx.toString();
-            }
+        if (this.config) {
+            this.config.showBottomRow = checkbox.checked;
         }
     }
 }

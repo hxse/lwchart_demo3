@@ -93,7 +93,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background-color: #e8f5e8;
+    background-color: #ffffff;
   }
   .content {
     display: flex;

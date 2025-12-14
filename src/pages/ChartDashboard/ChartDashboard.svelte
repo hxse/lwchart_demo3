@@ -33,6 +33,8 @@
         onTemplateChange={state.handleTemplateChange}
         onShowBottomRowChange={state.handleShowBottomRowChange}
         onViewModeChange={state.handleViewModeChange}
+        onFitContentAll={state.fitContentAll}
+        onResetTimeScaleAll={state.resetTimeScaleAll}
         isNotebookMode={state.isNotebookMode}
       />
     {/snippet}

@@ -11,7 +11,14 @@
     fitContentOnDblClick?: boolean; // New prop: Auto-fit on double click
     chartOptions?: Record<string, any>; // New prop: Custom chart options (e.g. handleScale)
     onCrosshairMove?: (param: any) => void; // New prop: Sync callback
-    onRegister?: (api: { setCrosshair: (param: any) => void }) => void; // Sync registration
+    onRegister?: (api: {
+      setCrosshair: (param: any) => void;
+      clearCrosshair: () => void;
+      scrollToTime: (time: number) => void;
+      resetTimeScale: () => void;
+      fitContent: () => void;
+    }) => void; // Sync registration
+    onClick?: (param: any) => void; // New prop: Click callback
   }
 
   let {
@@ -21,15 +28,32 @@
     chartOptions = {},
     onCrosshairMove,
     onRegister,
+    onClick,
   }: Props = $props();
 
   // State
   let chartContainer = $state<HTMLDivElement>();
   const controller = new ChartController();
 
-  // Exported method for external sync
+  // Exported methods for external sync
   export const setCrosshair = (param: any) => {
     controller.setCrosshair(param);
+  };
+
+  export const clearCrosshair = () => {
+    controller.clearCrosshair();
+  };
+
+  export const scrollToTime = (time: number) => {
+    controller.scrollToTime(time);
+  };
+
+  export const resetTimeScale = () => {
+    controller.resetTimeScale();
+  };
+
+  export const doFitContent = () => {
+    controller.fitContent();
   };
 
   onMount(() => {
@@ -46,7 +70,13 @@
 
     // Register API if requested
     if (onRegister) {
-      onRegister({ setCrosshair });
+      onRegister({
+        setCrosshair,
+        clearCrosshair,
+        scrollToTime,
+        resetTimeScale,
+        fitContent: doFitContent,
+      });
     }
 
     // Subscribe to Crosshair Move
@@ -57,8 +87,39 @@
     };
     controller.subscribeCrosshairMove(handleCrosshairMove);
 
+    // Click Handler with debounce for dblclick conflict
+    let clickTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleClick = (param: any) => {
+      if (onClick) {
+        // 如果同时有双击处理，延迟单击以避免冲突
+        if (fitContentOnDblClick) {
+          // 清除之前的定时器
+          if (clickTimer) {
+            clearTimeout(clickTimer);
+          }
+          // 延迟执行单击，如果是双击则会被双击事件取消
+          clickTimer = setTimeout(() => {
+            onClick(param);
+            clickTimer = null;
+          }, 250); // 250ms足够检测双击
+        } else {
+          // 没有双击处理，直接执行单击
+          onClick(param);
+        }
+      }
+    };
+
+    if (onClick) {
+      controller.subscribeClick(handleClick);
+    }
+
     // Double Click Handler
     const handleDblClick = () => {
+      // 双击时取消待执行的单击
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
       controller.fitContent();
     };
 
@@ -77,6 +138,11 @@
 
     resizeObserver.observe(chartContainer);
 
+    // 如果不是fitContent模式，初始化后重置时间轴显示最新数据
+    if (!fitContent) {
+      controller.resetTimeScale();
+    }
+
     console.log(
       `[Performance] Chart mount: ${(performance.now() - startTime).toFixed(2)}ms`,
     );
@@ -85,6 +151,9 @@
     return () => {
       resizeObserver.disconnect();
       controller.unsubscribeCrosshairMove(handleCrosshairMove);
+      if (onClick) {
+        controller.unsubscribeClick(handleClick);
+      }
       if (fitContentOnDblClick) {
         controller.unsubscribeDblClick(handleDblClick);
       }

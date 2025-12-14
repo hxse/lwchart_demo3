@@ -22,6 +22,8 @@
         onTemplateChange: (event: Event) => void;
         onShowBottomRowChange: (event: Event) => void;
         onViewModeChange: (mode: "chart" | "table") => void; // New callback
+        onFitContentAll?: () => void; // 新增：所有图表显示全部
+        onResetTimeScaleAll?: () => void; // 新增：主图表重置时间轴
 
         // Notebook Mode Flag
         isNotebookMode?: boolean;
@@ -43,6 +45,8 @@
         onTemplateChange,
         onShowBottomRowChange,
         onViewModeChange,
+        onFitContentAll,
+        onResetTimeScaleAll,
         isNotebookMode = false,
     }: Props = $props();
 </script>
@@ -100,6 +104,27 @@
         显示底栏
     </label>
 
+    <!-- 显示控制按钮 -->
+    {#if onFitContentAll}
+        <button
+            class="control-btn"
+            onclick={onFitContentAll}
+            disabled={loading}
+        >
+            显示全部
+        </button>
+    {/if}
+
+    {#if onResetTimeScaleAll}
+        <button
+            class="control-btn"
+            onclick={onResetTimeScaleAll}
+            disabled={loading}
+        >
+            重置时间
+        </button>
+    {/if}
+
     <div class="separator"></div>
 
     <!-- View Mode Toggle -->
@@ -152,6 +177,21 @@
         border: none;
         border-radius: 4px;
         cursor: pointer;
+    }
+    .control-btn {
+        padding: 5px 10px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .control-btn:hover:not(:disabled) {
+        background: #218838;
+    }
+    .control-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
     }
     .separator {
         width: 1px;

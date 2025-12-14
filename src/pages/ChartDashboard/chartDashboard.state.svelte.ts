@@ -61,7 +61,8 @@ export class ChartDashboardState {
         // 生成原始gridItems
         const rawItems = generateGridItemsFromConfig(this.config, this.files, {
             onRegister: (id, api) => this.syncManager.register(id, api),
-            onSync: (id, p) => this.syncManager.sync(id, p)
+            onSync: (id, p) => this.syncManager.sync(id, p),
+            onBottomClick: (time: number) => this.syncManager.jumpToTime(time, "bottom-row-backtest")
         });
 
         // 获取模板主槽位数量（不含底栏）
@@ -414,5 +415,15 @@ export class ChartDashboardState {
         if (this.config) {
             this.config.showBottomRow = checkbox.checked;
         }
+    }
+
+    // 所有图表显示全部数据
+    fitContentAll = () => {
+        this.syncManager.fitContentAll();
+    }
+
+    // 主图表重置时间轴
+    resetTimeScaleAll = () => {
+        this.syncManager.resetTimeScaleAll();
     }
 }

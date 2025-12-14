@@ -89,6 +89,7 @@ export function generateGridItemsFromConfig(
     syncHandlers?: {
         onRegister: (id: string, api: any) => void;
         onSync: (id: string, param: any) => void;
+        onBottomClick?: (time: number) => void;
     }
 ): GridItem[] {
     const perfStart = performance.now();
@@ -281,7 +282,7 @@ export function generateGridItemsFromConfig(
                 component: LWChart,
                 props: {
                     series: flatSeries,
-                    fitContent: true,
+                    fitContent: false,  // 改为false，初始显示最新数据
                     fitContentOnDblClick: true,  // 启用双击fitContent功能
                     chartOptions: {
                         timeScale: { timeVisible: true, secondsVisible: false }
@@ -315,12 +316,21 @@ export function generateGridItemsFromConfig(
                     props: {
                         series: backtestSeries,
                         fitContent: true,
-                        fitContentOnDblClick: true,  // 启用双击fitContent功能
+                        fitContentOnDblClick: true,  // 启用双出fitContent功能
                         chartOptions: {
                             handleScroll: true,
                             handleScale: true,
                             timeScale: { minBarSpacing: 0.001 }
                         },
+                        onClick: syncHandlers?.onBottomClick ? (param: any) => {
+                            console.log('[底栏点击] param:', param);
+                            if (param.time) {
+                                console.log('[底栏点击] 准备跳转到时间:', param.time);
+                                syncHandlers.onBottomClick!(param.time);
+                            } else {
+                                console.warn('[底栏点击] param.time为空，无法跳转');
+                            }
+                        } : undefined,
                         onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister("bottom-row-backtest", api) : undefined,
                         onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync("bottom-row-backtest", p) : undefined,
                     }

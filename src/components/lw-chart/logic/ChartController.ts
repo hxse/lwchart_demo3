@@ -124,6 +124,11 @@ export class ChartController {
         this.chart?.timeScale().fitContent();
     }
 
+    resetTimeScale() {
+        if (!this.chart) return;
+        this.chart.timeScale().resetTimeScale();
+    }
+
     setCrosshair(param: any) {
         if (!this.chart || !param || !param.time || this.seriesMap.size === 0) {
             this.chart?.clearCrosshairPosition();
@@ -134,6 +139,10 @@ export class ChartController {
         if (firstSeries) {
             this.chart.setCrosshairPosition(NaN, param.time, firstSeries);
         }
+    }
+
+    clearCrosshair() {
+        this.chart?.clearCrosshairPosition();
     }
 
     subscribeCrosshairMove(callback: (param: any) => void) {
@@ -150,6 +159,99 @@ export class ChartController {
 
     unsubscribeDblClick(callback: (param: any) => void) {
         this.chart?.unsubscribeDblClick(callback);
+    }
+
+    subscribeClick(callback: (param: any) => void) {
+        this.chart?.subscribeClick(callback);
+    }
+
+    unsubscribeClick(callback: (param: any) => void) {
+        this.chart?.unsubscribeClick(callback);
+    }
+
+    scrollToTime(time: number) {
+        if (!this.chart) return;
+
+        console.log('[scrollToTime] 输入时间:', time);
+
+        const timeScale = this.chart.timeScale();
+
+        // 尝试直接转换时间
+        let coordinate = timeScale.timeToCoordinate(time as any);
+        console.log('[scrollToTime] 直接查找 coordinate:', coordinate);
+
+        // 如果找不到精确时间，查找最接近且不超过目标时间的时间
+        if (coordinate === null) {
+            console.log('[scrollToTime] 精确时间不存在，开始查找最近时间');
+
+            let closestTime: number | null = null;
+            let closestDistance = Infinity;
+
+            // 遍历所有series，找到最接近的时间
+            this.seriesMap.forEach((series) => {
+                try {
+                    // 获取series的所有数据
+                    // @ts-ignore - 访问内部API获取数据
+                    const data = series.data?.() || [];
+
+                    // 遍历数据找到最接近且不超过目标时间的时间
+                    for (const point of data) {
+                        const pointTime = point.time;
+                        if (typeof pointTime === 'number' && pointTime <= time) {
+                            const distance = time - pointTime;
+                            if (distance < closestDistance) {
+                                closestDistance = distance;
+                                closestTime = pointTime;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[scrollToTime] 无法获取series数据:', e);
+                }
+            });
+
+            if (closestTime !== null) {
+                console.log('[scrollToTime] 找到最近时间:', closestTime, '距离:', closestDistance);
+                coordinate = timeScale.timeToCoordinate(closestTime as any);
+                console.log('[scrollToTime] 最近时间的 coordinate:', coordinate);
+            } else {
+                console.warn('[scrollToTime] 无法找到合适的时间，跳转失败');
+                return;
+            }
+        }
+
+        if (coordinate === null) {
+            console.warn('[scrollToTime] coordinate为null，跳转失败');
+            return;
+        }
+
+        const logicalIndex = timeScale.coordinateToLogical(coordinate);
+        console.log('[scrollToTime] logicalIndex:', logicalIndex);
+        if (logicalIndex === null) {
+            console.warn('[scrollToTime] logicalIndex为null，跳转失败');
+            return;
+        }
+
+        // 获取当前可见范围的宽度，保持当前的缩放级别
+        const visibleRange = timeScale.getVisibleLogicalRange();
+        if (!visibleRange) return;
+
+        const barSpacing = visibleRange.to - visibleRange.from;
+        console.log('[scrollToTime] 保持当前窗口宽度:', barSpacing);
+
+        // 直接设置范围，确保宽度精确等于barSpacing
+        const halfSpacing = barSpacing / 2;
+        const newRange = {
+            from: logicalIndex - halfSpacing,
+            to: logicalIndex - halfSpacing + barSpacing  // 直接相加，避免浮点数精度问题
+        };
+
+        console.log('[scrollToTime] 设置新范围:', newRange);
+
+        // 将目标时间（逻辑索引）居中显示
+        timeScale.setVisibleLogicalRange(newRange);
+
+        console.log('[scrollToTime] 跳转完成');
     }
 
     applyOptions(options: any) {

@@ -5,7 +5,7 @@
   import GridTemplate from "../../components/grid-template/GridTemplate.svelte";
   import { GridTemplateType } from "../../components/grid-template/gridTemplates";
   import { navigate } from "../../router/utils";
-  import { ChartDashboardState } from "./chartDashboard.state.svelte";
+  import { ChartDashboardState } from "./state/ChartDashboardState.svelte";
   import type { DashboardProps } from "./chartDashboard.types";
 
   let { zipData, config }: DashboardProps = $props();

@@ -1,88 +1,29 @@
-import type { GridItem, ChartConfigJSON, SeriesItemConfig } from "./chartDashboard.types";
-import EmptyGridItem from "../../components/EmptyGridItem.svelte";
-import LWChart from "../../components/lw-chart/LWChart.svelte";
-import type { ParsedFileContent } from "../../utils/zipParser";
-import type { SeriesConfig } from "../../utils/seriesMatcher";
-import { matchColumnsToSeries } from "../../utils/seriesMatcher";
+/**
+ * 网格项构建器
+ * 负责将图表配置转换为网格布局所需的 GridItem 数组
+ */
 
-// Helper: Convert user friendly type to LWChart type
-function mapSeriesType(type: string): "Candlestick" | "Line" | "Histogram" | "Area" | "Baseline" | "Bar" | "HLine" | "VLine" {
-    const t = type.toLowerCase();
-    switch (t) {
-        case "candle":
-        case "candlestick": return "Candlestick";
-        case "line": return "Line";
-        case "bar": return "Bar";
-        case "histogram": return "Histogram";
-        case "volume": return "Histogram";  // Volume使用Histogram渲染
-        case "area": return "Area";
-        case "baseline": return "Baseline";
-        case "hline": return "HLine";
-        case "vline": return "VLine";
-        default: return "Line";
-    }
-}
+import type { GridItem, ChartConfigJSON, SeriesItemConfig } from "../chartDashboard.types";
+import EmptyGridItem from "../../../components/EmptyGridItem.svelte";
+import LWChart from "../../../components/lw-chart/LWChart.svelte";
+import type { ParsedFileContent } from "../../../utils/zipParser";
+import type { SeriesConfig } from "../../../utils/seriesMatcher";
+import { matchColumnsToSeries } from "../../../utils/seriesMatcher";
+import { mapSeriesType } from "../../../components/lw-chart/logic/SeriesTypeMapper";
+import {
+    getOptionsForType,
+    applyDefaultScaleMargins,
+    DEFAULT_SCALE_MARGIN_TOP,
+    DEFAULT_SCALE_MARGIN_BOTTOM
+} from "../../../components/lw-chart/logic/SeriesOptionsBuilder";
 
-const defaultTop = 0.02
-const defaultBottom = 0.02
-
-// Helper: Apply default scale margins to options
-function applyDefaultScaleMargins(options: any, top: number = defaultTop, bottom: number = defaultBottom): any {
-    return {
-        ...options,
-        scaleMargins: {
-            top,
-            bottom
-        }
-    };
-}
-
-// Helper: Get options for a series based on its type
-function getOptionsForType(config: SeriesItemConfig): any {
-    // 默认值
-    const DEFAULT_CANDLE_OPTIONS = {
-        upColor: "#26a69a",
-        downColor: "#ef5350",
-        wickUpColor: "#26a69a",
-        wickDownColor: "#ef5350",
-        borderVisible: false,
-    };
-
-    switch (config.type) {
-        case 'candle':
-            return { ...DEFAULT_CANDLE_OPTIONS, ...config.candleOpt };
-        case 'bar':
-            return { ...DEFAULT_CANDLE_OPTIONS, ...config.barOpt };
-        case 'line':
-            return {
-                lineWidth: 1.5,  // 线条粗细，默认1（更细）
-                ...config.lineOpt
-            };
-        case 'histogram':
-            return config.histogramOpt || {};
-        case 'volume':
-            // Volume默认配置（自动应用）
-            const volumeOpt = config.volumeOpt || {};
-            const marginTop = volumeOpt.priceScaleMarginTop || 0.7;
-
-            return {
-                priceFormat: { type: 'volume' },
-                priceScaleId: '',
-                scaleMargins: {
-                    top: marginTop,
-                    bottom: 0
-                },
-                ...volumeOpt
-            };
-        case 'area':
-            return config.areaOpt || {};
-        case 'baseline':
-            return config.baselineOpt || {};
-        default:
-            return {};
-    }
-}
-
+/**
+ * 从配置生成网格项数组
+ * @param config 图表配置 JSON
+ * @param files 解析后的文件内容数组
+ * @param syncHandlers 可选的同步处理器（用于图表间的十字线同步等）
+ * @returns 网格项数组
+ */
 export function generateGridItemsFromConfig(
     config: ChartConfigJSON,
     files: ParsedFileContent[],
@@ -141,8 +82,6 @@ export function generateGridItemsFromConfig(
                         return validTime && validValue;
                     });
 
-                    // 过滤null值（静默）
-
                     // Volume类型：自动设置涨跌颜色
                     if (itemConfig.type === 'volume') {
                         // 查找同文件的OHLC数据用于判断涨跌
@@ -187,8 +126,6 @@ export function generateGridItemsFromConfig(
                         title: itemConfig.hLineOpt.label || ''
                     });
                 }
-
-                // Series添加（静默）
 
                 // 智能应用scaleMargins
                 // 排除：1. volume类型（有特殊的priceScaleMarginTop）
@@ -258,12 +195,11 @@ export function generateGridItemsFromConfig(
                         if (series !== volumeSeriesInPane) {  // 排除volume自己
                             if (!series.options) series.options = {};
                             series.options.scaleMargins = {
-                                top: defaultTop,
+                                top: DEFAULT_SCALE_MARGIN_TOP,
                                 bottom: seriesBottom
                             };
                         }
                     });
-                    // Volume调整完成（静默）
                 }
             }
 
@@ -316,16 +252,14 @@ export function generateGridItemsFromConfig(
                     props: {
                         series: backtestSeries,
                         fitContent: true,
-                        fitContentOnDblClick: true,  // 启用双出fitContent功能
+                        fitContentOnDblClick: true,  // 启用双击fitContent功能
                         chartOptions: {
                             handleScroll: true,
                             handleScale: true,
                             timeScale: { minBarSpacing: 0.001 }
                         },
                         onClick: syncHandlers?.onBottomClick ? (param: any) => {
-                            console.log('[底栏点击] param:', param);
                             if (param.time) {
-                                console.log('[底栏点击] 准备跳转到时间:', param.time);
                                 syncHandlers.onBottomClick!(param.time);
                             } else {
                                 console.warn('[底栏点击] param.time为空，无法跳转');

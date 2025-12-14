@@ -172,17 +172,17 @@ export class ChartController {
     scrollToTime(time: number) {
         if (!this.chart) return;
 
-        console.log('[scrollToTime] 输入时间:', time);
+
 
         const timeScale = this.chart.timeScale();
 
         // 尝试直接转换时间
         let coordinate = timeScale.timeToCoordinate(time as any);
-        console.log('[scrollToTime] 直接查找 coordinate:', coordinate);
+
 
         // 如果找不到精确时间，查找最接近且不超过目标时间的时间
         if (coordinate === null) {
-            console.log('[scrollToTime] 精确时间不存在，开始查找最近时间');
+
 
             let closestTime: number | null = null;
             let closestDistance = Infinity;
@@ -211,9 +211,9 @@ export class ChartController {
             });
 
             if (closestTime !== null) {
-                console.log('[scrollToTime] 找到最近时间:', closestTime, '距离:', closestDistance);
+
                 coordinate = timeScale.timeToCoordinate(closestTime as any);
-                console.log('[scrollToTime] 最近时间的 coordinate:', coordinate);
+
             } else {
                 console.warn('[scrollToTime] 无法找到合适的时间，跳转失败');
                 return;
@@ -226,7 +226,7 @@ export class ChartController {
         }
 
         const logicalIndex = timeScale.coordinateToLogical(coordinate);
-        console.log('[scrollToTime] logicalIndex:', logicalIndex);
+
         if (logicalIndex === null) {
             console.warn('[scrollToTime] logicalIndex为null，跳转失败');
             return;
@@ -237,7 +237,7 @@ export class ChartController {
         if (!visibleRange) return;
 
         const barSpacing = visibleRange.to - visibleRange.from;
-        console.log('[scrollToTime] 保持当前窗口宽度:', barSpacing);
+
 
         // 直接设置范围，确保宽度精确等于barSpacing
         const halfSpacing = barSpacing / 2;
@@ -246,12 +246,12 @@ export class ChartController {
             to: logicalIndex - halfSpacing + barSpacing  // 直接相加，避免浮点数精度问题
         };
 
-        console.log('[scrollToTime] 设置新范围:', newRange);
+
 
         // 将目标时间（逻辑索引）居中显示
         timeScale.setVisibleLogicalRange(newRange);
 
-        console.log('[scrollToTime] 跳转完成');
+
     }
 
     applyOptions(options: any) {

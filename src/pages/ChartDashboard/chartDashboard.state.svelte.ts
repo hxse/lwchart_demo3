@@ -1,6 +1,7 @@
 import { onMount, onDestroy } from "svelte";
 import { GridTemplateType } from "../../components/grid-template/gridTemplates";
 import { addBottomRow } from "../../components/grid-template/gridTemplatesExtended";
+import { getCurrentConfig } from "../../components/grid-template/utils";
 import {
     downloadFileBlob,
     fetchFileList,
@@ -9,6 +10,7 @@ import {
 import type { GridItem, DashboardProps, ChartConfigJSON, DashboardOverride } from "./chartDashboard.types";
 import { generateGridItemsFromConfig } from "./chartDashboard.utils";
 import type { ParsedFileContent } from "../../utils/zipParser";
+import EmptyGridItem from "../../components/EmptyGridItem.svelte";
 
 import { ChartSyncManager } from "./logic/ChartSyncManager";
 import { ChartDataProcessor } from "./logic/ChartDataProcessor";
@@ -55,10 +57,41 @@ export class ChartDashboardState {
     // Grid Items Derivation
     gridItems: GridItem[] = $derived.by(() => {
         if (!this.config || this.files.length === 0) return [];
-        return generateGridItemsFromConfig(this.config, this.files, {
+
+        // 生成原始gridItems
+        const rawItems = generateGridItemsFromConfig(this.config, this.files, {
             onRegister: (id, api) => this.syncManager.register(id, api),
             onSync: (id, p) => this.syncManager.sync(id, p)
         });
+
+        // 获取模板主槽位数量（不含底栏）
+        const templateConfig = getCurrentConfig(this.finalTemplate);
+        const templateSlots = templateConfig.slots;
+
+        // 分离底栏和主图表（底栏id包含'bottom'）
+        const bottomRowItem = rawItems.find(item => item.id.includes('bottom'));
+        const mainItems = rawItems.filter(item => !item.id.includes('bottom'));
+
+        // 调整主图表数量以匹配模板槽位
+        let adjustedMainItems: GridItem[] = [];
+
+        if (mainItems.length < templateSlots) {
+            // 不够，用EmptyGridItem填充
+            adjustedMainItems = [...mainItems];
+            for (let i = mainItems.length; i < templateSlots; i++) {
+                adjustedMainItems.push({
+                    id: `empty-fill-${i}`,
+                    component: EmptyGridItem,
+                    props: {}
+                });
+            }
+        } else {
+            // 取前templateSlots个（多余的忽略）
+            adjustedMainItems = mainItems.slice(0, templateSlots);
+        }
+
+        // 底栏始终在最后
+        return bottomRowItem ? [...adjustedMainItems, bottomRowItem] : adjustedMainItems;
     });
 
     // View State (Manual Table View)

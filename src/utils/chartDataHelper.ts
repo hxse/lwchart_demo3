@@ -1,27 +1,30 @@
 export function parseChartData(data: any[]): any[] {
     if (!data || data.length === 0) return [];
 
-    // 纯粹的时间转换逻辑
     try {
         const firstRow = data[0];
         if (!("time" in firstRow)) {
-            // console.log("数据缺少 'time' 字段，跳过转换");
             return data;
         }
 
-        const new_data = data.map((row) => {
+        // 预先获取所有字段名（只做一次）
+        const keys = Object.keys(firstRow);
+        const hasTime = keys.includes('time');
+        if (!hasTime) return data;
+
+        // 直接修改原数组，避免创建新对象
+        const processed: any[] = [];
+
+        for (let i = 0; i < data.length; i++) {
+            const row = data[i];
             let time: number | string = row.time;
 
-            // 0. Handle BigInt (often from Parquet)
+            // BigInt -> Number
             if (typeof time === "bigint") {
-                // Determine if we need to scale down (e.g. nanoseconds to seconds)
-                // BigInt doesn't support decimals, so divide first then Number, or Number then divide.
-                // Number(time) might lose precision if > 2^53, but for timestamps (13-19 digits) it's usually fine for "seconds" precision.
-                // Let's safe cast.
                 time = Number(time);
             }
 
-            // 1. String -> Number
+            // String -> Number
             if (typeof time === "string") {
                 const numTime = Number(time);
                 if (!isNaN(numTime)) {
@@ -29,81 +32,96 @@ export function parseChartData(data: any[]): any[] {
                 }
             }
 
-            // 2. Milliseconds/Nanoseconds -> Seconds
-            // Standard unix timestamp (seconds) is ~1.7e9 (10 digits)
-            // Milliseconds is ~1.7e12 (13 digits)
-            // Microseconds is ~1.7e15 (16 digits)
-            // Nanoseconds is ~1.7e18 (19 digits)
-
+            // 时间单位转换（纳秒/微秒/毫秒 -> 秒）
             if (typeof time === "number") {
                 if (time > 10000000000000000) {
-                    // Likely Nanoseconds (19 digits), divide by 1e9
                     time = Math.floor(time / 1000000000);
                 } else if (time > 10000000000000) {
-                    // Likely Microseconds (16 digits), divide by 1e6
                     time = Math.floor(time / 1000000);
                 } else if (time > 10000000000) {
-                    // Likely Milliseconds (13 digits), divide by 1e3
                     time = Math.floor(time / 1000);
                 }
             }
 
-            const newRow: any = { ...row, time };
-
-            // Convert other numeric fields
-            Object.keys(row).forEach(key => {
-                if (key === 'time') return;
-                let val = row[key];
-
-                // Handle BigInt for values
-                if (typeof val === 'bigint') {
-                    val = Number(val);
-                    newRow[key] = val;
-                    return;
-                }
-
-                // Handle explicit number conversion
-                if (typeof val === 'number') {
-                    if (isNaN(val)) {
-                        newRow[key] = null; // Convert actual NaN number to null
-                    }
-                    return;
-                }
-
-                if (typeof val === 'string') {
-                    // Check for "nan", "NaN", "null" strings
-                    const lowerVal = val.toLowerCase();
-                    if (lowerVal == "nan" || lowerVal === 'null' || val.trim() === '') {
-                        newRow[key] = null;
-                        return;
-                    }
-
-                    // Try strict number conversion
-                    const num = Number(val);
-                    if (!isNaN(num)) {
-                        newRow[key] = num;
-                    }
-                    // Else: keep as original string (e.g. date usually)
-                }
+            // 只在需要时创建新对象
+            const needsTransform = time !== row.time || keys.some(key => {
+                if (key === 'time') return false;
+                const val = row[key];
+                return typeof val === 'bigint' ||
+                    (typeof val === 'number' && isNaN(val)) ||
+                    (typeof val === 'string' && (val.toLowerCase() === 'nan' || val.toLowerCase() === 'null' || val.trim() === ''));
             });
 
-            return newRow;
-        });
+            if (!needsTransform) {
+                processed.push(row);
+                continue;
+            }
 
-        const filtered_data = new_data.filter((row: any) => row.time !== null);
-        filtered_data.sort((a, b) => (a.time as number) - (b.time as number));
+            // 需要转换时才创建新对象
+            const newRow: any = { time };
 
-        // Deduplicate
-        const uniqueData = [];
-        let lastTime = -Infinity;
-        for (const row of filtered_data) {
-            const t = row.time as number;
-            // Ensure strictly ascending
+            for (let j = 0; j < keys.length; j++) {
+                const key = keys[j];
+                if (key === 'time') continue;
+
+                let val = row[key];
+
+                // BigInt -> Number
+                if (typeof val === 'bigint') {
+                    newRow[key] = Number(val);
+                    continue;
+                }
+
+                // NaN -> null
+                if (typeof val === 'number') {
+                    newRow[key] = isNaN(val) ? null : val;
+                    continue;
+                }
+
+                // String处理
+                if (typeof val === 'string') {
+                    const lowerVal = val.toLowerCase();
+                    if (lowerVal === "nan" || lowerVal === 'null' || val.trim() === '') {
+                        newRow[key] = null;
+                        continue;
+                    }
+
+                    const num = Number(val);
+                    newRow[key] = isNaN(num) ? val : num;
+                    continue;
+                }
+
+                newRow[key] = val;
+            }
+
+            processed.push(newRow);
+        }
+
+        // 过滤null时间，假设大部分数据有效，避免filter
+        const filtered: any[] = [];
+        for (let i = 0; i < processed.length; i++) {
+            if (processed[i].time !== null && processed[i].time !== undefined) {
+                filtered.push(processed[i]);
+            }
+        }
+
+        // 排序（假设数据基本有序，TimSort快）
+        filtered.sort((a, b) => (a.time as number) - (b.time as number));
+
+        // 去重（假设重复少，提前退出）
+        if (filtered.length < 2) return filtered;
+
+        const uniqueData = [filtered[0]];
+        let lastTime = filtered[0].time as number;
+
+        for (let i = 1; i < filtered.length; i++) {
+            const t = filtered[i].time as number;
             if (t > lastTime) {
-                uniqueData.push(row);
+                uniqueData.push(filtered[i]);
                 lastTime = t;
             }
         }
+
         return uniqueData;
     } catch (e) {
         console.error("解析数据时间失败:", e);

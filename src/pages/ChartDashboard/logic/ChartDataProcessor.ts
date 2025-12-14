@@ -12,11 +12,15 @@ export class ChartDataProcessor {
         const startTime = performance.now();
 
         // 1. Parse all files from ZIP
+        const zipStartTime = performance.now();
         const result = await parseZipFile(blob);
+        const zipTime = performance.now() - zipStartTime;
+
         if (result.error) throw new Error(result.error);
         const files = result.files;
 
         // 2. Strict Config Check: Look for chartConfig.json
+        const configStartTime = performance.now();
         const configFiles = files.filter(f =>
             f.filename === "chartConfig.json" ||
             f.filename.endsWith("/chartConfig.json")
@@ -31,33 +35,30 @@ export class ChartDataProcessor {
 
         let config: ChartConfigJSON;
         try {
-            // Data might be string (if text/json type) or already object (if handled by parser)
-            // parseZipFile returns data as object for .json files usually, but let's be safe
             config = typeof configFile.data === 'string'
                 ? JSON.parse(configFile.data)
                 : configFile.data;
 
-            // Validate essential fields
             if (!config || !Array.isArray(config.chart)) {
                 throw new Error("Invalid chartConfig.json: Missing 'chart' array.");
             }
         } catch (e: any) {
             throw new Error(`Failed to parse chartConfig.json: ${e.message}`);
         }
+        const configTime = performance.now() - configStartTime;
 
-        // 3. Process time data for all files (for LWChart compatibility)
-        // We do this after config check to fail early, but before returning.
-        // We modify the files in place (or map to new array) to include parsed time.
-        // Import parseChartData at top of file needed.
+        // 3. Process time data for all files
+        const timeParseStartTime = performance.now();
         const processedFiles = files.map(f => {
-            // Only process data files (arrays)
             if (Array.isArray(f.data)) {
                 return { ...f, data: parseChartData(f.data) };
             }
             return f;
         });
+        const timeParseTime = performance.now() - timeParseStartTime;
 
-        console.log(`[Performance] ZIP & Config processing: ${(performance.now() - startTime).toFixed(2)}ms`);
+        const totalTime = performance.now() - startTime;
+        console.log(`[Performance] ZIP & Config processing: ${totalTime.toFixed(2)}ms (ZIP: ${zipTime.toFixed(2)}ms, Config: ${configTime.toFixed(2)}ms, TimeParse: ${timeParseTime.toFixed(2)}ms)`);
 
         return {
             files: processedFiles,

@@ -54,7 +54,10 @@ function getOptionsForType(config: SeriesItemConfig): any {
         case 'bar':
             return { ...DEFAULT_CANDLE_OPTIONS, ...config.barOpt };
         case 'line':
-            return config.lineOpt || {};
+            return {
+                lineWidth: 1.5,  // 线条粗细，默认1（更细）
+                ...config.lineOpt
+            };
         case 'histogram':
             return config.histogramOpt || {};
         case 'volume':
@@ -216,13 +219,18 @@ export function generateGridItemsFromConfig(
 
                 hLineOnlyItems.forEach(hl => {
                     if (hl.hLineOpt && hl.show) {
+                        // 检测是否是RSI center线（通常label包含"center"或value=50）
+                        const label = hl.hLineOpt.label || '';
+                        const isRSICenter = label.toLowerCase().includes('center') ||
+                            label.toLowerCase().includes('rsi') && hl.hLineOpt.value === 50;
+
                         first.priceLines!.push({
                             price: hl.hLineOpt.value,
                             color: hl.hLineOpt.color,
-                            lineWidth: 1,
-                            lineStyle: 2,
+                            lineWidth: isRSICenter ? 2 : 1,  // RSI center更粗
+                            lineStyle: 0,  // 实线
                             axisLabelVisible: true,
-                            title: hl.hLineOpt.label || ''
+                            title: ''   // 不显示label
                         });
                     }
                 });
@@ -274,6 +282,7 @@ export function generateGridItemsFromConfig(
                 props: {
                     series: flatSeries,
                     fitContent: true,
+                    fitContentOnDblClick: true,  // 启用双击fitContent功能
                     chartOptions: {
                         timeScale: { timeVisible: true, secondsVisible: false }
                     },
@@ -306,6 +315,7 @@ export function generateGridItemsFromConfig(
                     props: {
                         series: backtestSeries,
                         fitContent: true,
+                        fitContentOnDblClick: true,  // 启用双击fitContent功能
                         chartOptions: {
                             handleScroll: true,
                             handleScale: true,

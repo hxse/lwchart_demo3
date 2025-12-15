@@ -7,8 +7,7 @@ import type { GridItem, ChartConfigJSON, SeriesItemConfig } from "../chartDashbo
 import EmptyGridItem from "../../../components/EmptyGridItem.svelte";
 import LWChart from "../../../components/lw-chart/LWChart.svelte";
 import type { ParsedFileContent } from "../../../utils/zipParser";
-import type { SeriesConfig } from "../../../utils/seriesMatcher";
-import { matchColumnsToSeries } from "../../../utils/seriesMatcher";
+import type { SeriesConfig } from "../../../utils/chartTypes";
 import { mapSeriesType } from "../../../components/lw-chart/logic/SeriesTypeMapper";
 import {
     getOptionsForType,
@@ -236,23 +235,81 @@ export function generateGridItemsFromConfig(
         }
     });
 
-    // 处理底部栏（回测结果）
+    // ========== 底部栏处理：从配置读取 ==========
     if (showBottomRow) {
-        const backtestFile = files.find(f =>
-            f.filename.includes("backtest_result.csv") ||
-            f.filename.includes("backtest_result.parquet")
-        );
+        if (config.bottomRowChart && config.bottomRowChart.length > 0) {
+            // 从配置读取底部栏定义
+            const allPaneSeries: SeriesConfig[][] = [];
 
-        if (backtestFile) {
-            const backtestSeries = matchColumnsToSeries(backtestFile);
-            if (backtestSeries.length > 0) {
+            config.bottomRowChart.forEach((paneSeriesList, paneIdx) => {
+                const paneSeries: SeriesConfig[] = [];
+
+                // 处理每个系列（复用主图逻辑）
+                paneSeriesList.forEach(itemConfig => {
+                    if (!itemConfig.show) return;
+                    if (!itemConfig.fileName || !itemConfig.dataName) return;
+
+                    const file = files.find(f => f.filename === itemConfig.fileName);
+                    if (!file) {
+                        console.warn(`[BottomRow] File not found: ${itemConfig.fileName}`);
+                        return;
+                    }
+                    if (!Array.isArray(file.data)) return;
+
+                    // 提取数据（与主图逻辑相同）
+                    let seriesData: any[] = [];
+
+                    if (typeof itemConfig.dataName === 'string') {
+                        const key = itemConfig.dataName;
+                        const rawData = file.data.map((row: any) => {
+                            const val = row[key];
+                            return {
+                                time: row.time,
+                                value: (val === null || val === undefined || isNaN(Number(val))) ? null : Number(val)
+                            };
+                        });
+
+                        seriesData = rawData.filter((d: any) => {
+                            const validTime = d.time !== null && d.time !== undefined;
+                            const validValue = d.value !== null && d.value !== undefined && !isNaN(d.value);
+                            return validTime && validValue;
+                        });
+                    } else if (Array.isArray(itemConfig.dataName)) {
+                        const keys = itemConfig.dataName as string[];
+                        seriesData = file.data.map((row: any) => {
+                            const newRow: any = { time: row.time };
+                            keys.forEach(k => {
+                                newRow[k] = row[k];
+                            });
+                            return newRow;
+                        });
+                    }
+
+                    const lwcType = mapSeriesType(itemConfig.type) as any;
+                    const options = getOptionsForType(itemConfig);
+
+                    paneSeries.push({
+                        type: lwcType,
+                        data: seriesData,
+                        pane: paneIdx,
+                        options: options,
+                        name: (typeof itemConfig.dataName === 'string') ? itemConfig.dataName : 'Data'
+                    });
+                });
+
+                if (paneSeries.length > 0) {
+                    allPaneSeries.push(paneSeries);
+                }
+            });
+
+            if (allPaneSeries.length > 0) {
                 gridItems.push({
-                    id: "bottom-row-backtest",
+                    id: "bottom-row-chart",
                     component: LWChart,
                     props: {
-                        series: backtestSeries,
+                        series: allPaneSeries.flat(),
                         fitContent: true,
-                        fitContentOnDblClick: true,  // 启用双击fitContent功能
+                        fitContentOnDblClick: true,
                         chartOptions: {
                             handleScroll: true,
                             handleScale: true,
@@ -265,15 +322,26 @@ export function generateGridItemsFromConfig(
                                 console.warn('[底栏点击] param.time为空，无法跳转');
                             }
                         } : undefined,
-                        onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister("bottom-row-backtest", api) : undefined,
-                        onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync("bottom-row-backtest", p) : undefined,
+                        onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister("bottom-row-chart", api) : undefined,
+                        onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync("bottom-row-chart", p) : undefined,
                     }
                 });
             } else {
-                gridItems.push({ id: "bottom-empty-data", component: EmptyGridItem, props: {} });
+                // 配置了底部栏但没有有效系列
+                gridItems.push({
+                    id: "bottom-empty-series",
+                    component: EmptyGridItem,
+                    props: {}
+                });
             }
         } else {
-            gridItems.push({ id: "bottom-empty-file", component: EmptyGridItem, props: {} });
+            // showBottomRow 为 true 但 bottomRowChart 未定义
+            console.warn('[BottomRow] showBottomRow is true but bottomRowChart is not defined');
+            gridItems.push({
+                id: "bottom-no-config",
+                component: EmptyGridItem,
+                props: {}
+            });
         }
     }
 

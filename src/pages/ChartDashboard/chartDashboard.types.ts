@@ -156,4 +156,8 @@ export interface ChartConfigJSON {
 
     // 三维数组: [Grid Slots][Panes][Series]
     chart: SeriesItemConfig[][][];
+
+    // 底部栏图表配置（可选）
+    // 如果 showBottomRow 为 true 但此字段为空，显示空白
+    bottomRowChart?: SeriesItemConfig[][];  // [Panes][Series]
 }

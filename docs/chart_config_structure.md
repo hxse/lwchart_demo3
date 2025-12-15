@@ -74,6 +74,10 @@ interface ChartConfigJSON {
   
   // 三维数组: [Grid Slots][Panes][Series]
   chart: SeriesItemConfig[][][];
+  
+  // 底部栏图表配置（可选）
+  // 如果 showBottomRow 为 true 但此字段为空，显示空白
+  bottomRowChart?: SeriesItemConfig[][];  // [Panes][Series]
 }
 ```
 
@@ -133,11 +137,100 @@ interface SeriesItemConfig {
 
 ---
 
+## 📊 bottomRowChart 字段说明
+
+### 概述
+
+`bottomRowChart` 是可选字段，用于显式定义底部栏的图表内容。
+
+**数据结构**: 二维数组 `[Panes][Series]`
+
+- **第一维（Panes）**: 底部栏中的不同窗格
+- **第二维（Series）**: 每个窗格中的系列
+
+### 与主图的区别
+
+| 字段 | 结构 | 说明 |
+|------|------|------|
+| `chart` | `[Slots][Panes][Series]` | 主图表，支持多个网格插槽 |
+| `bottomRowChart` | `[Panes][Series]` | 底部栏，仅一个固定区域 |
+
+### 配置示例
+
+#### 单 Pane 多 Series（最常见）
+
+```json
+{
+  "showBottomRow": true,
+  "bottomRowChart": [
+    [  // Pane 0
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_result.parquet",
+        "dataName": "balance",
+        "lineOpt": {
+          "color": "#2962FF",
+          "lineWidth": 2
+        }
+      },
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_result.parquet",
+        "dataName": "equity",
+        "lineOpt": {
+          "color": "#FF6D00",
+          "lineWidth": 2
+        }
+      }
+    ]
+  ]
+}
+```
+
+#### 多 Pane（分离显示）
+
+```json
+{
+  "showBottomRow": true,
+  "bottomRowChart": [
+    [  // Pane 0: Balance
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_result.parquet",
+        "dataName": "balance",
+        "lineOpt": {"color": "#2962FF", "lineWidth": 2}
+      }
+    ],
+    [  // Pane 1: Equity
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_result.parquet",
+        "dataName": "equity",
+        "lineOpt": {"color": "#FF6D00", "lineWidth": 2}
+      }
+    ]
+  ]
+}
+```
+
+### 降级处理
+
+如果 `showBottomRow: true` 但 `bottomRowChart` 未定义或为空：
+- ✅ 不会报错
+- ⚠️ 显示空白底部栏
+- 📝 控制台警告: `[BottomRow] showBottomRow is true but bottomRowChart is not defined`
+
+---
+
 ## 📝 完整配置示例
 
 ```json
 {
-  "template": "vertical-1x3",
+  "template": "vertical-1x2",
   "showBottomRow": true,
   "viewMode": "chart",
   "selectedInternalFileName": "data_dict/source_ohlcv_15m.parquet",
@@ -151,82 +244,55 @@ interface SeriesItemConfig {
           "type": "candle",
           "show": true,
           "fileName": "data_dict/source_ohlcv_15m.parquet",
-          "dataName": ["open", "high", "low", "close"],
-          "candleOpt": {
-            "upColor": "#26a69a",
-            "downColor": "#ef5350",
-            "borderVisible": false
-          }
+          "dataName": ["open", "high", "low", "close"]
         },
         {
-          "type": "histogram",
-          "show": true,
+          "type": "volume",
+          "show": false,
           "fileName": "data_dict/source_ohlcv_15m.parquet",
           "dataName": "volume",
-          "histogramOpt": {
-            "color": "#26a69a"
+          "volumeOpt": {
+            "priceScaleMarginTop": 0.9,
+            "adjustMainSeries": true
           }
         },
         {
           "type": "line",
           "show": true,
           "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
-          "dataName": "bbands_upper",
-          "lineOpt": {
-            "color": "#1f77b4",
-            "lineWidth": 2,
-            "lineStyle": 0
-          }
+          "dataName": "bbands_upper"
         },
         {
           "type": "line",
           "show": true,
           "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
-          "dataName": "bbands_middle",
-          "lineOpt": {
-            "color": "#ff7f0e",
-            "lineWidth": 2,
-            "lineStyle": 0
-          }
+          "dataName": "bbands_middle"
         },
         {
           "type": "line",
           "show": true,
           "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
-          "dataName": "bbands_lower",
-          "lineOpt": {
-            "color": "#2ca02c",
-            "lineWidth": 2,
-            "lineStyle": 0
-          }
+          "dataName": "bbands_lower"
         }
       ],
       
-      // ----- Pane 1: RSI副图 -----
+      // ----- Pane 1: 副图1 (BBands Bandwidth) -----
       [
         {
           "type": "line",
           "show": false,
           "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
-          "dataName": "bbands_bandwidth",
-          "lineOpt": {
-            "color": "#9467bd",
-            "lineWidth": 2
-          }
+          "dataName": "bbands_bandwidth"
         }
       ],
       
-      // ----- Pane 2: 另一个副图 -----
+      // ----- Pane 2: 副图2 (BBands Percent) -----
       [
         {
           "type": "line",
           "show": false,
           "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
-          "dataName": "bbands_percent",
-          "lineOpt": {
-            "color": "#8c564b",
-            "lineWidth": 2
-          }
+          "dataName": "bbands_percent"
         }
       ]
     ],
@@ -239,17 +305,17 @@ interface SeriesItemConfig {
           "type": "candle",
           "show": true,
           "fileName": "data_dict/source_ohlcv_1h.parquet",
-          "dataName": ["open", "high", "low", "close"],
-          "candleOpt": {
-            "upColor": "#26a69a",
-            "downColor": "#ef5350"
-          }
+          "dataName": ["open", "high", "low", "close"]
         },
         {
-          "type": "histogram",
-          "show": true,
+          "type": "volume",
+          "show": false,
           "fileName": "data_dict/source_ohlcv_1h.parquet",
-          "dataName": "volume"
+          "dataName": "volume",
+          "volumeOpt": {
+            "priceScaleMarginTop": 0.9,
+            "adjustMainSeries": true
+          }
         }
       ],
       
@@ -259,18 +325,14 @@ interface SeriesItemConfig {
           "type": "line",
           "show": true,
           "fileName": "backtest_results/indicators_ohlcv_1h.parquet",
-          "dataName": "rsi",
-          "lineOpt": {
-            "color": "#9467bd",
-            "lineWidth": 2
-          }
+          "dataName": "rsi"
         },
         {
           "type": "hline",
           "show": true,
           "hLineOpt": {
-            "value": 50.0,
             "color": "#faad14",
+            "value": 50.0,
             "label": "rsi_center"
           }
         }
@@ -288,10 +350,14 @@ interface SeriesItemConfig {
           "dataName": ["open", "high", "low", "close"]
         },
         {
-          "type": "histogram",
-          "show": true,
+          "type": "volume",
+          "show": false,
           "fileName": "data_dict/source_ohlcv_4h.parquet",
-          "dataName": "volume"
+          "dataName": "volume",
+          "volumeOpt": {
+            "priceScaleMarginTop": 0.9,
+            "adjustMainSeries": true
+          }
         },
         {
           "type": "line",
@@ -314,6 +380,32 @@ interface SeriesItemConfig {
           }
         }
       ]
+    ]
+  ],
+  
+  // ========== 底部栏配置 ==========
+  "bottomRowChart": [
+    [  // Pane 0: 回测结果
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_results/backtest_result.parquet",
+        "dataName": "balance",
+        "lineOpt": {
+          "color": "#2962FF",
+          "lineWidth": 2
+        }
+      },
+      {
+        "type": "line",
+        "show": true,
+        "fileName": "backtest_results/backtest_result.parquet",
+        "dataName": "equity",
+        "lineOpt": {
+          "color": "#FF6D00",
+          "lineWidth": 2
+        }
+      }
     ]
   ]
 }

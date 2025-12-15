@@ -10,7 +10,7 @@ import {
     type IChartApi,
     type ISeriesApi,
 } from "lightweight-charts";
-import type { SeriesConfig } from "../../../utils/seriesMatcher";
+import type { SeriesConfig } from "../../../utils/chartTypes";
 
 export class ChartController {
     private chart: IChartApi | null = null;

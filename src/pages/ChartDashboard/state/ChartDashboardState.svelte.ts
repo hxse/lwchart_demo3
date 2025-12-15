@@ -19,7 +19,7 @@ import EmptyGridItem from "../../../components/EmptyGridItem.svelte";
 
 import { ChartSyncManager } from "../logic/ChartSyncManager";
 import { loadZipFromBlob, convertToBlob } from "./FileLoader";
-import { applyOverrides, parseUrlOverrides } from "./OverrideManager";
+import { applyOverridesToConfig } from "./OverrideManager";
 
 export class ChartDashboardState {
     // --- 文件和 ZIP 状态 ---
@@ -174,6 +174,12 @@ export class ChartDashboardState {
             const result = await loadZipFromBlob(blob, this.isNotebookMode);
             this.files = result.files;
             this.config = result.config;
+
+            // 应用 Notebook Props 覆盖
+            if (propsOverride && this.config) {
+                console.log('[Override] Applying Props overrides:', propsOverride);
+                applyOverridesToConfig(this.config, propsOverride);
+            }
         } catch (e: any) {
             console.error("Load ZIP Error:", e);
             this.errorString = e.message;

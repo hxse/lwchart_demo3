@@ -6,6 +6,7 @@
 import type { DashboardOverride, ChartConfigJSON } from "../chartDashboard.types";
 import type { ParsedFileContent } from "../../../utils/zipParser";
 import { ChartDataProcessor } from "../logic/ChartDataProcessor";
+import { parseUrlOverrides, applyOverridesToConfig } from './OverrideManager';
 
 /**
  * ZIP 加载结果
@@ -39,25 +40,12 @@ export async function loadZipFromBlob(
         });
     }
 
-    // 在浏览器模式下，应用 URL 参数中的 show 覆盖
-    if (typeof window !== "undefined" && !isNotebookMode && result.config?.chart) {
-        const params = new URLSearchParams(window.location.search);
-
-        // 直接应用 show 覆盖到配置
-        if (params.has("show")) {
-            const showArray = params.getAll("show");
-            showArray.forEach(showStr => {
-                const parts = showStr.split(",");
-                if (parts.length === 4) {
-                    const [s, p, i, show] = parts.map(x => parseInt(x.trim()));
-                    if (!isNaN(s) && !isNaN(p) && !isNaN(i) && !isNaN(show)) {
-                        const series = result.config!.chart[s]?.[p]?.[i];
-                        if (series) {
-                            series.show = show === 1;
-                        }
-                    }
-                }
-            });
+    // 应用 URL 参数覆盖（浏览器模式）
+    if (typeof window !== "undefined" && !isNotebookMode && result.config) {
+        const urlOverrides = parseUrlOverrides();
+        if (Object.keys(urlOverrides).length > 0) {
+            console.log('[Override] Applying URL overrides:', urlOverrides);
+            applyOverridesToConfig(result.config, urlOverrides);
         }
     }
 

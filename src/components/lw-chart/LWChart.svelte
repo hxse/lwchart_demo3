@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import type { SeriesConfig } from "../../utils/seriesMatcher";
+  import type { SeriesConfig } from "../../utils/chartTypes";
   import { ChartController } from "./logic/ChartController";
 
   // Props

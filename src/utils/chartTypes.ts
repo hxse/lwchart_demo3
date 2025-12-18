@@ -10,6 +10,7 @@ export interface SeriesConfig {
     options?: any;
     name?: string;
     priceLines?: any[];
+    markers?: any[];  // 仓位进出场标记
 }
 
 export interface ChartConfig {

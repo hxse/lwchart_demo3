@@ -9,6 +9,7 @@ import {
     ColorType,
     type IChartApi,
     type ISeriesApi,
+    createSeriesMarkers,
 } from "lightweight-charts";
 import type { SeriesConfig } from "../../../utils/chartTypes";
 
@@ -72,6 +73,18 @@ export class ChartController {
 
             // Set Data
             series.setData(config.data);
+
+            // Set Markers（仓位进出场标记）
+            if (config.markers && Array.isArray(config.markers) && config.markers.length > 0) {
+                console.log(`[Markers Debug] ChartController: 准备设置 markers，数量: ${config.markers.length}, series名称: ${config.name}`);
+                console.log('[Markers Debug] markers 前3个:', config.markers.slice(0, 3));
+
+                // 使用 createSeriesMarkers API (Lightweight Charts v5)
+                createSeriesMarkers(series, config.markers);
+                console.log('[Markers Debug] createSeriesMarkers 调用完成');
+            } else {
+                console.log(`[Markers Debug] ChartController: 没有 markers 需要设置 (markers存在: ${!!config.markers}, 是数组: ${Array.isArray(config.markers)}, 长度: ${config.markers?.length || 0})`);
+            }
 
             // Handle Panes - attempting to use moveToPane or fallback
             // @ts-ignore

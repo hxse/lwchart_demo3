@@ -92,6 +92,7 @@ export function parseChartData(data: any[]): any[] {
         const timeTransform = detectTimeTransform(sampleRows);
 
         // 检测是否需要值转换（采样检测）
+        // 检查是否存在: bigint、NaN、字符串类型的值
         let needsValueTransform = false;
         for (const row of sampleRows) {
             for (const key of keys) {
@@ -99,7 +100,8 @@ export function parseChartData(data: any[]): any[] {
                 const val = row[key];
                 if (typeof val === 'bigint' ||
                     (typeof val === 'number' && isNaN(val)) ||
-                    (typeof val === 'string' && (val.toLowerCase() === 'nan' || val.toLowerCase() === 'null' || val.trim() === ''))) {
+                    typeof val === 'string') {
+                    // 只要有字符串类型的值，就需要转换（CSV 数据都是字符串）
                     needsValueTransform = true;
                     break;
                 }

@@ -14,6 +14,7 @@ import {
 import type { SeriesConfig } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
 import { SlTpLineSeries } from "../plugins/SlTpLineSeries";
+import { findClosestTime, calculateCenteredRange } from "./TimeScaleHelper";
 
 export class ChartController {
     private chart: IChartApi | null = null;
@@ -39,6 +40,8 @@ export class ChartController {
         if (!this.chart) return;
 
         const startTime = performance.now();
+        const perfStats = { add: 0, data: 0, markers: 0, options: 0 };
+        const typeCount: Record<string, number> = {};
 
         // 1. Cleanup existing script-managed series map (references)
         this.seriesMap.forEach((series) => {
@@ -49,6 +52,12 @@ export class ChartController {
         // 2. Add new series
         configs.forEach((config, index) => {
             let series: ISeriesApi<any>;
+
+            // 统计类型
+            typeCount[config.type] = (typeCount[config.type] || 0) + 1;
+
+            // 添加系列计时
+            const addStart = performance.now();
 
             // Define series type
             switch (config.type) {
@@ -77,17 +86,21 @@ export class ChartController {
                 default:
                     series = this.chart!.addSeries(LineSeries, config.options);
             }
+            perfStats.add += performance.now() - addStart;
 
-            // Set Data
+            // Set Data 计时
+            const dataStart = performance.now();
             series.setData(config.data);
+            perfStats.data += performance.now() - dataStart;
 
-            // Set Markers（仓位进出场标记）
+            // Set Markers 计时
             if (config.markers && Array.isArray(config.markers) && config.markers.length > 0) {
-                // 使用 createSeriesMarkers API (Lightweight Charts v5)
+                const markersStart = performance.now();
                 createSeriesMarkers(series, config.markers);
+                perfStats.markers += performance.now() - markersStart;
             }
 
-            // Handle Panes - attempting to use moveToPane or fallback
+            // Handle Panes
             // @ts-ignore
             if (typeof series.moveToPane === 'function') {
                 // @ts-ignore
@@ -95,12 +108,12 @@ export class ChartController {
             }
 
             // Apply price scale margins if specified
+            const optStart = performance.now();
             if (config.options?.scaleMargins) {
                 try {
                     series.priceScale().applyOptions({
                         scaleMargins: config.options.scaleMargins
                     });
-                    // ScaleMargins应用完成（静默）
                 } catch (e) {
                     console.warn('[ScaleMargins] Failed to apply:', e);
                 }
@@ -112,6 +125,7 @@ export class ChartController {
                     series.createPriceLine(lineOptions);
                 });
             }
+            perfStats.options += performance.now() - optStart;
 
             // Store in map
             this.seriesMap.set(config.name || `series_${index}`, series);
@@ -130,7 +144,15 @@ export class ChartController {
         const totalPoints = configs.reduce((sum, config) =>
             sum + (Array.isArray(config.data) ? config.data.length : 0), 0);
 
-        console.log(`[Performance] Chart series update: ${(performance.now() - startTime).toFixed(2)}ms - ${configs.length} series, ${totalPoints} points`);
+        // 构建类型统计字符串
+        const typeStr = Object.entries(typeCount).map(([k, v]) => `${k}:${v}`).join(', ');
+
+        console.log(
+            `[Performance] Chart update: ${(performance.now() - startTime).toFixed(1)}ms ` +
+            `(add: ${perfStats.add.toFixed(1)}ms, data: ${perfStats.data.toFixed(1)}ms, ` +
+            `markers: ${perfStats.markers.toFixed(1)}ms, opts: ${perfStats.options.toFixed(1)}ms) ` +
+            `- ${configs.length} series [${typeStr}], ${totalPoints} points`
+        );
     }
 
     /**
@@ -207,86 +229,33 @@ export class ChartController {
     scrollToTime(time: number) {
         if (!this.chart) return;
 
-
-
         const timeScale = this.chart.timeScale();
 
-        // 尝试直接转换时间
+        // 1. 尝试直接转换完整时间
         let coordinate = timeScale.timeToCoordinate(time as any);
 
-
-        // 如果找不到精确时间，查找最接近且不超过目标时间的时间
+        // 2. 如果找不到精确时间，查找最接近的时间
         if (coordinate === null) {
-
-
-            let closestTime: number | null = null;
-            let closestDistance = Infinity;
-
-            // 遍历所有series，找到最接近的时间
-            this.seriesMap.forEach((series) => {
-                try {
-                    // 获取series的所有数据
-                    // @ts-ignore - 访问内部API获取数据
-                    const data = series.data?.() || [];
-
-                    // 遍历数据找到最接近且不超过目标时间的时间
-                    for (const point of data) {
-                        const pointTime = point.time;
-                        if (typeof pointTime === 'number' && pointTime <= time) {
-                            const distance = time - pointTime;
-                            if (distance < closestDistance) {
-                                closestDistance = distance;
-                                closestTime = pointTime;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn('[scrollToTime] 无法获取series数据:', e);
-                }
-            });
-
+            const closestTime = findClosestTime(this.seriesMap, time);
             if (closestTime !== null) {
-
                 coordinate = timeScale.timeToCoordinate(closestTime as any);
-
-            } else {
-                console.warn('[scrollToTime] 无法找到合适的时间，跳转失败');
-                return;
             }
         }
 
         if (coordinate === null) {
-            console.warn('[scrollToTime] coordinate为null，跳转失败');
+            console.warn('[scrollToTime] 无法找到合适的时间坐标，跳转取消');
             return;
         }
 
+        // 3. 转换为逻辑索引
         const logicalIndex = timeScale.coordinateToLogical(coordinate);
+        if (logicalIndex === null) return;
 
-        if (logicalIndex === null) {
-            console.warn('[scrollToTime] logicalIndex为null，跳转失败');
-            return;
+        // 4. 计算居中范围并应用
+        const newRange = calculateCenteredRange(timeScale, logicalIndex);
+        if (newRange) {
+            timeScale.setVisibleLogicalRange(newRange);
         }
-
-        // 获取当前可见范围的宽度，保持当前的缩放级别
-        const visibleRange = timeScale.getVisibleLogicalRange();
-        if (!visibleRange) return;
-
-        const barSpacing = visibleRange.to - visibleRange.from;
-
-
-        // 直接设置范围，确保宽度精确等于barSpacing
-        const halfSpacing = barSpacing / 2;
-        const newRange = {
-            from: logicalIndex - halfSpacing,
-            to: logicalIndex - halfSpacing + barSpacing  // 直接相加，避免浮点数精度问题
-        };
-
-
-
-        // 将目标时间（逻辑索引）居中显示
-        timeScale.setVisibleLogicalRange(newRange);
-
-
     }
 
     applyOptions(options: any) {

@@ -26,6 +26,10 @@ export interface DashboardOverride {
 
     // Legend 显示覆盖: 使用三维坐标 "slotIdx,paneIdx,seriesIdx,show"
     showInLegend?: string[];
+
+    // 风险线 Legend 显示控制: "sl,tp,tsl" (1=显示, 0=隐藏)
+    // 例如 "1,1,0" 表示显示 SL 和 TP，隐藏 TSL
+    showRiskLegend?: string;
 }
 
 // --- Chart Config & Series Options ---
@@ -166,4 +170,7 @@ export interface ChartConfigJSON {
     // 底部栏图表配置（可选）
     // 如果 showBottomRow 为 true 但此字段为空，显示空白
     bottomRowChart?: SeriesItemConfig[][];  // [Panes][Series]
+
+    // 风险线 Legend 显示设置 (从 override 传递给 GridItemBuilder)
+    showRiskLegend?: [boolean, boolean, boolean];
 }

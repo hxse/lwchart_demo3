@@ -40,7 +40,8 @@ function buildPaneSeries(
     paneSeriesList: SeriesItemConfig[],
     paneIdx: number,
     slotIdx: number,
-    files: ParsedFileContent[]
+    files: ParsedFileContent[],
+    showRiskLegend?: [boolean, boolean, boolean]
 ): SeriesConfig[] {
     const paneSeries: SeriesConfig[] = [];
 
@@ -139,7 +140,7 @@ function buildPaneSeries(
 
         // 添加 SL/TP/TSL 价格线（仅第一个主图，使用拆分模块）
         if (slotIdx === 0 && isMainSeries && backtestFile && Array.isArray(backtestFile.data)) {
-            const slTpSeries = buildSlTpLines(backtestFile.data, paneIdx);
+            const slTpSeries = buildSlTpLines(backtestFile.data, paneIdx, showRiskLegend);
             paneSeries.push(...slTpSeries);
         }
     });
@@ -226,7 +227,7 @@ export function generateGridItemsFromConfig(
 
         // 遍历 Panes
         slotPanes.forEach((paneSeriesList, paneIdx) => {
-            const paneSeries = buildPaneSeries(paneSeriesList, paneIdx, slotIdx, files);
+            const paneSeries = buildPaneSeries(paneSeriesList, paneIdx, slotIdx, files, config.showRiskLegend);
 
             // 调整 Volume 边距
             adjustVolumeMargins(paneSeries, paneSeriesList);

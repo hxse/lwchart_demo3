@@ -1,4 +1,4 @@
-import JSZip from "jszip";
+import { unzipSync } from "fflate";
 import { parquetReadObjects } from "hyparquet";
 import { compressors } from "hyparquet-compressors";
 
@@ -186,26 +186,22 @@ function formatPreview(data: any, type: string): string {
  */
 export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
     try {
-        const zip = new JSZip();
-        const zipContent = await zip.loadAsync(blob);
+        const arrayBuffer = await blob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
 
+        // fflate.unzipSync 是同步且极快的
+        const unzipped = unzipSync(uint8Array);
         const files: ParsedFileContent[] = [];
-        const fileEntries = Object.entries(zipContent.files);
 
-        // 只处理文件，跳过目录
-        const filePromises = fileEntries
-            .filter(([_, file]) => !file.dir)
-            .map(async ([filename, file]) => {
+        // 只处理文件，跳过可能的目录（fflate 返回的对象键是完整路径）
+        const filePromises = Object.entries(unzipped)
+            .filter(([filename, data]) => data.length > 0) // 简单过滤潜在目录
+            .map(async ([filename, fileData]) => {
                 try {
                     const lowerFilename = filename.toLowerCase();
+                    const headBuffer = fileData.buffer;
 
                     // Pre-read first 4 bytes to check for Parquet magic number "PAR1"
-                    // This handles cases where file is named .csv but contains Parquet data
-                    const headBuffer = await file.async("arraybuffer");
-                    // Note: downloading whole file as arraybuffer is expensive if we only want 4 bytes, 
-                    // but JSZip file.async doesn't support partial read easily without internals.
-                    // Given these are small files, it's acceptable.
-
                     const magic = new Uint8Array(headBuffer.slice(0, 4));
                     const isParquetMagic =
                         magic[0] === 0x50 && // P
@@ -215,9 +211,8 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
 
                     if (isParquetMagic || lowerFilename.endsWith(".parquet")) {
                         // Parquet文件
-                        const data = await parseParquetContent(headBuffer);
+                        const data = await parseParquetContent(headBuffer as ArrayBuffer);
                         const preview = formatPreview(data, "parquet");
-                        // If checking magic, use original filename but treat as parquet
                         return {
                             filename,
                             type: "parquet" as const,
@@ -226,7 +221,7 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                         };
                     } else if (lowerFilename.endsWith(".csv")) {
                         // CSV文件
-                        const text = new TextDecoder().decode(headBuffer);
+                        const text = new TextDecoder().decode(fileData);
                         const data = await parseCsvContent(text);
                         const preview = formatPreview(data, "csv");
                         return {
@@ -237,7 +232,7 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                         };
                     } else if (lowerFilename.endsWith(".json")) {
                         // JSON文件
-                        const text = new TextDecoder().decode(headBuffer);
+                        const text = new TextDecoder().decode(fileData);
                         const data = await parseJsonContent(text);
                         const preview = formatPreview(data, "json");
                         return {
@@ -248,7 +243,7 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
                         };
                     } else {
                         // 其他文件类型，作为纯文本处理
-                        const text = new TextDecoder().decode(headBuffer);
+                        const text = new TextDecoder().decode(fileData);
                         const preview =
                             text.length > 1000 ? text.substring(0, 997) + "..." : text;
                         return {

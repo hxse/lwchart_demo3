@@ -3,15 +3,14 @@
  * 负责处理来自 URL 参数和 props 的配置覆盖
  */
 
-import type { ChartConfigJSON, DashboardOverride } from "../chartDashboard.types";
+import type { ChartConfigJSON, DashboardOverride, SeriesItemConfig } from "../chartDashboard.types";
 
 /**
- * 直接应用覆盖到配置对象（不触发响应式更新）
- * 用于在配置加载时立即应用覆盖，避免多次渲染
+ * 内部共享逻辑：应用覆盖到配置对象
  * @param config 图表配置对象
  * @param overrideConfig 覆盖配置
  */
-export function applyOverridesToConfig(
+function applyOverrideLogic(
     config: ChartConfigJSON,
     overrideConfig: DashboardOverride
 ): void {
@@ -27,38 +26,64 @@ export function applyOverridesToConfig(
     if (overrideConfig.selectedInternalFileName) {
         config.selectedInternalFileName = overrideConfig.selectedInternalFileName;
     }
+    if (overrideConfig.showRiskLegend) {
+        // 统一使用字符串格式 "1,1,0"
+        const parts = overrideConfig.showRiskLegend.split(',').map(s => s.trim());
+        if (parts.length === 3) {
+            config.showRiskLegend = parts.map(p => p === '1') as [boolean, boolean, boolean];
+        }
+    }
+
+    if (!config.chart) return;
 
     // 处理显示/隐藏覆盖
-    if (overrideConfig.show && config.chart) {
-        overrideConfig.show.forEach(coordStr => {
-            const parts = coordStr.split(',').map(s => s.trim());
-            if (parts.length === 4) {
-                const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p));
-                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
-                    const series = config.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
-                    if (series) {
-                        series.show = showVal === 1;
-                    }
-                }
-            }
-        });
+    if (overrideConfig.show) {
+        applyShowOverrides(config.chart, overrideConfig.show, 'show');
     }
 
     // 处理 Legend 显示覆盖
-    if (overrideConfig.showInLegend && config.chart) {
-        overrideConfig.showInLegend.forEach(coordStr => {
-            const parts = coordStr.split(',').map(s => s.trim());
-            if (parts.length === 4) {
-                const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p));
-                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
-                    const series = config.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
-                    if (series) {
-                        series.showInLegend = showVal === 1;
+    if (overrideConfig.showInLegend) {
+        applyShowOverrides(config.chart, overrideConfig.showInLegend, 'showInLegend');
+    }
+}
+
+/**
+ * 辅助：应用显示相关的三维坐标覆盖
+ */
+function applyShowOverrides(
+    chartConfig: SeriesItemConfig[][][],
+    overrides: string[],
+    key: 'show' | 'showInLegend'
+): void {
+    overrides.forEach(coordStr => {
+        const parts = coordStr.split(',').map(s => s.trim());
+        if (parts.length === 4) {
+            const [slotIdx, paneIdx, seriesIdx, val] = parts.map(p => parseInt(p));
+            if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(val)) {
+                const series = chartConfig[slotIdx]?.[paneIdx]?.[seriesIdx];
+                if (series) {
+                    if (key === 'show') {
+                        series.show = val === 1;
+                    } else {
+                        series.showInLegend = val === 1;
                     }
                 }
             }
-        });
-    }
+        }
+    });
+}
+
+/**
+ * 直接应用覆盖到配置对象（不触发响应式更新）
+ * 用于在配置加载时立即应用覆盖，避免多次渲染
+ * @param config 图表配置对象
+ * @param overrideConfig 覆盖配置
+ */
+export function applyOverridesToConfig(
+    config: ChartConfigJSON,
+    overrideConfig: DashboardOverride
+): void {
+    applyOverrideLogic(config, overrideConfig);
 }
 
 /**
@@ -73,61 +98,9 @@ export function applyOverrides(
     overrideConfig: DashboardOverride
 ): ChartConfigJSON {
     // 创建新对象以触发响应式
-    const nextConfig = { ...config };
-
-    if (overrideConfig.template) {
-        nextConfig.template = overrideConfig.template;
-    }
-    if (overrideConfig.showBottomRow !== undefined) {
-        nextConfig.showBottomRow = overrideConfig.showBottomRow;
-    }
-    if (overrideConfig.viewMode) {
-        nextConfig.viewMode = overrideConfig.viewMode;
-    }
-    if (overrideConfig.selectedInternalFileName) {
-        nextConfig.selectedInternalFileName = overrideConfig.selectedInternalFileName;
-    }
-
-    // 处理显示/隐藏覆盖（三维坐标格式）
-    if (overrideConfig.show && nextConfig.chart) {
-        overrideConfig.show.forEach(coordStr => {
-            const parts = coordStr.split(',').map(s => s.trim());
-            if (parts.length === 4) {
-                const slotIdx = parseInt(parts[0]);
-                const paneIdx = parseInt(parts[1]);
-                const seriesIdx = parseInt(parts[2]);
-                const showVal = parseInt(parts[3]);
-
-                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
-                    const series = nextConfig.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
-                    if (series) {
-                        series.show = showVal === 1;
-                    }
-                }
-            }
-        });
-    }
-
-    // 处理 Legend 显示覆盖
-    if (overrideConfig.showInLegend && nextConfig.chart) {
-        overrideConfig.showInLegend.forEach(coordStr => {
-            const parts = coordStr.split(',').map(s => s.trim());
-            if (parts.length === 4) {
-                const slotIdx = parseInt(parts[0]);
-                const paneIdx = parseInt(parts[1]);
-                const seriesIdx = parseInt(parts[2]);
-                const showVal = parseInt(parts[3]);
-
-                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
-                    const series = nextConfig.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
-                    if (series) {
-                        series.showInLegend = showVal === 1;
-                    }
-                }
-            }
-        });
-    }
-
+    // 使用深拷贝以确保状态完全独立，避免副作用
+    const nextConfig = JSON.parse(JSON.stringify(config));
+    applyOverrideLogic(nextConfig, overrideConfig);
     return nextConfig;
 }
 
@@ -201,6 +174,18 @@ export function parseUrlOverrides(): DashboardOverride {
             override.showInLegend = legendArray;
         }
     }
+
+    // 处理 showRiskLegend=sl,tp,tsl (0或1)
+    if (params.has("showRiskLegend")) {
+        const val = params.get("showRiskLegend");
+        if (val) {
+            const parts = val.split(',').map(s => s.trim());
+            if (parts.length === 3) {
+                override.showRiskLegend = val;
+            }
+        }
+    }
+
 
     return override;
 }

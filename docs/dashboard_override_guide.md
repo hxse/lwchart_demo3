@@ -44,6 +44,9 @@ interface DashboardOverride {
 
     // Legend 价格数值显示控制, 和show格式相同
     showInLegend?: string[];
+
+    // 风险线 Legend 显示控制: "sl,tp,tsl" (1=显示, 0=隐藏)
+    showRiskLegend?: string;
 }
 ```
 
@@ -262,6 +265,7 @@ http://localhost:5173/chart-dashboard?参数名=参数值&参数名=参数值
 | `selectedInternalFileName` | string | 选中的内部文件 | `selectedInternalFileName=data.csv` |
 | `selectedZipFileName` | string | 自动加载的ZIP文件 | `selectedZipFileName=result.zip` |
 | `show` | string | 指标显示控制 | `show=0,0,0,1` |
+| `showRiskLegend` | string | 风险线 Legend 控制 | `showRiskLegend=1,0,0` |
 
 ### 基础用法
 
@@ -354,6 +358,22 @@ http://localhost:5173/chart-dashboard
 3. 显示图表模式
 4. 默认选中 `source_ohlcv_15m.parquet`
 5. 隐藏3个布林带指标
+
+### ⚠️ 风险线控制专用参数
+
+由于 SL/TP/TSL 线是根据回测结果动态生成的，不属于常规指标三维坐标控制范围，因此提供了专门的参数：
+
+#### `showRiskLegend` 参数详解
+
+**格式**: `showRiskLegend=sl,tp,tsl` (0=隐藏, 1=显示)
+
+- **sl**: Stop Loss (止损线)
+- **tp**: Take Profit (止盈线)
+- **tsl**: Trailing Stop Loss (移动止损线)
+
+**示例**:
+- `?showRiskLegend=1,0,0`: 只显示 SL 线在 Legend 中的值。
+- `?showRiskLegend=0,0,0`: 隐藏所有风险线在 Legend 中的显示。
 
 ---
 

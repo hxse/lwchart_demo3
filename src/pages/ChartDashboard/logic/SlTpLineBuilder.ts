@@ -8,13 +8,13 @@ import type { SlTpData } from "../../../components/lw-chart/plugins/SlTpLineSeri
 
 /** 预定义的 SL/TP/TSL 线配置 */
 const SL_TP_LINE_CONFIGS = [
-    { field: 'sl_pct_price_long', name: 'SL%多', color: '#ff4444', lineStyle: 0, isLong: true },
-    { field: 'tp_atr_price_long', name: 'TP-ATR多', color: '#ff8800', lineStyle: 0, isLong: true },
-    { field: 'tsl_atr_price_long', name: 'TSL-ATR多', color: '#B8860B', lineStyle: 2, isLong: true },
+    { field: 'sl_pct_price_long', name: 'L-SL-PCT', color: '#ff4444', lineStyle: 0, isLong: true },
+    { field: 'tp_atr_price_long', name: 'L-TP-ATR', color: '#ff8800', lineStyle: 0, isLong: true },
+    { field: 'tsl_atr_price_long', name: 'L-TSL-ATR', color: '#B8860B', lineStyle: 2, isLong: true },
 
-    { field: 'sl_pct_price_short', name: 'SL%空', color: '#9944ff', lineStyle: 0, isLong: false },
-    { field: 'tp_atr_price_short', name: 'TP-ATR空', color: '#4488ff', lineStyle: 0, isLong: false },
-    { field: 'tsl_atr_price_short', name: 'TSL-ATR空', color: '#008B8B', lineStyle: 2, isLong: false },
+    { field: 'sl_pct_price_short', name: 'S-SL-PCT', color: '#9944ff', lineStyle: 0, isLong: false },
+    { field: 'tp_atr_price_short', name: 'S-TP-ATR', color: '#4488ff', lineStyle: 0, isLong: false },
+    { field: 'tsl_atr_price_short', name: 'S-TSL-ATR', color: '#008B8B', lineStyle: 2, isLong: false },
 ];
 
 /**
@@ -106,11 +106,13 @@ function buildSlTpData(
  * 
  * @param backtestData backtest_result 数据数组
  * @param paneIdx 所属 Pane 索引
+ * @param showRiskLegend 风险线 Legend 显示控制 [sl, tp, tsl]
  * @returns 价格线系列配置
  */
 export function buildSlTpLines(
     backtestData: any[],
-    paneIdx: number
+    paneIdx: number,
+    showRiskLegend?: [boolean, boolean, boolean]
 ): SeriesConfig[] {
     const result: SeriesConfig[] = [];
 
@@ -128,6 +130,19 @@ export function buildSlTpLines(
         const lineData = buildSlTpData(backtestData, lineConfig.field, lineConfig.isLong);
 
         if (lineData) {
+            // 默认全部显示 legend
+            const legendFlags = showRiskLegend ?? [true, true, true];
+            let showInLegend = true;
+
+            // 修复判定逻辑：tsl 包含 sl，所以必须先判定 tsl
+            if (lineConfig.field.includes('tsl_')) {
+                showInLegend = legendFlags[2];
+            } else if (lineConfig.field.includes('sl_')) {
+                showInLegend = legendFlags[0];
+            } else if (lineConfig.field.includes('tp_')) {
+                showInLegend = legendFlags[1];
+            }
+
             result.push({
                 type: 'SlTpLine',
                 data: lineData,
@@ -137,7 +152,8 @@ export function buildSlTpLines(
                     lineWidth: 2,
                     lineStyle: lineConfig.lineStyle,
                 },
-                name: lineConfig.name
+                name: lineConfig.name,
+                showInLegend: showInLegend
             });
         }
     });

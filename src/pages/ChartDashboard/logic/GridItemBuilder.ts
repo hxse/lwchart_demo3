@@ -50,7 +50,7 @@ function buildPaneSeries(
 
     // 处理普通系列
     seriesItems.forEach(itemConfig => {
-        if (!itemConfig.show) return;
+        if (!itemConfig.show && !itemConfig.showInLegend) return;
         if (!itemConfig.fileName || !itemConfig.dataName) return;
 
         // 严格匹配文件
@@ -73,7 +73,10 @@ function buildPaneSeries(
 
         // 获取选项
         const lwcType = mapSeriesType(itemConfig.type) as any;
-        let options = getOptionsForType(itemConfig);
+        let options = {
+            ...getOptionsForType(itemConfig),
+            visible: !!itemConfig.show
+        };
 
         // 处理附属的价格线
         const priceLines: any[] = [];
@@ -101,22 +104,13 @@ function buildPaneSeries(
         // 生成仓位标记（仅对第一个主图）
         let markers: any[] | undefined = undefined;
         let backtestFile: ParsedFileContent | undefined = undefined;
-        console.log(`[Markers Debug] 处理 series: slotIdx=${slotIdx}, type=${itemConfig.type}, lwcType=${lwcType}, isMainSeries=${isMainSeries}, dataLength=${file.data.length}`);
-
         if (slotIdx === 0 && isMainSeries && file.data.length > 0) {
-            if (paneIdx === 0) {
-                console.log('[Markers Debug] 所有可用文件:', files.map(f => f.filename));
-            }
-
             // 查找 backtest_result 文件
             backtestFile = files.find(f => {
                 const filename = f.filename.toLowerCase();
                 return filename.endsWith('backtest_result.parquet') ||
                     filename.endsWith('backtest_result.csv');
             });
-
-            console.log(`[Markers Debug] 主图检测 - fileName: ${itemConfig.fileName}`);
-            console.log(`[Markers Debug] 查找 backtest_result 文件: ${backtestFile ? backtestFile.filename : '未找到'}`);
 
             if (backtestFile && Array.isArray(backtestFile.data) && backtestFile.data.length > 0) {
                 const firstRow = backtestFile.data[0];
@@ -126,23 +120,9 @@ function buildPaneSeries(
                     'exit_long_price' in firstRow ||
                     'exit_short_price' in firstRow;
 
-                console.log(`[Markers Debug] backtest_result 文件字段检测 - hasPositionFields: ${hasPositionFields}`);
-
                 if (hasPositionFields) {
-                    console.log('[Markers Debug] 开始从 backtest_result 生成 markers...');
                     markers = generatePositionMarkers(backtestFile.data);
-                    console.log(`[Markers Debug] markers 生成完成，数量: ${markers?.length || 0}`);
-                } else {
-                    console.log('[Markers Debug] backtest_result 文件中未检测到仓位字段');
                 }
-            } else {
-                console.log('[Markers Debug] 未找到 backtest_result.parquet 或 .csv 文件，或文件为空');
-            }
-        } else {
-            if (slotIdx !== 0 && isMainSeries) {
-                console.log('[Markers Debug] 不是第一个周期窗口，跳过 markers 生成');
-            } else if (!isMainSeries) {
-                console.log('[Markers Debug] 不是主图类型，跳过 markers 生成');
             }
         }
 
@@ -153,7 +133,8 @@ function buildPaneSeries(
             options: finalOptions,
             priceLines: priceLines,
             markers: markers,
-            name: extracted.name
+            name: extracted.name,
+            showInLegend: itemConfig.showInLegend ?? false
         });
 
         // 添加 SL/TP/TSL 价格线（仅第一个主图，使用拆分模块）
@@ -272,6 +253,7 @@ export function generateGridItemsFromConfig(
                     },
                     onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister(chartId, api) : undefined,
                     onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync(chartId, p) : undefined,
+                    enableLegend: true,
                 }
             });
         } else {

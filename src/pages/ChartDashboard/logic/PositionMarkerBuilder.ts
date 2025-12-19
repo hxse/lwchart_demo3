@@ -12,16 +12,7 @@ export function generatePositionMarkers(fileData: any[]): any[] {
     const perfStart = performance.now();
     const markers: any[] = [];
 
-    console.log('[Markers Debug] generatePositionMarkers 被调用，数据行数:', fileData.length);
-    if (fileData.length > 0) {
-        const firstRow = fileData[0];
-        console.log('[Markers Debug] 第一行数据字段:', Object.keys(firstRow));
-        console.log('[Markers Debug] 检查仓位字段:');
-        console.log('  - entry_long_price:', firstRow.entry_long_price);
-        console.log('  - entry_short_price:', firstRow.entry_short_price);
-        console.log('  - exit_long_price:', firstRow.exit_long_price);
-        console.log('  - exit_short_price:', firstRow.exit_short_price);
-    }
+
 
     // 状态追踪变量
     let prevLongEntry: number | null = null;
@@ -129,10 +120,6 @@ export function generatePositionMarkers(fileData: any[]): any[] {
 
     const perfEnd = performance.now();
 
-    // 统计生成的标记
-    const validMarkers = markers.filter(m => m.position !== undefined);
-    const emptyMarkers = markers.filter(m => m.position === undefined);
-    console.log(`[Markers Debug] 生成完成 - 总数: ${markers.length}, 有效标记: ${validMarkers.length}, 空标记: ${emptyMarkers.length}`);
     console.log(`[Performance] Position markers generation: ${(perfEnd - perfStart).toFixed(2)}ms - ${markers.length} markers from ${fileData.length} bars`);
 
     return markers;

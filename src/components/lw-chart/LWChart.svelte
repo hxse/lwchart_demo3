@@ -19,6 +19,7 @@
       fitContent: () => void;
     }) => void; // Sync registration
     onClick?: (param: any) => void; // New prop: Click callback
+    enableLegend?: boolean; // 是否启用 Legend 展示
   }
 
   let {
@@ -29,6 +30,7 @@
     onCrosshairMove,
     onRegister,
     onClick,
+    enableLegend = false,
   }: Props = $props();
 
   // State
@@ -57,7 +59,6 @@
   };
 
   onMount(() => {
-    const startTime = performance.now();
     if (!chartContainer) return;
 
     // 1. Initialize Chart
@@ -66,6 +67,11 @@
     // Apply custom options
     if (Object.keys(chartOptions).length > 0) {
       controller.applyOptions(chartOptions);
+    }
+
+    // Enable Legend if requested
+    if (enableLegend) {
+      controller.enableLegend(chartContainer);
     }
 
     // Register API if requested
@@ -143,10 +149,6 @@
       controller.resetTimeScale();
     }
 
-    console.log(
-      `[Performance] Chart mount: ${(performance.now() - startTime).toFixed(2)}ms`,
-    );
-
     // Cleanup
     return () => {
       resizeObserver.disconnect();
@@ -163,7 +165,6 @@
 
   // React to series config changes
   $effect(() => {
-    const startTime = performance.now();
     const currentSeriesConfig = series;
 
     untrack(() => {
@@ -182,10 +183,6 @@
         controller.fitContent();
       }
     });
-
-    console.log(
-      `[Performance] Chart effect update: ${(performance.now() - startTime).toFixed(2)}ms`,
-    );
   });
 </script>
 

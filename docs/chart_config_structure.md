@@ -49,7 +49,7 @@ Chart 配置 [Grid Slots][Panes][Series]
 
 3. **第三层 - Series（系列）**
    - 同一个 Pane 内的多条线/蜡烛图/直方图
-   - 共享同一个价格轴和时间轴
+   - 共享同一个价格轴 and 时间轴
    - 例: `[蜡烛图, 布林带上轨, 布林带中轨, 布林带下轨]`
 
 ---
@@ -90,19 +90,23 @@ interface SeriesItemConfig {
   idx?: number;
   
   // 系列类型
-  type: "candle" | "line" | "histogram" | "area" | "baseline" | "bar" | "hline" | "vline";
+  type: "candle" | "line" | "histogram" | "volume" | "area" | "baseline" | "bar" | "hline" | "vline";
   
   // 数据源（hline/vline 类型时可不填）
   fileName?: string;
   dataName?: string | string[];
   
-  // 是否显示
+  // 是否显示该系列
   show: boolean;
+
+  // 是否在 Legend 中显示该系列的值（默认 false）
+  showInLegend?: boolean;
   
   // 各类型专用选项（根据 type 只填写对应的选项）
   candleOpt?: CandleOption;
   lineOpt?: LineOption;
   histogramOpt?: HistogramOption;
+  volumeOpt?: VolumeOption;
   areaOpt?: AreaOption;
   baselineOpt?: BaselineOption;
   barOpt?: BarOption;
@@ -233,23 +237,27 @@ interface SeriesItemConfig {
   "template": "vertical-1x2",
   "showBottomRow": true,
   "viewMode": "chart",
-  "selectedInternalFileName": "data_dict/source_ohlcv_15m.parquet",
-  
+  "selectedInternalFileName": "data_dict/source_ohlcv_15m.csv"
   "chart": [
-    // ========== Grid Slot 0: 15分钟周期 ==========
     [
-      // ----- Pane 0: 主图 -----
       [
         {
           "type": "candle",
           "show": true,
-          "fileName": "data_dict/source_ohlcv_15m.parquet",
-          "dataName": ["open", "high", "low", "close"]
+          "showInLegend": true,
+          "fileName": "data_dict/source_ohlcv_15m.csv",
+          "dataName": [
+            "open",
+            "high",
+            "low",
+            "close"
+          ]
         },
         {
           "type": "volume",
           "show": false,
-          "fileName": "data_dict/source_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "data_dict/source_ohlcv_15m.csv",
           "dataName": "volume",
           "volumeOpt": {
             "priceScaleMarginTop": 0.9,
@@ -259,58 +267,63 @@ interface SeriesItemConfig {
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_15m.csv",
           "dataName": "bbands_upper"
         },
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_15m.csv",
           "dataName": "bbands_middle"
         },
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_15m.csv",
           "dataName": "bbands_lower"
         }
       ],
-      
-      // ----- Pane 1: 副图1 (BBands Bandwidth) -----
       [
         {
           "type": "line",
           "show": false,
-          "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_15m.csv",
           "dataName": "bbands_bandwidth"
         }
       ],
-      
-      // ----- Pane 2: 副图2 (BBands Percent) -----
       [
         {
           "type": "line",
           "show": false,
-          "fileName": "backtest_results/indicators_ohlcv_15m.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_15m.csv",
           "dataName": "bbands_percent"
         }
       ]
     ],
-    
-    // ========== Grid Slot 1: 1小时周期 ==========
     [
-      // ----- Pane 0: 主图 -----
       [
         {
           "type": "candle",
           "show": true,
-          "fileName": "data_dict/source_ohlcv_1h.parquet",
-          "dataName": ["open", "high", "low", "close"]
+          "showInLegend": true,
+          "fileName": "data_dict/source_ohlcv_1h.csv",
+          "dataName": [
+            "open",
+            "high",
+            "low",
+            "close"
+          ]
         },
         {
           "type": "volume",
           "show": false,
-          "fileName": "data_dict/source_ohlcv_1h.parquet",
+          "showInLegend": false,
+          "fileName": "data_dict/source_ohlcv_1h.csv",
           "dataName": "volume",
           "volumeOpt": {
             "priceScaleMarginTop": 0.9,
@@ -318,18 +331,18 @@ interface SeriesItemConfig {
           }
         }
       ],
-      
-      // ----- Pane 1: RSI副图 -----
       [
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_1h.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_1h.csv",
           "dataName": "rsi"
         },
         {
           "type": "hline",
           "show": true,
+          "showInLegend": false,
           "hLineOpt": {
             "color": "#faad14",
             "value": 50.0,
@@ -338,21 +351,25 @@ interface SeriesItemConfig {
         }
       ]
     ],
-    
-    // ========== Grid Slot 2: 4小时周期 ==========
     [
-      // ----- Pane 0: 主图 -----
       [
         {
           "type": "candle",
           "show": true,
-          "fileName": "data_dict/source_ohlcv_4h.parquet",
-          "dataName": ["open", "high", "low", "close"]
+          "showInLegend": true,
+          "fileName": "data_dict/source_ohlcv_4h.csv",
+          "dataName": [
+            "open",
+            "high",
+            "low",
+            "close"
+          ]
         },
         {
           "type": "volume",
           "show": false,
-          "fileName": "data_dict/source_ohlcv_4h.parquet",
+          "showInLegend": false,
+          "fileName": "data_dict/source_ohlcv_4h.csv",
           "dataName": "volume",
           "volumeOpt": {
             "priceScaleMarginTop": 0.9,
@@ -362,7 +379,8 @@ interface SeriesItemConfig {
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_4h.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_4h.csv",
           "dataName": "sma_0",
           "lineOpt": {
             "color": "#1f77b4",
@@ -372,7 +390,8 @@ interface SeriesItemConfig {
         {
           "type": "line",
           "show": true,
-          "fileName": "backtest_results/indicators_ohlcv_4h.parquet",
+          "showInLegend": false,
+          "fileName": "backtest_results/indicators_ohlcv_4h.csv",
           "dataName": "sma_1",
           "lineOpt": {
             "color": "#ff7f0e",
@@ -382,14 +401,13 @@ interface SeriesItemConfig {
       ]
     ]
   ],
-  
-  // ========== 底部栏配置 ==========
   "bottomRowChart": [
-    [  // Pane 0: 回测结果
+    [
       {
         "type": "line",
         "show": true,
-        "fileName": "backtest_results/backtest_result.parquet",
+        "showInLegend": false,
+        "fileName": "backtest_results/backtest_result.csv",
         "dataName": "balance",
         "lineOpt": {
           "color": "#2962FF",
@@ -399,7 +417,8 @@ interface SeriesItemConfig {
       {
         "type": "line",
         "show": true,
-        "fileName": "backtest_results/backtest_result.parquet",
+        "showInLegend": false,
+        "fileName": "backtest_results/backtest_result.csv",
         "dataName": "equity",
         "lineOpt": {
           "color": "#FF6D00",
@@ -416,19 +435,6 @@ interface SeriesItemConfig {
 ## 🎯 配置最佳实践
 
 ### 1. 只输出有值的选项字段
-
-❌ **不推荐**（冗余）:
-```json
-{
-  "type": "line",
-  "candleOpt": null,
-  "histogramOpt": null,
-  "lineOpt": {
-    "color": "#1f77b4"
-  },
-  "hLineOpt": null
-}
-```
 
 ✅ **推荐**（简洁）:
 ```json
@@ -451,20 +457,18 @@ interface SeriesItemConfig {
   "show": true,
   "fileName": "ohlcv.parquet",
   "dataName": ["open", "high", "low", "close"]
-  // 不填 candleOpt，将使用默认颜色和样式
 }
 ```
 
-### 3. Pane 分组建议
-
-- **主图 Pane**: 通常包含价格数据（Candle/Bar）+ 价格相关指标（MA, Bollinger等）
-- **副图 Pane**: 每个独立的技术指标占一个 Pane（RSI, MACD, Volume等）
-- **空 Pane**: 如果某个 Pane 暂时没有数据，传空数组 `[]`
-
-### 4. show 字段用法
+### 3. show 字段用法
 
 - `show: true` - 系列会被渲染
-- `show: false` - 系列不会被渲染，但仍保留在配置中（方便后续动态显示）
+- `show: false` - 系列不会被渲染
+
+### 4. showInLegend 字段用法
+
+- `showInLegend: true` - 该系列的值会显示在图表左上角的 Legend 中
+- `showInLegend: false` - 不在 Legend 中显示（默认值）
 
 ---
 
@@ -473,7 +477,7 @@ interface SeriesItemConfig {
 浏览器模式支持通过 URL 参数覆盖部分配置：
 
 ```
-http://.../?template=grid-2x2&viewMode=table&selectedZipFileName=result.zip&isShow=2,0&isShow=5,1
+http://.../?template=grid-2x2&viewMode=table&selectedZipFileName=result.zip&show=0,0,0,1&showInLegend=0,0,0,1
 ```
 
 ### 支持的覆盖参数
@@ -484,12 +488,14 @@ http://.../?template=grid-2x2&viewMode=table&selectedZipFileName=result.zip&isSh
 | `viewMode` | 覆盖视图模式 | `viewMode=table` |
 | `selectedInternalFileName` | 选中的内部文件 | `selectedInternalFileName=data.csv` |
 | `selectedZipFileName` | 自动加载的ZIP文件名 | `selectedZipFileName=result.zip` |
-| `isShow` | 覆盖系列显隐状态 | `isShow=2,0` (隐藏idx=2的系列) |
+| `show` | 覆盖指标显隐（三维坐标） | `show=0,0,0,1` |
+| `showInLegend` | 覆盖 Legend 显隐（三维坐标） | `showInLegend=0,0,0,1` |
 
-> **注意**: `isShow` 参数使用的是运行时分配的 `idx` 索引，格式为 `idx,status`（1=显示, 0=隐藏）。
+> **注意**: `show` 和 `showInLegend` 使用相同的坐标格式：`slotIdx,paneIdx,seriesIdx,status`（1=显示/启用, 0=隐藏/禁用）。
 
 ---
 
 ## 📚 相关文档
 
 - [图表系列选项参考](./chart_series_options.md) - 各图表类型的详细选项字段说明
+- [Dashboard Override 配置覆盖使用指南](./dashboard_override_guide.md) - 详细了解覆盖机制

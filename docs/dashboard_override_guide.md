@@ -41,6 +41,9 @@ interface DashboardOverride {
     
     // 指标显隐控制（三维坐标格式）
     show?: string[];
+
+    // Legend 价格数值显示控制, 和show格式相同
+    showInLegend?: string[];
 }
 ```
 

@@ -15,7 +15,7 @@ import type {
 } from "../../../pages/ChartDashboard/chartDashboard.types";
 
 /** 默认顶部边距 */
-export const DEFAULT_SCALE_MARGIN_TOP = 0.02;
+export const DEFAULT_SCALE_MARGIN_TOP = 0.005;
 
 /** 默认底部边距 */
 export const DEFAULT_SCALE_MARGIN_BOTTOM = 0.02;

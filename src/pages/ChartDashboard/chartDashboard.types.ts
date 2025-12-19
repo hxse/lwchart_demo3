@@ -23,6 +23,9 @@ export interface DashboardOverride {
     // 指标显隐覆盖: 使用三维坐标 "slotIdx,paneIdx,seriesIdx,show"
     // 例: ["0,0,0,1", "0,1,0,0"] 表示 Slot0-Pane0-Series0显示, Slot0-Pane1-Series0隐藏
     show?: string[];
+
+    // Legend 显示覆盖: 使用三维坐标 "slotIdx,paneIdx,seriesIdx,show"
+    showInLegend?: string[];
 }
 
 // --- Chart Config & Series Options ---
@@ -134,6 +137,9 @@ export interface SeriesItemConfig {
 
     // 是否显示
     show: boolean;
+
+    // 是否在 Legend 中显示
+    showInLegend?: boolean;
 
     // 各类型专用选项（根据 type 只填写对应的选项）
     candleOpt?: CandleOption;

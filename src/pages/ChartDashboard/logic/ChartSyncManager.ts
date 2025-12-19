@@ -1,12 +1,32 @@
 export class ChartSyncManager {
     private chartApis = new Map<string, any>();
+    private ready = false;
+    private lastCrosshairParam: { sourceId: string, param: any } | null = null;
 
     register(id: string, api: any) {
         // console.log(`[Sync] Registering chart ${id}`);
         this.chartApis.set(id, api);
     }
 
+    setReady(isReady: boolean = true) {
+        this.ready = isReady;
+
+        // 核心优化：开启同步时，如果有缓存的事件（通常是初始化期间触发的），立即广播一次
+        if (isReady && this.lastCrosshairParam) {
+            const { sourceId, param } = this.lastCrosshairParam;
+            for (const [id, api] of this.chartApis) {
+                if (id !== sourceId) {
+                    api.setCrosshair(param);
+                }
+            }
+        }
+    }
+
     sync(sourceId: string, param: any) {
+        // 更新缓存
+        this.lastCrosshairParam = { sourceId, param };
+
+        if (!this.ready) return;
         // Broadcast to all other charts
         for (const [id, api] of this.chartApis) {
             if (id !== sourceId) {
@@ -61,5 +81,7 @@ export class ChartSyncManager {
 
     clear() {
         this.chartApis.clear();
+        this.ready = false;
+        this.lastCrosshairParam = null;
     }
 }

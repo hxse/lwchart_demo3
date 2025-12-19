@@ -161,6 +161,20 @@ export class ChartDashboardState {
                 }
             }
         });
+
+        // 核心修复：图表加载完成后开启同步
+        $effect(() => {
+            if (!this.loading && !this.parsing && this.gridItems.length > 0) {
+                // 延迟一小段时间确保所有 LWChart 的 onMount 执行完毕
+                const timer = setTimeout(() => {
+                    this.syncManager.setReady(true);
+                    console.log("[Sync] All charts ready, synchronization enabled.");
+                }, 300);
+                return () => clearTimeout(timer);
+            } else {
+                this.syncManager.setReady(false);
+            }
+        });
     }
 
     /**
@@ -177,7 +191,6 @@ export class ChartDashboardState {
 
             // 应用 Notebook Props 覆盖
             if (propsOverride && this.config) {
-                console.log('[Override] Applying Props overrides:', propsOverride);
                 applyOverridesToConfig(this.config, propsOverride);
             }
         } catch (e: any) {

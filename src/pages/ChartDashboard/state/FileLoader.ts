@@ -44,7 +44,6 @@ export async function loadZipFromBlob(
     if (typeof window !== "undefined" && !isNotebookMode && result.config) {
         const urlOverrides = parseUrlOverrides();
         if (Object.keys(urlOverrides).length > 0) {
-            console.log('[Override] Applying URL overrides:', urlOverrides);
             applyOverridesToConfig(result.config, urlOverrides);
         }
     }

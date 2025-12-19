@@ -43,6 +43,22 @@ export function applyOverridesToConfig(
             }
         });
     }
+
+    // 处理 Legend 显示覆盖
+    if (overrideConfig.showInLegend && config.chart) {
+        overrideConfig.showInLegend.forEach(coordStr => {
+            const parts = coordStr.split(',').map(s => s.trim());
+            if (parts.length === 4) {
+                const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p));
+                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                    const series = config.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
+                    if (series) {
+                        series.showInLegend = showVal === 1;
+                    }
+                }
+            }
+        });
+    }
 }
 
 /**
@@ -73,7 +89,6 @@ export function applyOverrides(
     }
 
     // 处理显示/隐藏覆盖（三维坐标格式）
-    // 格式: "slotIdx,paneIdx,seriesIdx,show" 例如 "0,1,2,1"
     if (overrideConfig.show && nextConfig.chart) {
         overrideConfig.show.forEach(coordStr => {
             const parts = coordStr.split(',').map(s => s.trim());
@@ -84,15 +99,29 @@ export function applyOverrides(
                 const showVal = parseInt(parts[3]);
 
                 if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
-                    const slot = nextConfig.chart[slotIdx];
-                    if (slot) {
-                        const pane = slot[paneIdx];
-                        if (pane) {
-                            const series = pane[seriesIdx];
-                            if (series) {
-                                series.show = showVal === 1;
-                            }
-                        }
+                    const series = nextConfig.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
+                    if (series) {
+                        series.show = showVal === 1;
+                    }
+                }
+            }
+        });
+    }
+
+    // 处理 Legend 显示覆盖
+    if (overrideConfig.showInLegend && nextConfig.chart) {
+        overrideConfig.showInLegend.forEach(coordStr => {
+            const parts = coordStr.split(',').map(s => s.trim());
+            if (parts.length === 4) {
+                const slotIdx = parseInt(parts[0]);
+                const paneIdx = parseInt(parts[1]);
+                const seriesIdx = parseInt(parts[2]);
+                const showVal = parseInt(parts[3]);
+
+                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                    const series = nextConfig.chart[slotIdx]?.[paneIdx]?.[seriesIdx];
+                    if (series) {
+                        series.showInLegend = showVal === 1;
                     }
                 }
             }
@@ -138,15 +167,12 @@ export function parseUrlOverrides(): DashboardOverride {
     }
 
     // 处理 show=slotIdx,paneIdx,seriesIdx,show (允许多个)
-    // 例: &show=0,0,0,1&show=0,1,0,0
-    // 格式: slotIdx,paneIdx,seriesIdx,show(0/1)
     if (params.has("show")) {
         const showArray: string[] = [];
         const shows = params.getAll("show");
         shows.forEach(val => {
             const parts = val.split(',');
             if (parts.length === 4) {
-                // 验证格式
                 const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p.trim()));
                 if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
                     showArray.push(val);
@@ -155,6 +181,24 @@ export function parseUrlOverrides(): DashboardOverride {
         });
         if (showArray.length > 0) {
             override.show = showArray;
+        }
+    }
+
+    // 处理 showInLegend=slotIdx,paneIdx,seriesIdx,show (允许多个)
+    if (params.has("showInLegend")) {
+        const legendArray: string[] = [];
+        const entries = params.getAll("showInLegend");
+        entries.forEach(val => {
+            const parts = val.split(',');
+            if (parts.length === 4) {
+                const [slotIdx, paneIdx, seriesIdx, showVal] = parts.map(p => parseInt(p.trim()));
+                if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(showVal)) {
+                    legendArray.push(val);
+                }
+            }
+        });
+        if (legendArray.length > 0) {
+            override.showInLegend = legendArray;
         }
     }
 

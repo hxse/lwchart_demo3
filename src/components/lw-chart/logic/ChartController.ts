@@ -12,10 +12,13 @@ import {
     createSeriesMarkers,
 } from "lightweight-charts";
 import type { SeriesConfig } from "../../../utils/chartTypes";
+import { LegendManager } from "./LegendManager";
+import { SlTpLineSeries } from "../plugins/SlTpLineSeries";
 
 export class ChartController {
     private chart: IChartApi | null = null;
     private seriesMap = new Map<string, ISeriesApi<any>>();
+    private legendManager: LegendManager | null = null;
 
     init(container: HTMLElement, options?: Record<string, any>) {
         this.chart = createChart(container, {
@@ -67,6 +70,10 @@ export class ChartController {
                 case "Histogram":
                     series = this.chart!.addSeries(HistogramSeries, config.options);
                     break;
+                case "SlTpLine":
+                    // @ts-ignore
+                    series = this.chart!.addCustomSeries(new SlTpLineSeries(), config.options);
+                    break;
                 default:
                     series = this.chart!.addSeries(LineSeries, config.options);
             }
@@ -76,14 +83,8 @@ export class ChartController {
 
             // Set Markers（仓位进出场标记）
             if (config.markers && Array.isArray(config.markers) && config.markers.length > 0) {
-                console.log(`[Markers Debug] ChartController: 准备设置 markers，数量: ${config.markers.length}, series名称: ${config.name}`);
-                console.log('[Markers Debug] markers 前3个:', config.markers.slice(0, 3));
-
                 // 使用 createSeriesMarkers API (Lightweight Charts v5)
                 createSeriesMarkers(series, config.markers);
-                console.log('[Markers Debug] createSeriesMarkers 调用完成');
-            } else {
-                console.log(`[Markers Debug] ChartController: 没有 markers 需要设置 (markers存在: ${!!config.markers}, 是数组: ${Array.isArray(config.markers)}, 长度: ${config.markers?.length || 0})`);
             }
 
             // Handle Panes - attempting to use moveToPane or fallback
@@ -114,15 +115,36 @@ export class ChartController {
 
             // Store in map
             this.seriesMap.set(config.name || `series_${index}`, series);
+
+            // Register for Legend if enabled and requested
+            if (this.legendManager && config.showInLegend) {
+                this.legendManager.registerSeries(series, {
+                    name: config.name || "Unnamed",
+                    color: (config.options as any)?.color || "#2962FF",
+                    showInLegend: true
+                });
+            }
         });
 
-        // Calculate data points per series for performance tracking
-        const seriesInfo = configs.map(config => {
-            const points = Array.isArray(config.data) ? config.data.length : 0;
-            return `${config.name || 'unnamed'}: ${points} points`;
-        }).join(', ');
+        // 计算总数据点数用于性能追踪
+        const totalPoints = configs.reduce((sum, config) =>
+            sum + (Array.isArray(config.data) ? config.data.length : 0), 0);
 
-        console.log(`[Performance] Chart series update: ${(performance.now() - startTime).toFixed(2)}ms (${configs.length} series) - ${seriesInfo}`);
+        console.log(`[Performance] Chart series update: ${(performance.now() - startTime).toFixed(2)}ms - ${configs.length} series, ${totalPoints} points`);
+    }
+
+    /**
+     * 启用 Legend 功能
+     * @param container 图表容器
+     */
+    public enableLegend(container: HTMLElement): void {
+        if (this.legendManager) return;
+        this.legendManager = new LegendManager();
+        this.legendManager.create(container);
+
+        this.chart?.subscribeCrosshairMove((param) => {
+            this.legendManager?.update(param);
+        });
     }
 
     resize(width: number, height: number, forceFit: boolean = false) {
@@ -272,6 +294,10 @@ export class ChartController {
     }
 
     destroy() {
+        if (this.legendManager) {
+            this.legendManager.destroy();
+            this.legendManager = null;
+        }
         if (this.chart) {
             this.chart.remove();
             this.chart = null;

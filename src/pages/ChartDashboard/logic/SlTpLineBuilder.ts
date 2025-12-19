@@ -1,83 +1,112 @@
 /**
- * SL/TP/TSL 价格线构建器
- * 负责从 backtest_result 数据生成 Stop Loss / Take Profit / Trailing Stop Loss 价格线
+ * SL/TP/TSL 专用数据构建器
+ * 适配 SlTpLineSeries 插件
  */
 
 import type { SeriesConfig } from "../../../utils/chartTypes";
-
-/** SL/TP/TSL 价格线配置 */
-interface SlTpLineConfig {
-    field: string;       // 数据字段名
-    name: string;        // 系列名称
-    color: string;       // 线条颜色
-    lineStyle: number;   // 线型 (0=实线, 2=虚线)
-}
+import type { SlTpData } from "../../../components/lw-chart/plugins/SlTpLineSeries";
 
 /** 预定义的 SL/TP/TSL 线配置 */
-const SL_TP_LINE_CONFIGS: SlTpLineConfig[] = [
-    { field: 'sl_pct_price', name: 'SL%', color: '#ff4444', lineStyle: 0 },      // 实线红色
-    { field: 'tp_pct_price', name: 'TP%', color: '#44ff44', lineStyle: 0 },      // 实线绿色
-    { field: 'tsl_pct_price', name: 'TSL%', color: '#4444ff', lineStyle: 2 },    // 虚线蓝色
-    { field: 'sl_atr_price', name: 'SL-ATR', color: '#ff8844', lineStyle: 0 },   // 实线橙红
-    { field: 'tp_atr_price', name: 'TP-ATR', color: '#44ff88', lineStyle: 0 },   // 实线青绿
-    { field: 'tsl_atr_price', name: 'TSL-ATR', color: '#8844ff', lineStyle: 2 }, // 虚线紫色
+const SL_TP_LINE_CONFIGS = [
+    { field: 'sl_pct_price_long', name: 'SL%多', color: '#ff4444', lineStyle: 0, isLong: true },
+    { field: 'tp_atr_price_long', name: 'TP-ATR多', color: '#ff8800', lineStyle: 0, isLong: true },
+    { field: 'tsl_atr_price_long', name: 'TSL-ATR多', color: '#B8860B', lineStyle: 2, isLong: true },
+
+    { field: 'sl_pct_price_short', name: 'SL%空', color: '#9944ff', lineStyle: 0, isLong: false },
+    { field: 'tp_atr_price_short', name: 'TP-ATR空', color: '#4488ff', lineStyle: 0, isLong: false },
+    { field: 'tsl_atr_price_short', name: 'TSL-ATR空', color: '#008B8B', lineStyle: 2, isLong: false },
 ];
 
 /**
- * 将连续的有效数据点拆分为多个片段（遇到 null/NaN 断开）
- * @param data 原始数据数组
- * @param field 字段名
- * @returns 片段数组，每个片段是连续有效的数据点
+ * 辅助：检查是否为有效数字
  */
-function splitIntoSegments(data: any[], field: string): { time: any; value: number }[][] {
-    const segments: { time: any; value: number }[][] = [];
-    let currentSegment: { time: any; value: number }[] = [];
-    let nullEncountered = 0;
-    const segmentStarts: number[] = [];
+function isValidNumber(val: any): boolean {
+    return val !== null && val !== undefined && !isNaN(Number(val));
+}
 
-    data.forEach((row: any, idx: number) => {
+/**
+ * 将回测数据转换为 SlTpLineSeries 格式
+ * 
+ * 单点检测逻辑：
+ * - 连续情况：当前bar有进场+离场，且上一根有进场但无离场（正在持仓中）
+ * - 单点情况：当前bar有进场+离场，且不满足连续条件（上一根无进场或已离场）
+ * - break：价格无有效值
+ */
+function buildSlTpData(
+    data: any[],
+    field: string,
+    isLong: boolean
+): SlTpData[] | null {
+    let hasValidData = false;
+    const result: SlTpData[] = [];
+
+    const entryField = isLong ? 'entry_long_price' : 'entry_short_price';
+    const exitField = isLong ? 'exit_long_price' : 'exit_short_price';
+
+    for (let i = 0; i < data.length; i++) {
+        const row = data[i];
         const val = row[field];
-        const isValid = val !== null && val !== undefined && !isNaN(Number(val));
 
-        if (isValid) {
-            // 开始新片段
-            if (currentSegment.length === 0) {
-                segmentStarts.push(idx);
-            }
-            currentSegment.push({
-                time: row.time,
-                value: Number(val)
-            });
-        } else {
-            // 遇到null，保存当前片段
-            nullEncountered++;
-            if (currentSegment.length > 0) {
-                segments.push([...currentSegment]);
-                currentSegment = [];
+        // 无有效值 = break，跳过（渲染器自动断开）
+        if (!isValidNumber(val)) {
+            continue;
+        }
+
+        hasValidData = true;
+
+        // 当前 bar 的进出场情况
+        const hasEntry = isValidNumber(row[entryField]);
+        const hasExit = isValidNumber(row[exitField]);
+
+        // 默认不是单点，也不是断点
+        let isSinglePoint = false;
+        let isBreak = false;
+
+        // 只有同时有进场和离场时才需要判断单点
+        if (hasEntry && hasExit) {
+            // 检查上一根 bar 的情况
+            if (i > 0) {
+                const prevRow = data[i - 1];
+                const prevHasEntry = isValidNumber(prevRow[entryField]);
+                const prevHasExit = isValidNumber(prevRow[exitField]);
+
+                // 连续情况：上一根有进场且无离场（正在持仓中）
+                // 单点情况：上一根无进场，或者上一根已离场
+                if (prevHasEntry && !prevHasExit) {
+                    // 连续线段的最后一根，不是单点
+                    isSinglePoint = false;
+                } else {
+                    // 真正的单点
+                    isSinglePoint = true;
+                }
+            } else {
+                // 第一根 bar 就有进出场，是单点
+                isSinglePoint = true;
             }
         }
-    });
 
-    // 保存最后一个片段
-    if (currentSegment.length > 0) {
-        segments.push(currentSegment);
-    }
+        // 如果当前 bar 有离场，标记为断点
+        if (hasExit) {
+            isBreak = true;
+        }
 
-    console.log(`[SL/TP/TSL] ${field} - null值: ${nullEncountered}, 片段数: ${segments.length}`);
-    if (segments.length > 0) {
-        segments.forEach((seg, i) => {
-            console.log(`  片段${i}: ${seg.length}点, 起始索引${segmentStarts[i] || '?'}`);
+        result.push({
+            time: row.time,
+            value: Number(val),
+            isSinglePoint: isSinglePoint,
+            isBreak: isBreak
         });
     }
 
-    return segments;
+    return hasValidData ? result : null;
 }
 
 /**
  * 从 backtest 数据构建 SL/TP/TSL 价格线系列
- * @param backtestData backtest_result 文件的数据数组
+ * 
+ * @param backtestData backtest_result 数据数组
  * @param paneIdx 所属 Pane 索引
- * @returns 价格线系列数组
+ * @returns 价格线系列配置
  */
 export function buildSlTpLines(
     backtestData: any[],
@@ -95,27 +124,22 @@ export function buildSlTpLines(
             return;
         }
 
-        // 拆分成多个连续片段
-        const segments = splitIntoSegments(backtestData, lineConfig.field);
+        // 使用 SlTpLine 自定义系列
+        const lineData = buildSlTpData(backtestData, lineConfig.field, lineConfig.isLong);
 
-        // 为每个片段创建独立系列
-        segments.forEach((segmentData, segIdx) => {
-            if (segmentData.length > 0) {
-                result.push({
-                    type: 'Line',
-                    data: segmentData,
-                    pane: paneIdx,
-                    options: {
-                        color: lineConfig.color,
-                        lineWidth: 2,  // 加粗线条
-                        lineStyle: lineConfig.lineStyle,
-                        lastValueVisible: false,
-                        priceLineVisible: false,
-                    },
-                    name: segments.length > 1 ? `${lineConfig.name}_${segIdx}` : lineConfig.name
-                });
-            }
-        });
+        if (lineData) {
+            result.push({
+                type: 'SlTpLine',
+                data: lineData,
+                pane: paneIdx,
+                options: {
+                    color: lineConfig.color,
+                    lineWidth: 2,
+                    lineStyle: lineConfig.lineStyle,
+                },
+                name: lineConfig.name
+            });
+        }
     });
 
     return result;

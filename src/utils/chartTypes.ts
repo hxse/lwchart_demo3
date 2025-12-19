@@ -4,13 +4,14 @@
  */
 
 export interface SeriesConfig {
-    type: "Candlestick" | "Line" | "Area" | "Baseline" | "Histogram" | "Bar";
+    type: "Candlestick" | "Line" | "Area" | "Baseline" | "Histogram" | "Bar" | "SlTpLine";
     data: any[];
     pane: number; // 0 for main, 1+ for extra panes
     options?: any;
     name?: string;
     priceLines?: any[];
     markers?: any[];  // 仓位进出场标记
+    showInLegend?: boolean;
 }
 
 export interface ChartConfig {

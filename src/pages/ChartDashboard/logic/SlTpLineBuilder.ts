@@ -8,13 +8,27 @@ import type { SlTpData } from "../../../components/lw-chart/plugins/SlTpLineSeri
 
 /** 预定义的 SL/TP/TSL 线配置 */
 const SL_TP_LINE_CONFIGS = [
+    // Long
     { field: 'sl_pct_price_long', name: 'L-SL-PCT', color: '#ff4444', lineStyle: 0, isLong: true },
-    { field: 'tp_atr_price_long', name: 'L-TP-ATR', color: '#ff8800', lineStyle: 0, isLong: true },
-    { field: 'tsl_atr_price_long', name: 'L-TSL-ATR', color: '#B8860B', lineStyle: 2, isLong: true },
+    { field: 'sl_atr_price_long', name: 'L-SL-ATR', color: '#ff4444', lineStyle: 0, isLong: true },
 
+    { field: 'tp_pct_price_long', name: 'L-TP-PCT', color: '#ff8800', lineStyle: 0, isLong: true },
+    { field: 'tp_atr_price_long', name: 'L-TP-ATR', color: '#ff8800', lineStyle: 0, isLong: true },
+
+    { field: 'tsl_pct_price_long', name: 'L-TSL-PCT', color: '#B8860B', lineStyle: 2, isLong: true },
+    { field: 'tsl_atr_price_long', name: 'L-TSL-ATR', color: '#B8860B', lineStyle: 2, isLong: true },
+    { field: 'tsl_psar_price_long', name: 'L-TSL-PSAR', color: '#9B30FF', lineStyle: 2, isLong: true },
+
+    // Short
     { field: 'sl_pct_price_short', name: 'S-SL-PCT', color: '#9944ff', lineStyle: 0, isLong: false },
+    { field: 'sl_atr_price_short', name: 'S-SL-ATR', color: '#9944ff', lineStyle: 0, isLong: false },
+
+    { field: 'tp_pct_price_short', name: 'S-TP-PCT', color: '#4488ff', lineStyle: 0, isLong: false },
     { field: 'tp_atr_price_short', name: 'S-TP-ATR', color: '#4488ff', lineStyle: 0, isLong: false },
+
+    { field: 'tsl_pct_price_short', name: 'S-TSL-PCT', color: '#008B8B', lineStyle: 2, isLong: false },
     { field: 'tsl_atr_price_short', name: 'S-TSL-ATR', color: '#008B8B', lineStyle: 2, isLong: false },
+    { field: 'tsl_psar_price_short', name: 'S-TSL-PSAR', color: '#00CED1', lineStyle: 2, isLong: false },
 ];
 
 /**
@@ -106,13 +120,13 @@ function buildSlTpData(
  * 
  * @param backtestData backtest_result 数据数组
  * @param paneIdx 所属 Pane 索引
- * @param showRiskLegend 风险线 Legend 显示控制 [sl, tp, tsl]
+ * @param showRiskLegend 风险线 Legend 显示控制 [sl, tp, tsl, psar]
  * @returns 价格线系列配置
  */
 export function buildSlTpLines(
     backtestData: any[],
     paneIdx: number,
-    showRiskLegend?: [boolean, boolean, boolean]
+    showRiskLegend?: [boolean, boolean, boolean, boolean]
 ): SeriesConfig[] {
     const result: SeriesConfig[] = [];
 
@@ -131,11 +145,13 @@ export function buildSlTpLines(
 
         if (lineData) {
             // 默认全部显示 legend
-            const legendFlags = showRiskLegend ?? [true, true, true];
+            const legendFlags = showRiskLegend ?? [true, true, true, true];
             let showInLegend = true;
 
-            // 修复判定逻辑：tsl 包含 sl，所以必须先判定 tsl
-            if (lineConfig.field.includes('tsl_')) {
+            // 判定逻辑：先判定最具体的 psar，再判定 tsl（因为 tsl 包含 sl）
+            if (lineConfig.field.includes('tsl_psar_')) {
+                showInLegend = legendFlags[3];
+            } else if (lineConfig.field.includes('tsl_')) {
                 showInLegend = legendFlags[2];
             } else if (lineConfig.field.includes('sl_')) {
                 showInLegend = legendFlags[0];

@@ -490,7 +490,7 @@ http://.../?template=grid-2x2&viewMode=table&selectedZipFileName=result.zip&show
 | `selectedZipFileName` | 自动加载的ZIP文件名 | `selectedZipFileName=result.zip` |
 | `show` | 覆盖指标显隐（三维坐标） | `show=0,0,0,1` |
 | `showInLegend` | 覆盖 Legend 显隐（三维坐标） | `showInLegend=0,0,0,1` |
-| `showRiskLegend` | 风险线 Legend 显示 (sl,tp,tsl) | `showRiskLegend=1,0,0` |
+| `showRiskLegend` | 风险线 Legend 显示 (sl,tp,tsl,psar) | `showRiskLegend=1,0,0,1` |
 
 > **注意**: `show` 和 `showInLegend` 使用相同的坐标格式：`slotIdx,paneIdx,seriesIdx,status`（1=显示/启用, 0=隐藏/禁用）。
 

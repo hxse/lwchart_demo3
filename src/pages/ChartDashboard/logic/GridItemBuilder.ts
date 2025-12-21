@@ -41,7 +41,7 @@ function buildPaneSeries(
     paneIdx: number,
     slotIdx: number,
     files: ParsedFileContent[],
-    showRiskLegend?: [boolean, boolean, boolean]
+    showRiskLegend?: [boolean, boolean, boolean, boolean]
 ): SeriesConfig[] {
     const paneSeries: SeriesConfig[] = [];
 

@@ -27,10 +27,10 @@ function applyOverrideLogic(
         config.selectedInternalFileName = overrideConfig.selectedInternalFileName;
     }
     if (overrideConfig.showRiskLegend) {
-        // 统一使用字符串格式 "1,1,0"
+        // 统一使用字符串格式 "1,1,0,1" (sl,tp,tsl,psar)
         const parts = overrideConfig.showRiskLegend.split(',').map(s => s.trim());
-        if (parts.length === 3) {
-            config.showRiskLegend = parts.map(p => p === '1') as [boolean, boolean, boolean];
+        if (parts.length === 4) {
+            config.showRiskLegend = parts.map(p => p === '1') as [boolean, boolean, boolean, boolean];
         }
     }
 
@@ -175,12 +175,12 @@ export function parseUrlOverrides(): DashboardOverride {
         }
     }
 
-    // 处理 showRiskLegend=sl,tp,tsl (0或1)
+    // 处理 showRiskLegend=sl,tp,tsl,psar (0或1)
     if (params.has("showRiskLegend")) {
         const val = params.get("showRiskLegend");
         if (val) {
             const parts = val.split(',').map(s => s.trim());
-            if (parts.length === 3) {
+            if (parts.length === 4) {
                 override.showRiskLegend = val;
             }
         }

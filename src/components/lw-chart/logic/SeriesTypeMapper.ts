@@ -3,7 +3,7 @@
  * 负责将用户友好的类型名称转换为 LWChart 内部使用的类型
  */
 
-export type LWChartSeriesType = "Candlestick" | "Line" | "Histogram" | "Area" | "Baseline" | "Bar" | "HLine" | "VLine";
+export type LWChartSeriesType = "Candlestick" | "Line" | "Histogram" | "Area" | "Baseline" | "Bar" | "HLine" | "VLine" | "SlTpLine" | "PositionArrow";
 
 /**
  * 将用户友好的类型名称转换为 LWChart 类型
@@ -32,6 +32,10 @@ export function mapSeriesType(type: string): LWChartSeriesType {
             return "HLine";
         case "vline":
             return "VLine";
+        case "sltpline":
+            return "SlTpLine";
+        case "positionarrow":
+            return "PositionArrow";
         default:
             return "Line";
     }

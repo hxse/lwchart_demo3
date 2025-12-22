@@ -14,6 +14,7 @@ import {
 import type { SeriesConfig } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
 import { SlTpLineSeries } from "../plugins/SlTpLineSeries";
+import { PositionArrowSeries } from "../plugins/PositionArrowSeries";
 import { findClosestTime, calculateCenteredRange } from "./TimeScaleHelper";
 
 export class ChartController {
@@ -82,6 +83,10 @@ export class ChartController {
                 case "SlTpLine":
                     // @ts-ignore
                     series = this.chart!.addCustomSeries(new SlTpLineSeries(), config.options);
+                    break;
+                case "PositionArrow":
+                    // @ts-ignore
+                    series = this.chart!.addCustomSeries(new PositionArrowSeries(), config.options);
                     break;
                 default:
                     series = this.chart!.addSeries(LineSeries, config.options);

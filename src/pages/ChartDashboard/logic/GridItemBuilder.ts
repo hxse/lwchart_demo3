@@ -16,7 +16,7 @@ import {
 } from "../../../components/lw-chart/logic/SeriesOptionsBuilder";
 
 // 拆分模块导入
-import { generatePositionMarkers } from "./PositionMarkerBuilder";
+import { buildPositionArrowSeries } from "./PositionMarkerBuilder";
 import { buildSlTpLines } from "./SlTpLineBuilder";
 import { extractValueSeriesData, extractMultiKeySeriesData } from "./SeriesDataExtractor";
 import { buildBottomRowGridItem, buildEmptyBottomRowGridItem } from "./BottomRowBuilder";
@@ -102,8 +102,17 @@ function buildPaneSeries(
             finalOptions = applyDefaultScaleMargins(options);
         }
 
+        paneSeries.push({
+            type: lwcType,
+            data: extracted.data,
+            pane: paneIdx,
+            options: finalOptions,
+            priceLines: priceLines,
+            name: extracted.name,
+            showInLegend: itemConfig.showInLegend ?? false
+        });
+
         // 生成仓位标记（仅对第一个主图）
-        let markers: any[] | undefined = undefined;
         let backtestFile: ParsedFileContent | undefined = undefined;
         if (slotIdx === 0 && isMainSeries && file.data.length > 0) {
             // 查找 backtest_result 文件
@@ -122,21 +131,13 @@ function buildPaneSeries(
                     'exit_short_price' in firstRow;
 
                 if (hasPositionFields) {
-                    markers = generatePositionMarkers(backtestFile.data);
+                    const arrowSeries = buildPositionArrowSeries(backtestFile.data, paneIdx);
+                    if (arrowSeries) {
+                        paneSeries.push(arrowSeries);
+                    }
                 }
             }
         }
-
-        paneSeries.push({
-            type: lwcType,
-            data: extracted.data,
-            pane: paneIdx,
-            options: finalOptions,
-            priceLines: priceLines,
-            markers: markers,
-            name: extracted.name,
-            showInLegend: itemConfig.showInLegend ?? false
-        });
 
         // 添加 SL/TP/TSL 价格线（仅第一个主图，使用拆分模块）
         if (slotIdx === 0 && isMainSeries && backtestFile && Array.isArray(backtestFile.data)) {

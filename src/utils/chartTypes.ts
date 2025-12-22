@@ -4,7 +4,7 @@
  */
 
 export interface SeriesConfig {
-    type: "Candlestick" | "Line" | "Area" | "Baseline" | "Histogram" | "Bar" | "SlTpLine";
+    type: "Candlestick" | "Line" | "Area" | "Baseline" | "Histogram" | "Bar" | "SlTpLine" | "PositionArrow";
     data: any[];
     pane: number; // 0 for main, 1+ for extra panes
     options?: any;

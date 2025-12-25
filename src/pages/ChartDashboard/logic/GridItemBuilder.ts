@@ -45,9 +45,10 @@ function buildPaneSeries(
 ): SeriesConfig[] {
     const paneSeries: SeriesConfig[] = [];
 
-    // 分离普通系列和独立的HLine/VLine
+    // 分离普通系列、独立的HLine/VLine以及需要显示的参考线
     const seriesItems = paneSeriesList.filter(c => !["hline", "vline"].includes(c.type));
-    const hLineOnlyItems = paneSeriesList.filter(c => c.type === "hline");
+    const hLineItems = paneSeriesList.filter(c => c.type === "hline");
+    const vLineItems = paneSeriesList.filter(c => c.type === "vline");
 
     // 处理普通系列
     seriesItems.forEach(itemConfig => {
@@ -131,7 +132,7 @@ function buildPaneSeries(
                     'exit_short_price' in firstRow;
 
                 if (hasPositionFields) {
-                    const arrowSeries = buildPositionArrowSeries(backtestFile.data, paneIdx);
+                    const arrowSeries = buildPositionArrowSeries(backtestFile.data, paneIdx, file.data);
                     if (arrowSeries) {
                         paneSeries.push(arrowSeries);
                     }
@@ -146,16 +147,42 @@ function buildPaneSeries(
         }
     });
 
+    // 如果没有数据系列，但有 HLine 或 VLine，则注入一个透明的 Line 系列作为载体
+    if (paneSeries.length === 0 && (hLineItems.length > 0 || vLineItems.length > 0)) {
+        // 使用一个极小的数据集或者空数据集来初始化占位线
+        // LWChart 需要一个系列来承载 priceLines 和 markers
+        paneSeries.push({
+            type: 'Line',
+            data: [],
+            pane: paneIdx,
+            options: {
+                visible: false,
+                lastPriceAnimation: 0,
+                priceLineVisible: false,
+                baseLineVisible: false,
+                crosshairMarkerVisible: false,
+                autoscaleInfoProvider: () => ({
+                    priceRange: {
+                        minValue: 0,
+                        maxValue: 100,
+                    },
+                }),
+            },
+            name: 'ReferenceLinesHolder',
+            showInLegend: false
+        });
+    }
+
     // 处理独立的HLine（附加到第一个系列）
     if (paneSeries.length > 0) {
         const first = paneSeries[0];
         if (!first.priceLines) first.priceLines = [];
 
-        hLineOnlyItems.forEach(hl => {
+        hLineItems.forEach(hl => {
             if (hl.hLineOpt && hl.show) {
                 const label = hl.hLineOpt.label || '';
                 const isRSICenter = label.toLowerCase().includes('center') ||
-                    label.toLowerCase().includes('rsi') && hl.hLineOpt.value === 50;
+                    (label.toLowerCase().includes('rsi') && hl.hLineOpt.value === 50);
 
                 first.priceLines!.push({
                     price: hl.hLineOpt.value,
@@ -163,10 +190,26 @@ function buildPaneSeries(
                     lineWidth: isRSICenter ? 2 : 1,
                     lineStyle: 0,
                     axisLabelVisible: true,
-                    title: ''
+                    title: hl.hLineOpt.showLabel ? (hl.hLineOpt.label || '') : ''
                 });
             }
         });
+
+        // 处理独立的VLine（附加到第一个系列作为 Marker 或使用插件，此处简化为 Marker）
+        if (vLineItems.length > 0) {
+            if (!first.markers) first.markers = [];
+            vLineItems.forEach(vl => {
+                if (vl.vLineOpt && vl.show) {
+                    first.markers!.push({
+                        time: vl.vLineOpt.value as any,
+                        position: 'inBar',
+                        color: vl.vLineOpt.color,
+                        shape: 'arrowUp', // 临时占位，后续可扩展专用插件
+                        text: vl.vLineOpt.label || 'VLine'
+                    });
+                }
+            });
+        }
     }
 
     return paneSeries;
@@ -256,6 +299,7 @@ export function generateGridItemsFromConfig(
                     onRegister: syncHandlers ? (api: any) => syncHandlers.onRegister(chartId, api) : undefined,
                     onCrosshairMove: syncHandlers ? (p: any) => syncHandlers.onSync(chartId, p) : undefined,
                     enableLegend: true,
+                    showLegendInAll: config.showLegendInAll ?? true,
                 }
             });
         } else {
@@ -270,7 +314,8 @@ export function generateGridItemsFromConfig(
     // 底部栏处理（使用拆分模块）
     if (showBottomRow) {
         if (config.bottomRowChart && config.bottomRowChart.length > 0) {
-            gridItems.push(buildBottomRowGridItem(config.bottomRowChart, files, syncHandlers));
+            const bottomItems = buildBottomRowGridItem(config.bottomRowChart, files, config.showLegendInAll, syncHandlers);
+            gridItems.push(...bottomItems);
         } else {
             gridItems.push(buildEmptyBottomRowGridItem());
         }

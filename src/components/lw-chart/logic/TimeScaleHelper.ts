@@ -6,7 +6,7 @@
 import type { ITimeScaleApi, ISeriesApi } from "lightweight-charts";
 
 /**
- * 在系列数据中查找最接近目标时间的时间点
+ * 在系列数据中查找最接近目标时间的时间点（使用二分查找，O(log n)）
  * @param seriesMap 系列映射表
  * @param targetTime 目标时间戳
  * @returns 最接近的时间戳，如果没找到则返回 null
@@ -18,26 +18,45 @@ export function findClosestTime(
     let closestTime: number | null = null;
     let closestDistance = Infinity;
 
-    // 遍历所有 series，找到最接近且不超过目标时间的时间
-    seriesMap.forEach((series) => {
-        try {
-            // @ts-ignore - 访问内部 API 获取数据进行查找
-            const data = series.data?.() || [];
+    // 只需要从第一个 series 获取数据（所有 series 共享相同的时间轴）
+    const firstSeries = seriesMap.values().next().value;
+    if (!firstSeries) return null;
 
-            for (const point of data) {
-                const pointTime = point.time;
-                if (typeof pointTime === 'number' && pointTime <= targetTime) {
-                    const distance = targetTime - pointTime;
-                    if (distance < closestDistance) {
-                        closestDistance = distance;
-                        closestTime = pointTime;
-                    }
-                }
+    try {
+        // @ts-ignore - 访问内部 API 获取数据
+        const data = firstSeries.data?.() || [];
+        if (data.length === 0) return null;
+
+        // 二分查找最接近且不超过目标时间的点
+        let left = 0;
+        let right = data.length - 1;
+
+        while (left <= right) {
+            const mid = Math.floor((left + right) / 2);
+            const midTime = data[mid].time;
+
+            if (typeof midTime !== 'number') {
+                // 如果时间不是数字，跳过
+                left = mid + 1;
+                continue;
             }
-        } catch (e) {
-            console.warn('[findClosestTime] 无法获取 series 数据:', e);
+
+            if (midTime === targetTime) {
+                return midTime; // 精确匹配
+            } else if (midTime < targetTime) {
+                const distance = targetTime - midTime;
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestTime = midTime;
+                }
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
         }
-    });
+    } catch (e) {
+        console.warn('[findClosestTime] 无法获取 series 数据:', e);
+    }
 
     return closestTime;
 }

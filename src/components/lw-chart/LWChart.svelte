@@ -12,14 +12,15 @@
     chartOptions?: Record<string, any>; // New prop: Custom chart options (e.g. handleScale)
     onCrosshairMove?: (param: any) => void; // New prop: Sync callback
     onRegister?: (api: {
-      setCrosshair: (param: any) => void;
+      setCrosshair: (p: any) => void;
       clearCrosshair: () => void;
-      scrollToTime: (time: number) => void;
+      scrollToTime: (t: number) => void;
       resetTimeScale: () => void;
       fitContent: () => void;
     }) => void; // Sync registration
     onClick?: (param: any) => void; // New prop: Click callback
     enableLegend?: boolean; // 是否启用 Legend 展示
+    showLegendInAll?: boolean; // 是否在所有图表中同时显示 Legend
   }
 
   let {
@@ -31,6 +32,7 @@
     onRegister,
     onClick,
     enableLegend = false,
+    showLegendInAll = true,
   }: Props = $props();
 
   // State
@@ -71,7 +73,7 @@
 
     // Enable Legend if requested
     if (enableLegend) {
-      controller.enableLegend(chartContainer);
+      controller.enableLegend(chartContainer, showLegendInAll);
     }
 
     // Register API if requested

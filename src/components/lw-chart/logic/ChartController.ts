@@ -163,10 +163,13 @@ export class ChartController {
     /**
      * 启用 Legend 功能
      * @param container 图表容器
+     * @param showLegendInAll 是否在所有同步图表中显示
      */
-    public enableLegend(container: HTMLElement): void {
+    public enableLegend(container: HTMLElement, showLegendInAll: boolean = true): void {
         if (this.legendManager) return;
         this.legendManager = new LegendManager();
+        this.legendManager.setShowInAll(showLegendInAll);
+        this.legendManager.setChart(this.chart!);
         this.legendManager.create(container);
 
         this.chart?.subscribeCrosshairMove((param) => {
@@ -194,12 +197,28 @@ export class ChartController {
     setCrosshair(param: any) {
         if (!this.chart || !param || !param.time || this.seriesMap.size === 0) {
             this.chart?.clearCrosshairPosition();
+            // 隐藏 Legend
+            if (this.legendManager) {
+                this.legendManager.update({ time: undefined } as any);
+            }
             return;
         }
 
+        // 统一处理时间匹配：找到本图表中最接近的时间点
+        const closestTime = findClosestTime(this.seriesMap, param.time) ?? param.time;
+
         const firstSeries = this.seriesMap.values().next().value;
         if (firstSeries) {
-            this.chart.setCrosshairPosition(NaN, param.time, firstSeries);
+            // 使用已匹配的时间设置光标
+            this.chart.setCrosshairPosition(NaN, closestTime, firstSeries);
+        }
+
+        // 手动触发 Legend 更新，传递已匹配的时间（避免重复计算）
+        if (this.legendManager) {
+            this.legendManager.update({
+                time: closestTime,
+                seriesData: new Map()
+            } as any);
         }
     }
 

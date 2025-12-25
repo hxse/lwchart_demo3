@@ -33,25 +33,33 @@ function applyOverrideLogic(
             config.showRiskLegend = parts.map(p => p === '1') as [boolean, boolean, boolean, boolean];
         }
     }
+    if (overrideConfig.showLegendInAll !== undefined) {
+        config.showLegendInAll = overrideConfig.showLegendInAll;
+    }
 
     if (!config.chart) return;
 
     // 处理显示/隐藏覆盖
     if (overrideConfig.show) {
-        applyShowOverrides(config.chart, overrideConfig.show, 'show');
+        applyShowOverrides(config.chart, config.bottomRowChart, overrideConfig.show, 'show');
     }
 
     // 处理 Legend 显示覆盖
     if (overrideConfig.showInLegend) {
-        applyShowOverrides(config.chart, overrideConfig.showInLegend, 'showInLegend');
+        applyShowOverrides(config.chart, config.bottomRowChart, overrideConfig.showInLegend, 'showInLegend');
     }
 }
 
 /**
  * 辅助：应用显示相关的三维坐标覆盖
+ * @param chartConfig 主图表配置
+ * @param bottomRowConfig 底部栏配置
+ * @param overrides 覆盖字符串数组
+ * @param key 覆盖的属性名
  */
 function applyShowOverrides(
     chartConfig: SeriesItemConfig[][][],
+    bottomRowConfig: SeriesItemConfig[][][] | undefined,
     overrides: string[],
     key: 'show' | 'showInLegend'
 ): void {
@@ -60,7 +68,15 @@ function applyShowOverrides(
         if (parts.length === 4) {
             const [slotIdx, paneIdx, seriesIdx, val] = parts.map(p => parseInt(p));
             if (!isNaN(slotIdx) && !isNaN(paneIdx) && !isNaN(seriesIdx) && !isNaN(val)) {
-                const series = chartConfig[slotIdx]?.[paneIdx]?.[seriesIdx];
+
+                let series;
+                if (slotIdx === -1 && bottomRowConfig) {
+                    // -1 表示底栏，映射到底栏的第 0 个 Slot (通常底栏只有一个 Slot)
+                    series = bottomRowConfig[0]?.[paneIdx]?.[seriesIdx];
+                } else {
+                    series = chartConfig[slotIdx]?.[paneIdx]?.[seriesIdx];
+                }
+
                 if (series) {
                     if (key === 'show') {
                         series.show = val === 1;
@@ -184,6 +200,12 @@ export function parseUrlOverrides(): DashboardOverride {
                 override.showRiskLegend = val;
             }
         }
+    }
+
+    // 处理 showLegendInAll (0 或 1)
+    if (params.has("showLegendInAll")) {
+        const val = params.get("showLegendInAll");
+        override.showLegendInAll = val === "1" || val === "true";
     }
 
 

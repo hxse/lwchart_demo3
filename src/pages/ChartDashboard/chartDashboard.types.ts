@@ -30,6 +30,9 @@ export interface DashboardOverride {
     // 风险线 Legend 显示控制: "sl,tp,tsl,psar" (1=显示, 0=隐藏)
     // 例如 "1,1,0,1" 表示显示 SL、TP、PSAR，隐藏 TSL
     showRiskLegend?: string;
+
+    // 是否在所有图表中显示 Legend (默认 false，只在鼠标激活的图表显示)
+    showLegendInAll?: boolean;
 }
 
 // --- Chart Config & Series Options ---
@@ -113,11 +116,11 @@ export interface BaselineOption {
     lineStyle?: number;
 }
 
-// 水平参考线
 export interface HorizontalLine {
     color: string;
     value: number;
     label?: string;
+    showLabel?: boolean; // 是否在图表线上显示标签文本
 }
 
 // 垂直参考线
@@ -169,9 +172,12 @@ export interface ChartConfigJSON {
 
     // 底部栏图表配置（可选）
     // 如果 showBottomRow 为 true 但此字段为空，显示空白
-    bottomRowChart?: SeriesItemConfig[][];  // [Panes][Series]
+    bottomRowChart?: SeriesItemConfig[][][];  // [Slots][Panes][Series]
 
     // 风险线 Legend 显示设置 (从 override 传递给 GridItemBuilder)
     // [sl, tp, tsl, psar]
     showRiskLegend?: [boolean, boolean, boolean, boolean];
+
+    // 是否在所有图表中同时显示 Legend (默认 false)
+    showLegendInAll?: boolean;
 }

@@ -5,30 +5,31 @@
 
 import type { SeriesConfig } from "../../../utils/chartTypes";
 import type { SlTpData } from "../../../components/lw-chart/plugins/SlTpLineSeries";
+import { LONG_COLORS, SHORT_COLORS, CHART_STYLE_CONFIG } from "../../../utils/colorConfig";
 
 /** 预定义的 SL/TP/TSL 线配置 */
 const SL_TP_LINE_CONFIGS = [
     // Long
-    { field: 'sl_pct_price_long', name: 'L-SL-PCT', color: '#ff4444', lineStyle: 0, isLong: true },
-    { field: 'sl_atr_price_long', name: 'L-SL-ATR', color: '#ff4444', lineStyle: 0, isLong: true },
+    { field: 'sl_pct_price_long', name: 'L-SL-PCT', color: LONG_COLORS.sl, lineStyle: CHART_STYLE_CONFIG.slLineStyle, isLong: true },
+    { field: 'sl_atr_price_long', name: 'L-SL-ATR', color: LONG_COLORS.sl, lineStyle: CHART_STYLE_CONFIG.slLineStyle, isLong: true },
 
-    { field: 'tp_pct_price_long', name: 'L-TP-PCT', color: '#ff8800', lineStyle: 0, isLong: true },
-    { field: 'tp_atr_price_long', name: 'L-TP-ATR', color: '#ff8800', lineStyle: 0, isLong: true },
+    { field: 'tp_pct_price_long', name: 'L-TP-PCT', color: LONG_COLORS.tp, lineStyle: CHART_STYLE_CONFIG.tpLineStyle, isLong: true },
+    { field: 'tp_atr_price_long', name: 'L-TP-ATR', color: LONG_COLORS.tp, lineStyle: CHART_STYLE_CONFIG.tpLineStyle, isLong: true },
 
-    { field: 'tsl_pct_price_long', name: 'L-TSL-PCT', color: '#B8860B', lineStyle: 2, isLong: true },
-    { field: 'tsl_atr_price_long', name: 'L-TSL-ATR', color: '#B8860B', lineStyle: 2, isLong: true },
-    { field: 'tsl_psar_price_long', name: 'L-TSL-PSAR', color: '#9B30FF', lineStyle: 2, isLong: true },
+    { field: 'tsl_pct_price_long', name: 'L-TSL-PCT', color: LONG_COLORS.tsl, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: true },
+    { field: 'tsl_atr_price_long', name: 'L-TSL-ATR', color: LONG_COLORS.tsl, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: true },
+    { field: 'tsl_psar_price_long', name: 'L-TSL-PSAR', color: LONG_COLORS.tslPsar, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: true },
 
     // Short
-    { field: 'sl_pct_price_short', name: 'S-SL-PCT', color: '#9944ff', lineStyle: 0, isLong: false },
-    { field: 'sl_atr_price_short', name: 'S-SL-ATR', color: '#9944ff', lineStyle: 0, isLong: false },
+    { field: 'sl_pct_price_short', name: 'S-SL-PCT', color: SHORT_COLORS.sl, lineStyle: CHART_STYLE_CONFIG.slLineStyle, isLong: false },
+    { field: 'sl_atr_price_short', name: 'S-SL-ATR', color: SHORT_COLORS.sl, lineStyle: CHART_STYLE_CONFIG.slLineStyle, isLong: false },
 
-    { field: 'tp_pct_price_short', name: 'S-TP-PCT', color: '#4488ff', lineStyle: 0, isLong: false },
-    { field: 'tp_atr_price_short', name: 'S-TP-ATR', color: '#4488ff', lineStyle: 0, isLong: false },
+    { field: 'tp_pct_price_short', name: 'S-TP-PCT', color: SHORT_COLORS.tp, lineStyle: CHART_STYLE_CONFIG.tpLineStyle, isLong: false },
+    { field: 'tp_atr_price_short', name: 'S-TP-ATR', color: SHORT_COLORS.tp, lineStyle: CHART_STYLE_CONFIG.tpLineStyle, isLong: false },
 
-    { field: 'tsl_pct_price_short', name: 'S-TSL-PCT', color: '#008B8B', lineStyle: 2, isLong: false },
-    { field: 'tsl_atr_price_short', name: 'S-TSL-ATR', color: '#008B8B', lineStyle: 2, isLong: false },
-    { field: 'tsl_psar_price_short', name: 'S-TSL-PSAR', color: '#00CED1', lineStyle: 2, isLong: false },
+    { field: 'tsl_pct_price_short', name: 'S-TSL-PCT', color: SHORT_COLORS.tsl, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: false },
+    { field: 'tsl_atr_price_short', name: 'S-TSL-ATR', color: SHORT_COLORS.tsl, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: false },
+    { field: 'tsl_psar_price_short', name: 'S-TSL-PSAR', color: SHORT_COLORS.tslPsar, lineStyle: CHART_STYLE_CONFIG.tslLineStyle, isLong: false },
 ];
 
 /**
@@ -69,40 +70,14 @@ function buildSlTpData(
         hasValidData = true;
 
         // 当前 bar 的进出场情况
-        const hasEntry = isValidNumber(row[entryField]);
+        const firstEntrySide = row.first_entry_side;
         const hasExit = isValidNumber(row[exitField]);
 
-        // 默认不是单点，也不是断点
-        let isSinglePoint = false;
-        let isBreak = false;
-
-        // 只有同时有进场和离场时才需要判断单点
-        if (hasEntry && hasExit) {
-            // 检查上一根 bar 的情况
-            if (i > 0) {
-                const prevRow = data[i - 1];
-                const prevHasEntry = isValidNumber(prevRow[entryField]);
-                const prevHasExit = isValidNumber(prevRow[exitField]);
-
-                // 连续情况：上一根有进场且无离场（正在持仓中）
-                // 单点情况：上一根无进场，或者上一根已离场
-                if (prevHasEntry && !prevHasExit) {
-                    // 连续线段的最后一根，不是单点
-                    isSinglePoint = false;
-                } else {
-                    // 真正的单点
-                    isSinglePoint = true;
-                }
-            } else {
-                // 第一根 bar 就有进出场，是单点
-                isSinglePoint = true;
-            }
-        }
-
-        // 如果当前 bar 有离场，标记为断点
-        if (hasExit) {
-            isBreak = true;
-        }
+        // 判定 logic 优化：
+        // 1. isSinglePoint: 如果当前是“第一次进场”且同时有“离场价格”，则为同 Bar 闪进闪出。
+        // 2. isBreak: 只要有离场价格，当前 Bar 结束后线段必须断开。
+        const isSinglePoint = (isLong ? firstEntrySide === 1 : firstEntrySide === -1) && hasExit;
+        const isBreak = hasExit;
 
         result.push({
             time: row.time,
@@ -165,7 +140,7 @@ export function buildSlTpLines(
                 pane: paneIdx,
                 options: {
                     color: lineConfig.color,
-                    lineWidth: 2,
+                    lineWidth: CHART_STYLE_CONFIG.lineWidth,
                     lineStyle: lineConfig.lineStyle,
                 },
                 name: lineConfig.name,

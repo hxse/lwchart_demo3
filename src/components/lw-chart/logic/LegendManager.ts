@@ -1,4 +1,4 @@
-import type { ISeriesApi, MouseEventParams } from "lightweight-charts";
+import type { ISeriesApi, MouseEventParams, IChartApi } from "lightweight-charts";
 
 export interface LegendItemConfig {
     name: string;
@@ -9,6 +9,8 @@ export interface LegendItemConfig {
 export class LegendManager {
     private legendElement: HTMLElement | null = null;
     private seriesMap = new Map<ISeriesApi<any>, LegendItemConfig>();
+    private showInAll = false; // 是否在所有同步图表中显示
+    private chart: IChartApi | null = null; // 图表实例引用，用于同步时获取数据
 
     /**
      * 创建 Legend DOM 元素
@@ -56,20 +58,42 @@ export class LegendManager {
     }
 
     /**
+     * 设置是否在所有同步图表中显示
+     * @param val
+     */
+    public setShowInAll(val: boolean): void {
+        this.showInAll = val;
+    }
+
+    /**
+     * 设置图表实例引用（用于同步时获取数据）
+     */
+    public setChart(chart: IChartApi): void {
+        this.chart = chart;
+    }
+
+    /**
      * 更新 Legend 显示内容
+
      * @param param 十字线移动事件参数
      */
     public update(param: MouseEventParams): void {
         if (!this.legendElement) return;
 
-        // 如果不是用户发起的交互（例如程序调用的同步），隐藏 Legend
-        if (!param.sourceEvent) {
+        // 如果不是用户发起的交互（例如程序调用的同步），且未开启 showInAll，隐藏 Legend
+        if (!this.showInAll && !param.sourceEvent) {
             this.legendElement.style.display = "none";
             return;
         }
 
-        // 如果没有时间戳（鼠标离开）或点不在图表内，隐藏 Legend
-        if (!param.time || !param.point || param.point.x < 0 || param.point.y < 0) {
+        // 如果没有时间戳（鼠标离开），隐藏 Legend
+        if (!param.time) {
+            this.legendElement.style.display = "none";
+            return;
+        }
+
+        // 如果不是 showInAll 模式，还需要检查点是否在图表内
+        if (!this.showInAll && (!param.point || param.point.x < 0 || param.point.y < 0)) {
             this.legendElement.style.display = "none";
             return;
         }
@@ -80,7 +104,26 @@ export class LegendManager {
         this.seriesMap.forEach((config, series) => {
             if (!config.showInLegend) return;
 
-            const data = param.seriesData.get(series);
+            // 优先使用 param 中的数据，如果没有则尝试从图表获取
+            let data = param.seriesData?.get(series);
+
+            // 如果 seriesData 中没有数据（同步情况），尝试通过时间获取
+            // 注意：时间已在 setCrosshair 中匹配，这里直接使用
+            if (!data && this.chart && param.time) {
+                try {
+                    const timeScale = this.chart.timeScale();
+                    const coordinate = timeScale.timeToCoordinate(param.time as any);
+                    if (coordinate !== null) {
+                        const logicalIndex = timeScale.coordinateToLogical(coordinate);
+                        if (logicalIndex !== null) {
+                            data = series.dataByIndex(Math.round(logicalIndex)) as any;
+                        }
+                    }
+                } catch (e) {
+                    // 忽略获取数据失败的情况
+                }
+            }
+
             if (!data) return;
 
             hasContent = true;

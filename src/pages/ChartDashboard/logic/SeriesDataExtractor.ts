@@ -41,6 +41,8 @@ export function extractValueSeriesData(
     // Volume 类型：自动设置涨跌颜色
     if (seriesType === 'volume') {
         seriesData = applyVolumeColors(seriesData, fileData);
+    } else if (seriesType === 'histogram') {
+        seriesData = applyHistogramColors(seriesData);
     }
 
     return {
@@ -97,5 +99,31 @@ function applyVolumeColors(volumeData: any[], fileData: any[]): any[] {
             };
         }
         return vol;
+    });
+}
+
+/**
+ * 为 Histogram (如 MACD) 数据应用零轴与动能颜色
+ * @param histogramData histogram 系列数据
+ * @returns 带颜色的 histogram 数据
+ */
+function applyHistogramColors(histogramData: any[]): any[] {
+    return histogramData.map((data: any, index: number) => {
+        // 与前一根K线比较，判断动能是增强还是减弱
+        const prevValue = index > 0 ? histogramData[index - 1].value : 0;
+        const isIncreasing = data.value >= prevValue;
+        let color = '#26A69A'; 
+        // 经典的 MACD 4 色标准盘面视觉：
+        if (data.value >= 0) {
+            // 零轴上方：动能增强深绿，动能衰竭浅绿/空心绿
+            color = isIncreasing ? '#26a69a' : '#b2dfdb'; 
+        } else {
+            // 零轴下方：动能增强(更负)深红，动能衰竭(趋零)浅红/空心红
+            color = !isIncreasing ? '#ef5350' : '#ffcdd2'; 
+        }
+        return {
+            ...data,
+            color
+        };
     });
 }

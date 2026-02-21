@@ -51,7 +51,7 @@ interface SeriesItemConfig {
   // 是否在 Legend 中显示该系列的值 (默认 false)
   showInLegend?: boolean;
   
-  // 各类型专用选项 (根据 type 填写)
+  // 各类型专用选项 (根据 type 填写，均支持透传，详见下方说明)
   candleOpt?: CandleOption;
   lineOpt?: LineOption;
   histogramOpt?: HistogramOption;
@@ -69,6 +69,86 @@ interface SeriesItemConfig {
 |------|------|------|
 | `priceScaleMarginTop` | `number` | (0-1) 叠加层顶部边距，默认 0.7 |
 | `adjustMainSeries` | `boolean` | 是否自动调整同 Pane 主系列边距，默认 true |
+
+## 🔀 属性透传机制
+
+前端对**所有** `*Opt` 接口启用了透传支持。后端在 JSON 中写入的任何字段，只要是 [lightweight-charts 官方 API](https://tradingview.github.io/lightweight-charts/docs/api) 支持的属性，前端都会原样转发给渲染层，无需前端额外适配。
+
+**工作原理**：前端会先设置一组默认值，再用后端传入的字段覆盖（`{...defaults, ...backendOpt}`）。后端传了就用后端的，没传就走前端默认值。
+
+### 各系列类型可透传属性速查
+
+| 系列类型 | Opt 字段 | 底层映射 | 常用透传属性 |
+|---------|---------|---------|-------------|
+| `candle` | `candleOpt` | `CandlestickSeriesOptions` | `upColor`, `downColor`, `wickUpColor`, `wickDownColor`, `borderVisible`, `borderUpColor`, `borderDownColor` |
+| `bar` | `barOpt` | `BarSeriesOptions` | 同 candle + `openVisible`, `thinBars` |
+| `line` | `lineOpt` | `LineSeriesOptions` | `color`, `lineWidth`(1-4), `lineStyle`(0-4), `lineType`(0-2), `lineVisible`, `pointMarkersVisible`, `crosshairMarkerVisible` |
+| `histogram` | `histogramOpt` | `HistogramSeriesOptions` | `color`, `base` |
+| `volume` | `volumeOpt` | `HistogramSeriesOptions` | `priceScaleMarginTop` |
+| `area` | `areaOpt` | `AreaSeriesOptions` | `topColor`, `bottomColor`, `lineColor`, `lineWidth`, `lineStyle`, `lineVisible` |
+| `baseline` | `baselineOpt` | `BaselineSeriesOptions` | `baseValue`, `topLineColor`, `bottomLineColor`, `topFillColor1`, `topFillColor2`, `bottomFillColor1`, `bottomFillColor2`, `lineWidth`, `lineStyle` |
+| `hline` | `hLineOpt` | `PriceLineOptions` | `lineWidth`(1-4), `lineStyle`(0-4), `lineVisible`, `axisLabelVisible`, `axisLabelColor`, `axisLabelTextColor` |
+| `vline` | `vLineOpt` | `SeriesMarker` | `shape`(`arrowUp`/`arrowDown`/`circle`/`square`), `size`(数字), `position`(`aboveBar`/`belowBar`/`inBar`) |
+
+> `lineStyle` 枚举: 0=Solid, 1=Dotted, 2=Dashed, 3=LargeDashed, 4=SparseDotted
+>
+> `lineWidth` 取值: 1 \| 2 \| 3 \| 4
+
+### 后端用法示例
+
+```json
+{
+  "type": "line",
+  "fileName": "data.parquet",
+  "dataName": "ema20",
+  "show": true,
+  "lineOpt": {
+    "color": "#ff9800",
+    "lineWidth": 2,
+    "lineStyle": 2,
+    "lineType": 2,
+    "pointMarkersVisible": true
+  }
+}
+```
+
+```json
+{
+  "type": "hline",
+  "show": true,
+  "hLineOpt": {
+    "value": 70,
+    "color": "red",
+    "label": "RSI Overbought",
+    "showLabel": true,
+    "lineWidth": 2,
+    "lineStyle": 2,
+    "axisLabelColor": "#ff0000",
+    "axisLabelTextColor": "#ffffff"
+  }
+}
+```
+
+### 后端 Pydantic 模型对照
+
+以 `HorizontalLineOption` 为例，后端可以直接扩充字段：
+
+```python
+class HorizontalLineOption(BaseModel):
+    color: str
+    value: float
+    label: Optional[str] = None
+    showLabel: bool = False
+    # 以下字段前端均支持透传 (不传则走前端默认值)
+    lineWidth: Optional[int] = None       # 1-4
+    lineStyle: Optional[int] = None       # 0-4
+    lineVisible: Optional[bool] = None
+    axisLabelVisible: Optional[bool] = None
+    axisLabelColor: Optional[str] = None
+    axisLabelTextColor: Optional[str] = None
+```
+
+其他系列类型同理：只需在对应的 Pydantic Model 中加字段，前端自动透传，无需联调。
 
 ## 🌟 布局模板选项
 

@@ -80,16 +80,17 @@ function buildPaneSeries(
             visible: !!itemConfig.show
         };
 
-        // 处理附属的价格线
         const priceLines: any[] = [];
         if (itemConfig.hLineOpt) {
+            const { value, color, label, showLabel, ...passthrough } = itemConfig.hLineOpt;
             priceLines.push({
-                price: itemConfig.hLineOpt.value,
-                color: itemConfig.hLineOpt.color,
+                price: value,
+                color: color,
                 lineWidth: 1,
                 lineStyle: 1,
                 axisLabelVisible: true,
-                title: itemConfig.hLineOpt.label || ''
+                title: label || '',
+                ...passthrough
             });
         }
 
@@ -180,17 +181,19 @@ function buildPaneSeries(
 
         hLineItems.forEach(hl => {
             if (hl.hLineOpt && hl.show) {
-                const label = hl.hLineOpt.label || '';
-                const isRSICenter = label.toLowerCase().includes('center') ||
-                    (label.toLowerCase().includes('rsi') && hl.hLineOpt.value === 50);
+                const { value, color, label, showLabel, ...passthrough } = hl.hLineOpt;
+                const labelStr = label || '';
+                const isRSICenter = labelStr.toLowerCase().includes('center') ||
+                    (labelStr.toLowerCase().includes('rsi') && value === 50);
 
                 first.priceLines!.push({
-                    price: hl.hLineOpt.value,
-                    color: hl.hLineOpt.color,
+                    price: value,
+                    color: color,
                     lineWidth: isRSICenter ? 2 : 1,
                     lineStyle: 0,
                     axisLabelVisible: true,
-                    title: hl.hLineOpt.showLabel ? (hl.hLineOpt.label || '') : ''
+                    title: showLabel ? labelStr : '',
+                    ...passthrough
                 });
             }
         });
@@ -200,12 +203,14 @@ function buildPaneSeries(
             if (!first.markers) first.markers = [];
             vLineItems.forEach(vl => {
                 if (vl.vLineOpt && vl.show) {
+                    const { value, color, label, ...passthrough } = vl.vLineOpt;
                     first.markers!.push({
-                        time: vl.vLineOpt.value as any,
+                        time: value as any,
                         position: 'inBar',
-                        color: vl.vLineOpt.color,
+                        color: color,
                         shape: 'arrowUp', // 临时占位，后续可扩展专用插件
-                        text: vl.vLineOpt.label || 'VLine'
+                        text: label || 'VLine',
+                        ...passthrough
                     });
                 }
             });

@@ -39,6 +39,7 @@ export interface DashboardOverride {
 
 // Candle & Bar 选项（共享相同的选项）
 export interface CandleOption {
+    [key: string]: any;
     upColor?: string;
     downColor?: string;
     wickUpColor?: string;
@@ -52,12 +53,14 @@ export interface CandleOption {
 }
 
 export interface BarOption extends CandleOption {
+    [key: string]: any;
     openVisible?: boolean;
     thinBars?: boolean;
 }
 
 // Line 选项
 export interface LineOption {
+    [key: string]: any;
     color?: string;
     lineWidth?: number;
     lineStyle?: number; // 0=Solid, 1=Dotted, 2=Dashed, 3=LargeDashed, 4=SparseDotted
@@ -75,12 +78,14 @@ export interface LineOption {
 
 // Histogram 选项（简化，移除volume专用字段）
 export interface HistogramOption {
+    [key: string]: any;
     color?: string;
     base?: number;
 }
 
 // Volume 选项（独立类型）
 export interface VolumeOption {
+    [key: string]: any;
     // 布局控制（用户可配置）
     priceScaleMarginTop?: number;  // 叠加层顶部边距 (0-1)，默认0.7
     adjustMainSeries?: boolean;     // 是否自动调整同Pane主系列，默认true
@@ -92,6 +97,7 @@ export interface VolumeOption {
 
 // Area 选项
 export interface AreaOption {
+    [key: string]: any;
     topColor?: string;
     bottomColor?: string;
     lineColor?: string;
@@ -105,6 +111,7 @@ export interface AreaOption {
 
 // Baseline 选项
 export interface BaselineOption {
+    [key: string]: any;
     baseValue?: number;
     topLineColor?: string;
     bottomLineColor?: string;
@@ -117,6 +124,7 @@ export interface BaselineOption {
 }
 
 export interface HorizontalLine {
+    [key: string]: any;
     color: string;
     value: number;
     label?: string;
@@ -125,6 +133,7 @@ export interface HorizontalLine {
 
 // 垂直参考线
 export interface VerticalLine {
+    [key: string]: any;
     color: string;
     value: number | string; // Timestamp 或日期字符串
     label?: string;

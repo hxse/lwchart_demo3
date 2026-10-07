@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Header from "../../components/Header.svelte";
   import ChartDashboardHeader from "../../components/ChartDashboardHeader.svelte";
   import FileContentViewer from "../../components/FileContentViewer.svelte";
@@ -10,7 +11,7 @@
 
   let { zipData, config }: DashboardProps = $props();
 
-  const state = new ChartDashboardState({ zipData, config });
+  const state = untrack(() => new ChartDashboardState({ zipData, config }));
 </script>
 
 <div class="page-container">

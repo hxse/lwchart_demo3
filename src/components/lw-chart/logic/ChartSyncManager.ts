@@ -2,10 +2,20 @@ export class ChartSyncManager {
     private chartApis = new Map<string, any>();
     private ready = false;
     private lastCrosshairParam: { sourceId: string, param: any } | null = null;
+    private broadcasting = false;
+    private jumpTimer: ReturnType<typeof setTimeout> | null = null;
 
     register(id: string, api: any) {
         // console.log(`[Sync] Registering chart ${id}`);
         this.chartApis.set(id, api);
+        return () => {
+            if (this.chartApis.get(id) === api) this.unregister(id);
+        };
+    }
+
+    unregister(id: string) {
+        this.chartApis.delete(id);
+        if (this.lastCrosshairParam?.sourceId === id) this.lastCrosshairParam = null;
     }
 
     setReady(isReady: boolean = true) {
@@ -14,25 +24,23 @@ export class ChartSyncManager {
         // 核心优化：开启同步时，如果有缓存的事件（通常是初始化期间触发的），立即广播一次
         if (isReady && this.lastCrosshairParam) {
             const { sourceId, param } = this.lastCrosshairParam;
-            for (const [id, api] of this.chartApis) {
-                if (id !== sourceId) {
-                    api.setCrosshair(param);
-                }
-            }
+            this.sync(sourceId, param);
         }
     }
 
     sync(sourceId: string, param: any) {
+        if (this.broadcasting) return;
         // 更新缓存
         this.lastCrosshairParam = { sourceId, param };
 
         if (!this.ready) return;
         // Broadcast to all other charts
-        for (const [id, api] of this.chartApis) {
-            if (id !== sourceId) {
-                api.setCrosshair(param);
+        this.broadcasting = true;
+        try {
+            for (const [id, api] of this.chartApis) {
+                if (id !== sourceId) api.setCrosshair(param);
             }
-        }
+        } finally { this.broadcasting = false; }
     }
 
     // 时间跳转：点击底栏时，所有主图表跳转到该时间
@@ -54,14 +62,16 @@ export class ChartSyncManager {
         }
 
         // 步骤3：延迟同步光标，确保setVisibleLogicalRange完成后再设置光标
-        setTimeout(() => {
+        if (this.jumpTimer) clearTimeout(this.jumpTimer);
+        this.jumpTimer = setTimeout(() => {
+            this.jumpTimer = null;
             this.sync('jumpToTime-trigger', { time });
         }, 50);
     }
 
     // 所有图表显示全部数据
     fitContentAll() {
-        for (const [id, api] of this.chartApis) {
+        for (const api of this.chartApis.values()) {
             api.fitContent?.();
         }
     }
@@ -80,6 +90,8 @@ export class ChartSyncManager {
     }
 
     clear() {
+        if (this.jumpTimer) clearTimeout(this.jumpTimer);
+        this.jumpTimer = null;
         this.chartApis.clear();
         this.ready = false;
         this.lastCrosshairParam = null;

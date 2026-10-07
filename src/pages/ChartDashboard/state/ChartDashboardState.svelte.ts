@@ -17,7 +17,7 @@ import { generateGridItemsFromConfig } from "../logic/GridItemBuilder";
 import type { ParsedFileContent } from "../../../utils/zipParser";
 import EmptyGridItem from "../../../components/EmptyGridItem.svelte";
 
-import { ChartSyncManager } from "../logic/ChartSyncManager";
+import { ChartSyncManager } from "../../../components/lw-chart/logic/ChartSyncManager";
 import { loadZipFromBlob, convertToBlob } from "./FileLoader";
 import { applyOverridesToConfig } from "./OverrideManager";
 

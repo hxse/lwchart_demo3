@@ -55,7 +55,6 @@ function buildSlTpData(
     let hasValidData = false;
     const result: SlTpData[] = [];
 
-    const entryField = isLong ? 'entry_long_price' : 'entry_short_price';
     const exitField = isLong ? 'exit_long_price' : 'exit_short_price';
 
     for (let i = 0; i < data.length; i++) {

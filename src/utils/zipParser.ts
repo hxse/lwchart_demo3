@@ -195,7 +195,7 @@ export async function parseZipFile(blob: Blob): Promise<ZipParseResult> {
 
         // 只处理文件，跳过可能的目录（fflate 返回的对象键是完整路径）
         const filePromises = Object.entries(unzipped)
-            .filter(([filename, data]) => data.length > 0) // 简单过滤潜在目录
+            .filter(([, data]) => data.length > 0) // 简单过滤潜在目录
             .map(async ([filename, fileData]) => {
                 try {
                     const lowerFilename = filename.toLowerCase();

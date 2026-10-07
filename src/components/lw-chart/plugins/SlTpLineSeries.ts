@@ -7,7 +7,6 @@ import type {
     Time,
     WhitespaceData,
     CustomSeriesOptions,
-    ICustomSeriesPaneRenderer as IBaseRenderer,
 } from 'lightweight-charts';
 
 /** SL/TP/TSL 数据点定义 */

@@ -1,5 +1,17 @@
 dist-lib/
+dist-crypto/
+test-results/
+playwright-report/
 docs/context/
+
+# 本地运行配置与草稿
+/config.toml
+/config.local.toml
+/config.remote.toml
+/config.toml.*
+/config.local.toml.*
+/config.remote.toml.*
+/doc/drafts/
 
 # Logs
 logs

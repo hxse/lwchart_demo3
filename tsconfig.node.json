@@ -3,12 +3,10 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
-    "lib": [
-      "ES2023"
-    ],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "types": [
-      "node"
+      "node", "bun", "svelte", "vite/client"
     ],
     "skipLibCheck": true,
     /* Bundler mode */
@@ -26,6 +24,8 @@
     "noUncheckedSideEffectImports": true
   },
   "include": [
-    "vite.config.ts"
+    "vite.config*.ts",
+    "playwright.config.ts",
+    "tests/browser/launch.ts"
   ]
 }

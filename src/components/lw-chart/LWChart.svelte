@@ -1,23 +1,18 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import type { SeriesConfig } from "../../utils/chartTypes";
+  import type { SeriesConfig, SeriesMode, SeriesDataPatch, ChartApi } from "../../utils/chartTypes";
   import { ChartController } from "./logic/ChartController";
 
   // Props
   interface Props {
     series: SeriesConfig[]; // Configuration for all series in this chart
+    seriesMode?: SeriesMode;
     template?: string; // Optional identifier for template logic if needed
     fitContent?: boolean; // New prop: Auto-fit content
     fitContentOnDblClick?: boolean; // New prop: Auto-fit on double click
     chartOptions?: Record<string, any>; // New prop: Custom chart options (e.g. handleScale)
     onCrosshairMove?: (param: any) => void; // New prop: Sync callback
-    onRegister?: (api: {
-      setCrosshair: (p: any) => void;
-      clearCrosshair: () => void;
-      scrollToTime: (t: number) => void;
-      resetTimeScale: () => void;
-      fitContent: () => void;
-    }) => void; // Sync registration
+    onRegister?: (api: ChartApi) => void;
     onClick?: (param: any) => void; // New prop: Click callback
     enableLegend?: boolean; // 是否启用 Legend 展示
     showLegendInAll?: boolean; // 是否在所有图表中同时显示 Legend
@@ -25,6 +20,7 @@
 
   let {
     series,
+    seriesMode = 'replace',
     fitContent = false,
     fitContentOnDblClick = false,
     chartOptions = {},
@@ -38,6 +34,11 @@
   // State
   let chartContainer = $state<HTMLDivElement>();
   const controller = new ChartController();
+  let appliedSeries: SeriesConfig[] | undefined;
+  let appliedMode: SeriesMode | undefined;
+
+  export const replaceSeriesData = (patches: SeriesDataPatch[]) => controller.replaceSeriesData(patches);
+  export const updateSeriesData = (patches: SeriesDataPatch[]) => controller.updateSeriesData(patches);
 
   // Exported methods for external sync
   export const setCrosshair = (param: any) => {
@@ -76,6 +77,11 @@
       controller.enableLegend(chartContainer, showLegendInAll);
     }
 
+    // 注册前先准备系列，使调用方可以立即设置初始数据。
+    controller.updateSeries(untrack(() => series), untrack(() => seriesMode));
+    appliedSeries = untrack(() => series);
+    appliedMode = untrack(() => seriesMode);
+
     // Register API if requested
     if (onRegister) {
       onRegister({
@@ -84,6 +90,8 @@
         scrollToTime,
         resetTimeScale,
         fitContent: doFitContent,
+        replaceSeriesData,
+        updateSeriesData,
       });
     }
 
@@ -168,9 +176,11 @@
   // React to series config changes
   $effect(() => {
     const currentSeriesConfig = series;
+    const currentMode = seriesMode;
 
     untrack(() => {
-      if (!chartContainer) return;
+      if (!chartContainer || !controller.isInitialized()) return;
+      if (currentSeriesConfig === appliedSeries && currentMode === appliedMode) return;
 
       const rect = chartContainer.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
@@ -179,7 +189,9 @@
         controller.resize(rect.width, rect.height);
       }
 
-      controller.updateSeries(currentSeriesConfig);
+      controller.updateSeries(currentSeriesConfig, currentMode);
+      appliedSeries = currentSeriesConfig;
+      appliedMode = currentMode;
 
       if (fitContent) {
         controller.fitContent();

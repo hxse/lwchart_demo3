@@ -57,6 +57,11 @@ export class LegendManager {
         this.seriesMap.set(series, config);
     }
 
+    public clearSeries(): void {
+        this.seriesMap.clear();
+        if (this.legendElement) this.legendElement.style.display = 'none';
+    }
+
     /**
      * 设置是否在所有同步图表中显示
      * @param val

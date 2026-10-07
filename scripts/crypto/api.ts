@@ -13,7 +13,7 @@ function validateQuery(params: URLSearchParams, since: boolean) {
     const limit = parseInteger(params.get('limit') || '', 1, MAX_HISTORY_BARS, '行情数量');
     normalizeOptions({
         exchange_name: params.get('exchange_name'), market: params.get('market'), is_live: live === 'true',
-        symbol: params.get('symbol'), layout: '1x1', timeframes: [params.get('timeframe')], indicators: [], refresh_seconds: 5, history_bars: limit,
+        symbol: params.get('symbol'), layout: '1x1', timeframes: [params.get('timeframe')], indicators: [], refresh_seconds: 5, history_bars: limit, theme: 'dark',
     });
     if (params.has('variant') && params.get('variant') !== 'default') throw new Error('只支持 default 价格序列');
     if (params.has('enable_cache') && params.get('enable_cache') !== 'true') throw new Error('本入口启用后端缓存');

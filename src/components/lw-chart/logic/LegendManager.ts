@@ -31,16 +31,16 @@ export class LegendManager {
             fontSize: "11px",
             fontFamily: "'Inter', 'Segoe UI', 'Consolas', monospace",
             lineHeight: "14px",
-            color: "#444",
-            background: "rgba(255, 255, 255, 0.3)",
+            color: "var(--chart-legend-value, #444)",
+            background: "var(--chart-legend-bg, rgba(255, 255, 255, 0.3))",
             padding: "4px 6px",
             borderRadius: "3px",
-            border: "1px solid rgba(0,0,0,0.08)",
+            border: "1px solid var(--chart-legend-border, rgba(0,0,0,0.08))",
             pointerEvents: "none",
             display: "none", // 初始隐藏
             flexDirection: "column",
             gap: "1px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+            boxShadow: "0 1px 3px var(--chart-legend-shadow, rgba(0,0,0,0.05))",
             backdropFilter: "blur(8px)"
         });
 
@@ -135,8 +135,8 @@ export class LegendManager {
 
             // 处理不同类型的数据显示
             let valueStr = "";
-            const labelStyle = 'color: #888; margin-right: 2px;';
-            const valStyle = () => `color: #222; font-weight: 500; margin-right: 6px;`;
+            const labelStyle = 'color: var(--chart-legend-label, #888); margin-right: 2px;';
+            const valStyle = () => `color: var(--chart-legend-value, #222); font-weight: 500; margin-right: 6px;`;
 
             if ("open" in data && "high" in data && "low" in data && "close" in data) {
                 // OHLC 数据 (Candle/Bar) - 采用更精简的标签

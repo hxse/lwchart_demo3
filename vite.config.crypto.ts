@@ -7,7 +7,7 @@ export default defineConfig({
     root: resolve(root, 'src/crypto'),
     publicDir: false,
     envDir: root,
-    plugins: [svelte()],
+    plugins: [svelte({ configFile: resolve(root, 'svelte.config.js') })],
     server: { fs: { allow: [root], deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.jj/**', '**/config.toml*', '**/config.local.toml*', '**/config.remote.toml*'] } },
     build: { outDir: resolve(root, 'dist-crypto'), emptyOutDir: true },
 });

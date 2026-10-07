@@ -24,6 +24,22 @@ describe('URL 与菜单的统一配置', () => {
         const single = changeLayout(defaults, '1x1', defaults);
         expect(changeLayout(single, '2x2', defaults).timeframes).toEqual(defaults.timeframes);
     });
+    test('主题读取配置默认值，URL 覆盖并往返，拒绝非法或缺失主题', () => {
+        expect(defaults.theme).toBe('dark');
+        const light = normalizeOptions({ ...defaults, theme: 'light' });
+        expect(parseDashboardQuery('', light).theme).toBe('light');
+        expect(parseDashboardQuery('?theme=dark', light).theme).toBe('dark');
+        expect(parseDashboardQuery('?theme=light', defaults)).toEqual(light);
+        expect(parseDashboardQuery(serializeDashboardQuery(light), defaults)).toEqual(light);
+        for (const theme of [undefined, null, '', 'auto', 'Dark', ['dark'], true]) {
+            expect(() => normalizeOptions({ ...defaults, theme })).toThrow('主题必须是 dark 或 light');
+        }
+        for (const query of ['?theme=auto', '?theme=Dark']) {
+            expect(() => parseDashboardQuery(query, defaults)).toThrow('主题必须是 dark 或 light');
+        }
+        expect(() => parseDashboardQuery('?theme=', defaults)).toThrow('URL 参数不能为空');
+        expect(() => parseDashboardQuery('?theme=dark&theme=light', defaults)).toThrow('URL 含有未知或重复参数');
+    });
     test('拒绝模糊写法、非法参数与重复值，不泄漏未知值', () => {
         for (const query of ['?layout=2x2&timeframes=30m,4h', '?timeframes=1M', '?indicators=ema14', '?indicators=ema,0',
             '?indicators=ema,5;ema,5', '?symbol=', '?symbol=A&symbol=B', '?is_live=1', '?refresh_seconds=1.5', '?timeframes=1h,']) {

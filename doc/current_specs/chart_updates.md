@@ -40,6 +40,21 @@ SeriesDataPatch 为 `{name,data}`，仅支持 Candle／Line 的 UTC 秒数据。
 继续跟随；查看历史时不强制右移，不 reset／fitContent，不重建 chart 或 series。
 新增 EMA 只增加相应系列，candle 和已存在的 EMA 保持实例。
 
+## 图表外观更新
+
+LWChart 导出方法与 onRegister API 提供 `applyOptions(options: DeepPartial<ChartOptions>)`，
+直接转发既有 ChartController／Lightweight Charts 的选项更新，不重建图表或系列。
+初始化 chartOptions props 保持原职责；动态切换颜色显式调用 applyOptions。
+
+```ts
+chartApi.applyOptions({ layout: { textColor: '#d1d4dc' } });
+```
+
+crypto 主题更新只携带背景、文字、网格、坐标轴边框和光标颜色，不携带初始化缩放、
+边距或 rightOffset；主题切换不替换数据、不 fitContent／reset，不改变用户当前视口。
+LegendManager 读取继承的 --chart-legend-bg／value／label／border／shadow CSS 变量，
+未提供变量的旧场景继续使用原浅色图例；两场景没有独立图例引擎。
+
 新看盘的 rightPriceScale.scaleMargins 为 `{top:0.03,bottom:0.03}`，以可见蜡烛的
 最高 high／最低 low 缩放。EMA 的 autoscaleInfoProvider 返回 null，线段可在边缘
 裁剪，不扩张蜡烛范围。价格显示复用已创建的 Intl.NumberFormat；不在每个刻度重新

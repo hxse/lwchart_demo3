@@ -5,10 +5,11 @@
   import { ChartSyncManager } from '../components/lw-chart/logic/ChartSyncManager';
   import { chartSeries, chartPatches } from './data/chartData';
   import type { MarketStream, StreamStatus } from './data/MarketStream';
-  import { EMA_COLORS, type IndicatorSpec } from './options';
+  import { EMA_COLORS, type IndicatorSpec, type Theme } from './options';
+  import { chartTheme } from './theme';
 
-  let { slotId, stream, indicators, sync }: {
-    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; sync: ChartSyncManager;
+  let { slotId, stream, indicators, theme, sync }: {
+    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; sync: ChartSyncManager;
   } = $props();
   let api = $state<ChartApi>();
   let status = $state<StreamStatus>(untrack(() => stream.status));
@@ -18,12 +19,16 @@
   let unregister: (() => void) | undefined;
   const series = $derived(chartSeries(indicators));
   const labels: Record<string,string> = { '1d': '日线', '1w': '周线' };
-  const chartOptions = {
-    layout: { textColor: '#536076', background: { type: 'solid', color: '#fff' }, attributionLogo: true },
-    grid: { vertLines: { color: '#f0f2f5' }, horzLines: { color: '#f0f2f5' } },
-    timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 5 },
-    rightPriceScale: { autoScale: true, scaleMargins: { top: 0.03, bottom: 0.03 } },
-  };
+  const chartOptions = $derived.by(() => {
+    const colors = chartTheme(theme);
+    return {
+      ...colors,
+      layout: { ...colors.layout, attributionLogo: true },
+      timeScale: { ...colors.timeScale, timeVisible: true, secondsVisible: false, rightOffset: 5 },
+      rightPriceScale: { ...colors.rightPriceScale, autoScale: true, scaleMargins: { top: 0.03, bottom: 0.03 } },
+    };
+  });
+  $effect(() => { api?.applyOptions(chartTheme(theme)); });
   function register(value: ChartApi) {
     unregister?.();
     api = value;
@@ -85,13 +90,13 @@
 </section>
 
 <style>
-  .crypto-chart { width:100%; height:100%; position:relative; min-width:0; min-height:0; overflow:hidden; background:white; }
-  .caption { position:absolute; z-index:12; left:9px; top:7px; display:flex; align-items:center; gap:9px; font-size:11px; pointer-events:none; background:rgba(255,255,255,.87); padding:3px 5px; border-radius:3px; }
-  strong { font-weight:600; color:#253247; }
-  .period { font-weight:600; color:#66738a; }
+  .crypto-chart { width:100%; height:100%; position:relative; min-width:0; min-height:0; overflow:hidden; background:var(--chart-background); }
+  .caption { position:absolute; z-index:12; left:9px; top:7px; display:flex; align-items:center; gap:9px; font-size:11px; pointer-events:none; background:var(--chart-overlay); padding:3px 5px; border-radius:3px; }
+  strong { font-weight:600; color:var(--text-color); }
+  .period { font-weight:600; color:var(--secondary-text); }
   .indicator-labels { display:flex; gap:7px; font-size:10px; }
-  .status { position:absolute; z-index:14; left:14px; bottom:30px; max-width:80%; background:rgba(247,249,252,.94); color:#728096; padding:5px 8px; font-size:11px; border-radius:4px; pointer-events:none; }
-  .status.error { background:#fff3f0; color:#bc4535; }
+  .status { position:absolute; z-index:14; left:14px; bottom:30px; max-width:80%; background:var(--status-background); color:var(--secondary-text); padding:5px 8px; font-size:11px; border-radius:4px; pointer-events:none; }
+  .status.error { background:var(--error-background); color:var(--error-text); }
   :global(.crypto-chart .chart-legend) { top:34px !important; }
   @media(max-width:700px) { .indicator-labels { display:none; } .caption { font-size:10px; gap:4px; } }
 </style>

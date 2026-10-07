@@ -4,6 +4,8 @@ import {
     type IChartApi,
     type ISeriesApi,
     type UTCTimestamp,
+    type ChartOptions,
+    type DeepPartial,
 } from "lightweight-charts";
 import type { SeriesConfig, SeriesMode, SeriesDataPatch } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
@@ -178,7 +180,7 @@ export class ChartController {
         }
     }
 
-    applyOptions(options: any) {
+    applyOptions(options: DeepPartial<ChartOptions>) {
         this.chart?.applyOptions(options);
     }
 

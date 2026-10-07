@@ -37,6 +37,7 @@ test('Notebook 原 UMD／ES 导出、ZIP 与回测图例继续工作，原网格
     await page.goto('http://127.0.0.1:43175/legacy');
     await expect(page.locator('.chart-container')).toHaveCount(2);
     await expect(page.locator('canvas').first()).toBeVisible();
+    await expect(page.locator('.chart-container').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)');
     expect(await page.evaluate(() => Object.keys((window as any).ChartDashboardLib).sort())).toEqual(['default', 'mountDashboard']);
     const es = await (await request.get('http://127.0.0.1:43175/legacy-assets/chart-dashboard.es.js')).text();
     expect(es).toContain('mountDashboard');
@@ -44,6 +45,7 @@ test('Notebook 原 UMD／ES 导出、ZIP 与回测图例继续工作，原网格
     const bounds = await page.locator('.chart-container').first().boundingBox();
     await page.mouse.move(bounds!.x + bounds!.width * .55, bounds!.y + bounds!.height * .5);
     await expect(page.locator('.chart-legend').first()).toBeVisible();
+    await expect(page.locator('.chart-legend').first().locator('span').nth(1)).toHaveCSS('color', 'rgb(34, 34, 34)');
     await expect(page.locator('.chart-legend').nth(1)).toBeVisible();
     // 样本风险线仅存在于单根进出场 K 线，移动到该根再验证图例。
     for (let x = 70; x < bounds!.width - 65; x += 4) {
@@ -53,5 +55,27 @@ test('Notebook 原 UMD／ES 导出、ZIP 与回测图例继续工作，原网格
     await expect(page.locator('.chart-legend').first()).toContainText('L-SL-PCT');
     await expect(page.locator('.chart-legend').first()).toContainText('L-TP-PCT');
     await page.screenshot({ path: 'test-results/legacy-notebook.png' });
+    expect(errors).toEqual([]);
+});
+
+test('旧浏览器入口的路由、ZIP 看图与 Parquet 表格在升级后可用', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(() => {
+        localStorage.setItem('baseUrl', 'http://127.0.0.1:43175');
+        localStorage.setItem('username', 'offline-user');
+        localStorage.setItem('password', 'OFFLINE_PRIVATE_$()_MARKER');
+    });
+    await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+    await page.goto('http://127.0.0.1:43175/');
+    await page.getByRole('button', { name: '图表看板', exact: true }).click();
+    await page.locator('select').filter({ has: page.locator('option', { hasText: '选择 ZIP 文件...' }) }).selectOption('0');
+    await expect(page.locator('.chart-container')).toHaveCount(2);
+    await expect(page.locator('canvas').first()).toBeVisible();
+    await page.getByRole('button', { name: '表格', exact: true }).click();
+    await page.locator('select').filter({ has: page.locator('option', { hasText: 'samples/alltypes_plain.parquet' }) }).selectOption({ label: 'samples/alltypes_plain.parquet' });
+    await expect(page.locator('.tabulator-row')).toHaveCount(8);
+    await expect(page.locator('.tabulator-col-title', { hasText: /^id$/ })).toBeVisible();
+    await page.screenshot({ path: 'test-results/legacy-browser-parquet.png' });
     expect(errors).toEqual([]);
 });

@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { OhlcvRow } from '../../src/crypto/data/ohlcv';
 import { legacyZip } from './legacy';
+import { staticHandler } from '../../scripts/crypto/static';
 
 // 此服务仅由离线测试显式启动，不进入生产 API 或构建。
 const root = resolve(import.meta.dirname, '../..');
@@ -81,6 +82,7 @@ async function main() {
     await Bun.write(config, configText); await Bun.write(devConfig, configText.replace('port = 43174', 'port = 43176'));
     await run(['just', 'crypto', '--build']);
     await run(['just', 'legacy', '--build', `--config=${config}`]);
+    await run(['bun', 'run', 'build']);
     for (const filename of await readdir(join(root, 'dist-lib'))) {
         const original = await Bun.file(join(root, 'dist-lib', filename)).bytes();
         const copied = await Bun.file(join(target, filename)).bytes();
@@ -88,9 +90,11 @@ async function main() {
         if (new TextDecoder().decode(original).includes(secret)) throw new Error('测试凭据进入旧产物');
     }
     const zip = await legacyZip();
+    const oldApp = staticHandler(join(root, 'dist'));
     const styles = (await readdir(join(root, 'dist-lib'))).filter(n => n.endsWith('.css'));
     mock = Bun.serve({ hostname: '127.0.0.1', port: 43175, async fetch(request) {
         const url = new URL(request.url);
+        if (url.pathname === '/' || url.pathname.startsWith('/assets/')) return oldApp(request);
         if (url.pathname === '/__fixture') {
             if (request.method === 'POST') {
                 const state = await request.json();
@@ -117,6 +121,11 @@ async function main() {
             if (form.get('username') !== 'offline-user' || form.get('password') !== secret || form.get('grant_type') !== 'password') return new Response(null, { status: 401 });
             metrics.logins++;
             return Response.json({ access_token: 'offline-jwt', token_type: 'bearer', expires_in: 3600 });
+        }
+        if (url.pathname.startsWith('/file/') && request.method === 'GET') {
+            if (request.headers.get('Authorization') !== 'Bearer offline-jwt') return new Response(null, { status: 401 });
+            if (url.pathname === '/file/list') return Response.json({ files: [{ filename: 'legacy.zip', path: 'fixture/legacy.zip' }] });
+            if (url.pathname === '/file/download') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         }
         if (!url.pathname.startsWith('/ccxt/fetch_ohlcv/') || request.method !== 'GET') return new Response(null, { status: 404 });
         if (request.headers.get('Authorization') !== 'Bearer offline-jwt') return new Response(null, { status: 401 });

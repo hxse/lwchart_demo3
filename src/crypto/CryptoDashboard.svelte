@@ -8,7 +8,8 @@
   import { MarketHub } from './data/MarketHub';
   import type { MarketStream } from './data/MarketStream';
   import { parseDashboardQuery, serializeDashboardQuery } from './query';
-  import { LAYOUTS, type DashboardOptions, type RuntimeOptions } from './options';
+  import { LAYOUTS, indicatorString, parseIndicators, type DashboardOptions, type RuntimeOptions } from './options';
+  import { themeStyles } from './theme';
 
   const client = new CryptoClient();
   const sync = new ChartSyncManager();
@@ -20,9 +21,13 @@
   let menuVersion = $state(0);
   let hub: MarketHub | undefined;
   let menuStart: { url: string; options: DashboardOptions | undefined; error: string } | undefined;
+  const theme = $derived(options?.theme ?? runtime?.defaults.theme ?? 'dark');
+  // 等价指标配置保持同一引用，切换颜色不触发数据重订阅和 setData。
+  const indicatorKey = $derived(indicatorString(options?.indicators || []));
+  const indicators = $derived(parseIndicators(indicatorKey));
   const items = $derived(streams.map((stream, index) => ({
     id: `slot-${index}`, component: CryptoChartPane,
-    props: { slotId: `slot-${index}`, stream, indicators: options?.indicators || [], sync },
+    props: { slotId: `slot-${index}`, stream, indicators, theme, sync },
   })));
 
   function urlFor(value: DashboardOptions) {
@@ -89,7 +94,7 @@
   });
 </script>
 
-<main class="dashboard" aria-label="加密货币多周期看盘">
+<main class="dashboard" data-theme={theme} style={themeStyles(theme)} aria-label="加密货币多周期看盘">
   {#if options && streams.length}
     <GridTemplate {items} templateConfig={LAYOUTS[options.layout]} gap="2px" />
   {:else}
@@ -106,10 +111,10 @@
 </main>
 
 <style>
-  .dashboard { width:100%; height:100%; overflow:hidden; background:#dce2ea; }
-  .toggle { position:fixed; z-index:110; top:8px; right:10px; width:32px; height:30px; padding:0; display:grid; place-items:center; border:1px solid #ccd5e099; border-radius:7px; background:rgba(255,255,255,.64); color:#52647f; font-size:18px; cursor:pointer; opacity:.7; box-shadow:0 2px 8px #24324811; }
-  .toggle:hover,.toggle[aria-expanded="true"] { opacity:1; background:white; }
+  .dashboard { width:100%; height:100%; overflow:hidden; background:var(--dashboard-divider); color:var(--text-color); }
+  .toggle { position:fixed; z-index:110; top:8px; right:10px; width:32px; height:30px; padding:0; display:grid; place-items:center; border:1px solid var(--ui-border); border-radius:7px; background:var(--toggle-background); color:var(--secondary-text); font-size:18px; cursor:pointer; opacity:.7; box-shadow:0 2px 8px var(--ui-shadow); }
+  .toggle:hover,.toggle[aria-expanded="true"] { opacity:1; background:var(--surface-background); }
   .toggle:disabled { cursor:wait; }
-  .empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#64718a; font-size:13px; background:#f8fafc; }
+  .empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--secondary-text); font-size:13px; background:var(--chart-background); }
   .empty p { max-width:80%; font-size:12px; }
 </style>

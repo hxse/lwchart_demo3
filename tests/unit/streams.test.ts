@@ -111,7 +111,7 @@ test('默认五秒、慢请求不重叠、卸载取消且丢弃旧响应', async
     } finally { stream.dispose(); timer.mockRestore(); }
 });
 
-test('重复周期共享请求，失败隔离，变品种释放旧状态，改 EMA 与节拍不重载', async () => {
+test('重复周期共享请求，失败隔离，变品种释放旧状态，改 EMA、主题与节拍不重载', async () => {
     const calls: string[] = [];
     const source: OhlcvSource = {
         async history(id) {
@@ -129,7 +129,8 @@ test('重复周期共享请求，失败隔离，变品种释放旧状态，改 E
         expect(calls).toHaveLength(3);
         expect(streams[2]!.status.phase).toBe('error');
         expect(streams[0]!.status.phase).toBe('ready');
-        hub.configure({ ...defaults, timeframes: ['30m', '30m', '4h', '1d'], indicators: [], refresh_seconds: 7 });
+        const themed = hub.configure({ ...defaults, timeframes: ['30m', '30m', '4h', '1d'], theme: 'light', indicators: [], refresh_seconds: 7 });
+        expect(themed).toEqual(streams);
         expect(calls).toHaveLength(3);
         const changed = hub.configure({ ...defaults, symbol: 'ETH/USDT:USDT' });
         await Promise.all(changed.map(s => s.poll()));

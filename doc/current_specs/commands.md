@@ -41,6 +41,19 @@ check:svelte 检查全部前端；check:ts 检查 Vite／Playwright 配置；che
 检查 Bun 服务及测试，允许由 Bun 转译的 TypeScript class 语法。
 Just 串行组织检查，均不格式化或改写源码。
 
+## 依赖与构建工具
+
+package.json 与 bun.lock 是唯一项目依赖链，安装使用 `bun install --frozen-lockfile`，
+显式升级使用 `bun update --latest`；本项目没有 uv 管理的 Python 依赖。
+Vite 使用正式 8 系列，旧 rolldown-vite 别名与 override 退出；crypto 明确加载
+根目录 svelte.config.js。旧浏览器构建用 rolldownOptions 将表格库独立成包，
+Notebook 库仍输出原 ES／UMD 文件名和全局名。
+
+TypeScript 按官方组合安装：@typescript/native 别名提供 7 系列 tsc，typescript
+指向 @typescript/typescript6，提供 Svelte 工具必需的 JS API。
+check:svelte 使用 --tsgo --incremental，全部正式类型检查使用 7 编译器；
+不在检查失败时回退到旧编译器。生成的 .svelte-check 缓存不纳入版本控制。
+
 ## 私有配置
 
 config.toml 与其备份忽略跟踪，完整公共模板为
@@ -52,7 +65,7 @@ config.toml 与其备份忽略跟踪，完整公共模板为
 
 `just test` 顺序执行 Bun 逻辑／服务回归和 Playwright 浏览器测试。
 所有数据为本地 fixture；不登录真实后端，不请求外网，不隐式安装浏览器。
-浏览器套件构建新页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
+浏览器套件构建新页面、旧演示页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
 真实 pyo3-quant 目录。虚拟鉴权后端与开发／生产适配服务只绑定本机测试端口。
 测试结束关闭所属进程、清理临时配置；截图和失败 trace 留在忽略的 test-results。
 

@@ -11,7 +11,7 @@ bun install --frozen-lockfile
 没有私有配置时，将根目录 config.example.toml 复制为 config.toml，再填写
 backend.username／password。账号对应 ccxt-proxy2 的 `[users.<username>]`，
 是后端登录账号；默认后端为 `http://127.0.0.1:5123`。
-已有 config.toml 可直接使用；配置修改后重启看盘服务。
+已有 config.toml 的 `[dashboard]` 需包含 `theme = "dark"`；配置修改后重启看盘服务。
 
 ```bash
 just crypto
@@ -20,6 +20,7 @@ just crypto
 打开 `http://127.0.0.1:5174/`。默认显示左上 30m、右上 4h、左下日线、右下周线，
 EMA14／50／100 为橙／绿／蓝，每 5 秒更新。鼠标光标跨周期联动；拖动查看历史
 不会被更新拉回末尾。首次打开会自动补全完整 URL 参数。
+默认深色，右上角设置里的“主题”可切换“深色”“浅色”，切换保留当前缩放和位置。
 右上角齿轮展开设置，有效修改会自动同步 URL 并预览图表；文字输入合并 250 毫秒，
 避免每个按键都请求历史。应用提交，取消／关闭／Esc 恢复打开前的配置和 URL。
 浏览器前进／后退也会同步打开中的设置菜单。
@@ -46,12 +47,14 @@ http://127.0.0.1:5174/?timeframes=15m,1h,1d,1w&indicators=ema,5;ema,14;ema,50
 http://127.0.0.1:5174/?layout=1x2&timeframes=30m,4h&indicators=none
 http://127.0.0.1:5174/?market=spot&symbol=BTC%2FUSDT&timeframes=1h
 http://127.0.0.1:5174/?history_bars=500
+http://127.0.0.1:5174/?theme=light
 ```
 
 layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2；周期列表按槽顺序填写。
 仅写周期列表会按数量选择布局；显式写布局时数量必须一致。
 指标写 `ema,周期`，多个用分号连接；`none` 不画指标，`ema14` 不接受。
 URL 与菜单还可设置 exchange_name、market、is_live、refresh_seconds、history_bars。
+主题参数 theme 仅支持 dark／light；配置中的同名字段决定没有 URL 覆盖时的默认主题。
 完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
 
 ## 历史与断网

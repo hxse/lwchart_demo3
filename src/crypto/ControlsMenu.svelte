@@ -57,10 +57,13 @@
       <label>市场<select name="market" bind:value={draft.market}><option value="future">合约</option><option value="spot">现货</option></select></label>
       <label>环境<select name="is_live" bind:value={draft.is_live}><option value={true}>实盘行情</option><option value={false}>模拟盘行情</option></select></label>
     </div>
-    <label>布局<select name="layout" value={draft.layout}
-      onchange={event => { draft = changeLayout(draft, event.currentTarget.value as Layout, defaults); }}>
-      {#each Object.keys(LAYOUTS) as layout}<option value={layout}>{layout.replace('x',' × ')}</option>{/each}
-    </select></label>
+    <div class="row">
+      <label>布局<select name="layout" value={draft.layout}
+        onchange={event => { draft = changeLayout(draft, event.currentTarget.value as Layout, defaults); }}>
+        {#each Object.keys(LAYOUTS) as layout}<option value={layout}>{layout.replace('x',' × ')}</option>{/each}
+      </select></label>
+      <label>主题<select name="theme" bind:value={draft.theme}><option value="dark">深色</option><option value="light">浅色</option></select></label>
+    </div>
     <div class="periods">
       {#each draft.timeframes as _, index}
         <label>窗口 {index + 1}<select name={`timeframe-${index}`} bind:value={draft.timeframes[index]}>
@@ -82,21 +85,21 @@
 </div>
 
 <style>
-  .menu { position:fixed; z-index:100; top:48px; right:12px; width:350px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 64px); overflow:auto; padding:18px; box-sizing:border-box; background:rgba(255,255,255,.98); border:1px solid #dce2ec; box-shadow:0 14px 50px #1c294322; border-radius:12px; }
-  .heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; color:#253247; }
-  .close { border:none; font-size:24px; padding:0 4px; background:none; color:#728096; }
+  .menu { position:fixed; z-index:100; top:48px; right:12px; width:350px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 64px); overflow:auto; padding:18px; box-sizing:border-box; background:var(--surface-background); border:1px solid var(--ui-border); box-shadow:0 14px 50px var(--ui-shadow); border-radius:12px; }
+  .heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; color:var(--text-color); }
+  .close { border:none; font-size:24px; padding:0 4px; background:none; color:var(--secondary-text); }
   form { display:flex; flex-direction:column; gap:13px; }
-  label { display:flex; flex-direction:column; gap:6px; font-size:11px; color:#64718a; flex:1; min-width:0; }
-  input,select,textarea { box-sizing:border-box; width:100%; border:1px solid #dbe2ec; padding:8px; border-radius:5px; background:#fff; color:#243248; font-size:12px; font-family:inherit; }
-  input:focus,select:focus,textarea:focus { outline:2px solid #5084dd44; border-color:#5084dd; }
+  label { display:flex; flex-direction:column; gap:6px; font-size:11px; color:var(--secondary-text); flex:1; min-width:0; }
+  input,select,textarea { box-sizing:border-box; width:100%; border:1px solid var(--ui-border); padding:8px; border-radius:5px; background:var(--field-background); color:var(--text-color); font-size:12px; font-family:inherit; }
+  input:focus,select:focus,textarea:focus { outline:2px solid var(--accent); border-color:var(--accent); }
   .row,.periods { display:flex; gap:8px; }
   .periods { flex-wrap:wrap; } .periods label { min-width:65px; }
-  .hint { margin-top:-8px; font-size:10px; color:#919cae; }
+  .hint { margin-top:-8px; font-size:10px; color:var(--muted-text); }
   .small-actions,.footer { display:flex; gap:8px; }
   .small-actions { margin-top:-7px; }
-  button { cursor:pointer; border:1px solid #dbe2ec; background:white; color:#53627b; padding:7px 11px; border-radius:5px; font-size:11px; }
+  button { cursor:pointer; border:1px solid var(--ui-border); background:var(--field-background); color:var(--secondary-text); padding:7px 11px; border-radius:5px; font-size:11px; }
   .small-actions button { font-size:10px; padding:4px 8px; }
   .footer { justify-content:flex-end; margin-top:5px; }
-  .apply { background:#346bc1; color:white; border-color:#346bc1; }
-  .error { font-size:11px; color:#b44235; margin:0; }
+  .apply { background:var(--accent); color:white; border-color:var(--accent); }
+  .error { font-size:11px; color:var(--error-text); margin:0; }
 </style>

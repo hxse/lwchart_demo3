@@ -9,6 +9,7 @@ just legacy   # 构建 Notebook 图表库，复制到 ~/dev/pyo3-quant/data/lwch
 
 实时看盘从 config.toml 读取后端鉴权配置，格式见 config.example.toml。
 默认四图为 30m／4h／日线／周线，显示 EMA14／50／100，每 5 秒增量更新。
+默认深色，右上角设置可切换深浅主题，也可通过 URL 的 theme=dark／light 指定。
 
 [看盘使用指南](doc/guides/crypto_dashboard.md) ·
 [当前命令规范](doc/current_specs/commands.md) ·

@@ -38,6 +38,7 @@ export function serializeDashboardQuery(options: DashboardOptions): string {
         layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
         refresh_seconds: String(o.refresh_seconds),
         history_bars: String(o.history_bars),
+        theme: o.theme,
     }).toString();
 }
 

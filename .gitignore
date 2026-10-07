@@ -2,6 +2,7 @@ dist-lib/
 dist-crypto/
 test-results/
 playwright-report/
+.svelte-check/
 docs/context/
 
 # 本地运行配置与草稿

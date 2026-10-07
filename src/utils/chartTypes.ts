@@ -3,7 +3,7 @@
  * 用于 LWChart 组件和 GridItemBuilder
  */
 
-import type { CandlestickData, LineData, UTCTimestamp } from 'lightweight-charts';
+import type { CandlestickData, LineData, UTCTimestamp, ChartOptions, DeepPartial } from 'lightweight-charts';
 
 export interface SeriesDataPatch {
     name: string;
@@ -18,6 +18,7 @@ export interface ChartApi {
     scrollToTime: (time: number) => void;
     resetTimeScale: () => void;
     fitContent: () => void;
+    applyOptions: (options: DeepPartial<ChartOptions>) => void;
     replaceSeriesData: (patches: SeriesDataPatch[]) => void;
     updateSeriesData: (patches: SeriesDataPatch[]) => void;
 }

@@ -16,6 +16,9 @@ URL、控制菜单、行情状态和本地鉴权服务与旧 ZIP／Notebook 场�
 `30m,4h,1d,1w`，图表填满视口。EMA14／50／100 依次为橙／绿／蓝，色值
 为 `#FF9800`、`#4CAF50`、`#2196F3`。更新间隔默认 5 秒。
 每周期默认请求并保留最多 1500 根，数量在配置、URL 和菜单统一限制为 1..10000。
+默认 theme=dark，设置可切换深色／浅色。画布、菜单、标题、状态、坐标轴、光标和
+共享图例使用同一主题；首次配置加载前使用暗色背景。
+只改主题更新现有图表颜色，保留系列、数据订阅和视口，不重取行情。
 
 右上角设置按钮默认收起；菜单覆盖图表，不改变图表尺寸。
 首次打开与前进／后退用 replaceState 补全完整有效 URL，保留 fragment，不增加历史项。
@@ -35,6 +38,7 @@ URL、控制菜单、行情状态和本地鉴权服务与旧 ZIP／Notebook 场�
 | indicators | none 或 `ema,5;ema,14;ema,50`；周期 1..100000，至多 12 项且不重复 |
 | refresh_seconds | 1..3600 严格整数 |
 | history_bars | 1..10000 严格整数；每图初始请求与滚动保留上限 |
+| theme | dark 或 light；TOML 默认 dark，菜单显示深色／浅色 |
 
 周期为 `1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w`。
 仅传 layout 时取默认周期的前 N 项，不够则报错；仅传 timeframes 且数量变化时，
@@ -42,6 +46,7 @@ URL、控制菜单、行情状态和本地鉴权服务与旧 ZIP／Notebook 场�
 菜单改变布局保留前 N 项，新增槽从默认周期补齐。
 未知／重复参数、非法类型、空项及含糊指标写法均报错，不回显未知值。
 首次参数错误不取行情、不覆盖无效 URL；菜单错误保留最后有效图表和 URL。
+theme 为必填配置字段，大小写变体、auto 或空值均非法；完整 URL 包含全部十个字段。
 
 ## 本地 API 与鉴权
 
@@ -55,6 +60,7 @@ URL、控制菜单、行情状态和本地鉴权服务与旧 ZIP／Notebook 场�
 
 runtime 为 `{ defaults: DashboardOptions, data: DataBudget }`，不含 backend、server、
 legacy 或凭据。history_bars 只在 defaults 中；data 仅包含增量数量与每轮补齐页数。
+theme 同样只在 defaults 中；前端与本地服务必须使用匹配的新投影，升级后重启服务。
 行情查询只接受 exchange_name、market、is_live、symbol、timeframe、
 limit 和可选 variant=default、enable_cache=true；since-limit 另需 since。
 适配层转发同名 `/ccxt/...` 路由，不提供通配或写代理。
@@ -95,7 +101,7 @@ since=1000000000000、相同 limit，避免大量周线倒推产生非法起点�
 不通过 interval、本机时间或响应数量生成游标，不叠加网络即时重试。
 
 同身份请求单飞。改变身份和退出取消请求／timer，已释放状态拒绝迟到响应。
-每身份最多保留 history_bars 根；只改 EMA、布局或节拍不重取未变身份的历史。
+每身份最多保留 history_bars 根；只改 EMA、布局、主题或节拍不重取未变身份的历史。
 数量改变时取消旧请求、释放旧状态，按新数量重取和保留；同身份、同数量重复槽共享。
 历史数量由 URL／菜单覆盖 TOML 默认值；增量数量 2..1000，每轮页数 1..100，仅由 TOML 配置。
 

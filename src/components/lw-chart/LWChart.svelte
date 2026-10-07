@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import type { ChartOptions, DeepPartial } from 'lightweight-charts';
   import type { SeriesConfig, SeriesMode, SeriesDataPatch, ChartApi } from "../../utils/chartTypes";
   import { ChartController } from "./logic/ChartController";
 
@@ -39,6 +40,7 @@
 
   export const replaceSeriesData = (patches: SeriesDataPatch[]) => controller.replaceSeriesData(patches);
   export const updateSeriesData = (patches: SeriesDataPatch[]) => controller.updateSeriesData(patches);
+  export const applyOptions = (options: DeepPartial<ChartOptions>) => controller.applyOptions(options);
 
   // Exported methods for external sync
   export const setCrosshair = (param: any) => {
@@ -90,6 +92,7 @@
         scrollToTime,
         resetTimeScale,
         fitContent: doFitContent,
+        applyOptions,
         replaceSeriesData,
         updateSeriesData,
       });
@@ -216,7 +219,7 @@
     flex: 1;
     width: 100%;
     height: 100%;
-    background: white;
+    background: var(--chart-background, white);
     overflow: hidden;
   }
 </style>

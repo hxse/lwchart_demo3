@@ -10,7 +10,8 @@ test('裸地址与部分参数自动补全，实时预览不增加历史；非�
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(4);
     const original = page.url();
     const defaults = new URL(original);
-    expect(defaults.searchParams.size).toBe(9);
+    expect(defaults.searchParams.size).toBe(10);
+    expect(defaults.searchParams.get('theme')).toBe('dark');
     expect(defaults.searchParams.get('timeframes')).toBe('30m,4h,1d,1w');
     expect(defaults.searchParams.get('indicators')).toBe('ema,14;ema,50;ema,100');
     expect(defaults.searchParams.get('refresh_seconds')).toBe('5');
@@ -49,7 +50,7 @@ test('裸地址与部分参数自动补全，实时预览不增加历史；非�
     await page.goto('/?timeframes=1h&indicators=none#one');
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(1);
     const partial = new URL(page.url());
-    expect(partial.searchParams.size).toBe(9);
+    expect(partial.searchParams.size).toBe(10);
     expect(partial.searchParams.get('layout')).toBe('1x1');
     expect(partial.searchParams.get('timeframes')).toBe('1h');
     expect(partial.searchParams.get('indicators')).toBe('none');

@@ -13,6 +13,7 @@ export const EMA_COLORS = ['#FF9800', '#4CAF50', '#2196F3'];
 export const MAX_HISTORY_BARS = 10000;
 export type Timeframe = typeof TIMEFRAMES[number];
 export type Layout = keyof typeof LAYOUTS;
+export type Theme = 'dark' | 'light';
 export interface IndicatorSpec { type: 'ema'; period: number }
 export interface DashboardOptions {
     exchange_name: 'binance' | 'kraken';
@@ -24,10 +25,11 @@ export interface DashboardOptions {
     indicators: IndicatorSpec[];
     refresh_seconds: number;
     history_bars: number;
+    theme: Theme;
 }
 export interface DataBudget { incremental_bars: number; max_catchup_pages: number }
 export interface RuntimeOptions { defaults: DashboardOptions; data: DataBudget }
-export const OPTION_KEYS = ['exchange_name','market','is_live','symbol','layout','timeframes','indicators','refresh_seconds','history_bars'] as const;
+export const OPTION_KEYS = ['exchange_name','market','is_live','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme'] as const;
 
 export function record(value: unknown, label: string): Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} 必须是表`);
@@ -79,6 +81,7 @@ export function normalizeOptions(input: unknown): DashboardOptions {
     if (typeof value.exchange_name !== 'string' || !['binance', 'kraken'].includes(value.exchange_name)) throw new Error('交易所必须是 binance 或 kraken');
     if (typeof value.market !== 'string' || !['future', 'spot'].includes(value.market)) throw new Error('市场必须是 future 或 spot');
     if (typeof value.is_live !== 'boolean') throw new Error('is_live 必须是 true 或 false');
+    if (value.theme !== 'dark' && value.theme !== 'light') throw new Error('主题必须是 dark 或 light');
     const symbol = text(value.symbol, '品种');
     if (symbol.length > 128 || /[\u0000-\u001f]/.test(symbol)) throw new Error('品种格式无效');
     if (typeof value.layout !== 'string' || !Object.hasOwn(LAYOUTS, value.layout)) throw new Error('未知图表布局');
@@ -91,6 +94,7 @@ export function normalizeOptions(input: unknown): DashboardOptions {
         symbol, layout, timeframes: [...value.timeframes], indicators: parseIndicators(value.indicators),
         refresh_seconds: integer(value.refresh_seconds, 1, 3600, '更新间隔'),
         history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'),
+        theme: value.theme,
     };
 }
 export function normalizeBudget(input: unknown): DataBudget {

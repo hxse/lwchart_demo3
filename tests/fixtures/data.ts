@@ -5,7 +5,7 @@ import type { MarketIdentity } from '../../src/crypto/data/client';
 export const defaults: DashboardOptions = normalizeOptions({
     exchange_name: 'binance', market: 'future', is_live: true, symbol: 'BTC/USDT:USDT',
     layout: '2x2', timeframes: ['30m', '4h', '1d', '1w'],
-    indicators: ['ema,14', 'ema,50', 'ema,100'], refresh_seconds: 5, history_bars: 1500,
+    indicators: ['ema,14', 'ema,50', 'ema,100'], refresh_seconds: 5, history_bars: 1500, theme: 'dark',
 });
 export const budget: DataBudget = { incremental_bars: 10, max_catchup_pages: 20 };
 export const identity: MarketIdentity = {

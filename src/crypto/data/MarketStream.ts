@@ -1,14 +1,14 @@
 import { CandleStore, type DataChange } from './CandleStore';
-import { validateOhlcv } from './ohlcv';
-import type { MarketIdentity, OhlcvSource } from './client';
-import type { DataBudget, IndicatorSpec } from '../options';
+import { validateBatch } from './ohlcv';
+import type { MarketIdentity, MarketSource } from './client';
+import { UPDATE_BARS, type IndicatorSpec } from '../options';
 
-export type StreamPhase = 'loading' | 'ready' | 'empty' | 'catching-up' | 'error';
+export type StreamPhase = 'loading' | 'ready' | 'empty' | 'reloading' | 'error';
 export interface StreamStatus { phase: StreamPhase; message: string; count: number; updatedAt: number | null }
 export type StreamEvent = { kind: 'status' } | DataChange;
 type Listener = (event: StreamEvent) => void;
 
-/** 每个行情身份独立单飞；相同周期槽位共享数据而保留独立图表。 */
+/** 单身份只读最新窗口；断开时整批替换，不维护 since 游标或分页。 */
 export class MarketStream {
     readonly store: CandleStore;
     status: StreamStatus = { phase: 'loading', message: '正在加载历史…', count: 0, updatedAt: null };
@@ -18,13 +18,12 @@ export class MarketStream {
     private controller: AbortController | null = null;
     private disposed = false;
     private refreshSeconds = 0;
-
-    constructor(readonly identity: MarketIdentity, private source: OhlcvSource, private budget: DataBudget, readonly historyBars: number) {
+    private reload = true;
+    constructor(readonly identity: MarketIdentity, private source: MarketSource, readonly historyBars: number) {
         this.store = new CandleStore(historyBars);
     }
     subscribe(listener: Listener) {
-        this.listeners.add(listener);
-        listener(this.store.snapshot());
+        this.listeners.add(listener); listener(this.store.snapshot());
         return () => this.listeners.delete(listener);
     }
     private emit(event: StreamEvent) { for (const listener of this.listeners) listener(event); }
@@ -35,8 +34,7 @@ export class MarketStream {
     configure(indicators: IndicatorSpec[], refreshSeconds: number) {
         const old = [...this.store.emas.keys()].sort((a,b) => a-b).join(',');
         this.store.setIndicators(indicators);
-        const changed = old !== [...this.store.emas.keys()].sort((a,b) => a-b).join(',');
-        if (changed) this.emit(this.store.snapshot());
+        if (old !== [...this.store.emas.keys()].sort((a,b) => a-b).join(',')) this.emit(this.store.snapshot());
         if (this.refreshSeconds !== refreshSeconds || !this.timer) {
             if (this.timer) clearInterval(this.timer);
             this.refreshSeconds = refreshSeconds;
@@ -53,36 +51,31 @@ export class MarketStream {
         }).finally(() => { this.inFlight = null; this.controller = null; });
         return this.inFlight;
     }
+    private async replaceWindow(signal: AbortSignal) {
+        const response = validateBatch(await this.source.latest(this.identity, this.historyBars, signal), this.historyBars);
+        if (this.disposed || signal.aborted) return;
+        this.emit(this.store.initialize(response.rows));
+        this.reload = response.rows.length === 0;
+        this.setStatus(response.rows.length ? 'ready' : 'empty', response.rows.length ? '' : '暂无历史数据，等待下一次更新', true);
+    }
     private async fetchCycle(signal: AbortSignal) {
-        if (this.store.tail === undefined) {
-            const response = validateOhlcv(await this.source.history(this.identity, this.historyBars, signal), this.historyBars);
-            if (this.disposed || signal.aborted) return;
-            this.emit(this.store.initialize(response.rows));
-            this.setStatus(response.rows.length ? 'ready' : 'empty', response.rows.length ? '' : '暂无历史数据，等待下一次更新', response.rows.length > 0);
+        if (this.reload) { await this.replaceWindow(signal); return; }
+        const response = validateBatch(await this.source.latest(this.identity, UPDATE_BARS, signal), UPDATE_BARS);
+        if (this.disposed || signal.aborted) return;
+        if (response.rows.length && response.rows.at(-1)![0] < this.store.tail!) throw new Error('返回的最新时间早于已有行情，保留当前窗口');
+        const change = this.store.merge(response.rows);
+        if (change) {
+            if (change.kind === 'replace' || change.rows.length || [...change.emas.values()].some(points => points.length)) this.emit(change);
+            this.setStatus('ready', '', true);
             return;
         }
-        for (let page = 0; page < this.budget.max_catchup_pages; page++) {
-            const since = this.store.tail!;
-            const response = validateOhlcv(await this.source.increment(this.identity, since, this.budget.incremental_bars, signal), this.budget.incremental_bars);
-            if (this.disposed || signal.aborted) return;
-            if (!response.rows.length) throw new Error('增量暂未返回数据，保留已有行情');
-            if (response.rows[0]![0] !== since) throw new Error('增量缺少末根重叠，等待数据恢复');
-            const last = response.rows.at(-1)![0];
-            if (response.rows.length === this.budget.incremental_bars && last <= since) throw new Error('补齐数据没有进展');
-            this.emit(this.store.merge(response.rows));
-            if (response.rows.length < this.budget.incremental_bars) {
-                this.setStatus('ready', '', true);
-                return;
-            }
-            this.setStatus('catching-up', '正在补齐断网期间行情…', true);
-        }
-        this.setStatus('catching-up', '正在补齐，下一轮继续…', true);
+        this.reload = true;
+        this.setStatus('reloading', '行情窗口断开，正在重新加载…');
+        await this.replaceWindow(signal);
     }
     dispose() {
-        this.disposed = true;
-        this.controller?.abort();
+        this.disposed = true; this.controller?.abort();
         if (this.timer) clearInterval(this.timer);
-        this.timer = null;
-        this.listeners.clear();
+        this.timer = null; this.listeners.clear();
     }
 }

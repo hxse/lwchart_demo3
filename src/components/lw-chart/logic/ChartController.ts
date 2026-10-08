@@ -6,6 +6,7 @@ import {
     type UTCTimestamp,
     type ChartOptions,
     type DeepPartial,
+    type TimeFormatterFn,
 } from "lightweight-charts";
 import type { SeriesConfig, SeriesMode, SeriesDataPatch } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
@@ -20,6 +21,7 @@ export class ChartController {
         return this.registry?.seriesMap ?? new Map();
     }
     private legendManager: LegendManager | null = null;
+    private crosshairTime: number | undefined;
 
     init(container: HTMLElement, options?: Record<string, any>) {
         this.chart = createChart(container, {
@@ -35,6 +37,9 @@ export class ChartController {
             ...options
         });
         this.registry = new SeriesRegistry(this.chart);
+        this.chart.subscribeCrosshairMove(param => {
+            this.crosshairTime = typeof param.time === 'number' ? param.time : undefined;
+        });
     }
 
     updateSeries(configs: SeriesConfig[], mode: SeriesMode = 'replace') {
@@ -63,6 +68,7 @@ export class ChartController {
         this.legendManager = new LegendManager();
         this.legendManager.setShowInAll(showLegendInAll);
         this.legendManager.setChart(this.chart!);
+        this.legendManager.setTimeFormatter(this.chart!.options().localization.timeFormatter);
         this.legendManager.create(container);
 
         this.chart?.subscribeCrosshairMove((param) => {
@@ -89,11 +95,7 @@ export class ChartController {
 
     setCrosshair(param: any) {
         if (!this.chart || !param || !param.time || this.seriesMap.size === 0) {
-            this.chart?.clearCrosshairPosition();
-            // 隐藏 Legend
-            if (this.legendManager) {
-                this.legendManager.update({ time: undefined } as any);
-            }
+            this.clearCrosshair();
             return;
         }
 
@@ -109,6 +111,7 @@ export class ChartController {
             // 使用已匹配的时间设置光标
             this.chart.setCrosshairPosition(NaN, closestTime as UTCTimestamp, firstSeries);
         }
+        this.crosshairTime = closestTime;
 
         // 手动触发 Legend 更新，传递已匹配的时间（避免重复计算）
         if (this.legendManager) {
@@ -120,9 +123,12 @@ export class ChartController {
     }
 
     clearCrosshair() {
+        this.crosshairTime = undefined;
         this.chart?.clearCrosshairPosition();
         this.legendManager?.update({ time: undefined } as any);
     }
+
+    getCrosshairTime() { return this.crosshairTime; }
 
     subscribeCrosshairMove(callback: (param: any) => void) {
         this.chart?.subscribeCrosshairMove(callback);
@@ -181,10 +187,17 @@ export class ChartController {
     }
 
     applyOptions(options: DeepPartial<ChartOptions>) {
+        const formatter = options.localization?.timeFormatter;
+        if (formatter !== undefined && typeof formatter !== 'function') throw new Error('时间格式器必须是函数');
         this.chart?.applyOptions(options);
+        if (options.localization && Object.hasOwn(options.localization, 'timeFormatter')) {
+            // SDK DeepPartial 的映射类型不保留函数签名，实际值已验证为函数。
+            this.legendManager?.setTimeFormatter(formatter as TimeFormatterFn | undefined);
+        }
     }
 
     destroy() {
+        this.crosshairTime = undefined;
         if (this.legendManager) {
             this.legendManager.destroy();
             this.legendManager = null;

@@ -36,7 +36,7 @@ test('默认四周期全屏、EMA 颜色、菜单隐藏、更新保持图表实�
     await page.goto('/'); await ready(page);
     const charts = page.locator('.crypto-chart');
     expect(await charts.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-timeframe')))).toEqual(['30m', '4h', '1d', '1w']);
-    expect(await charts.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-bars')))).toEqual(['1500', '1500', '1500', '350']);
+    expect(await charts.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-bars')))).toEqual(['1000', '1000', '1000', '350']);
     const bounds = await charts.evaluateAll(nodes => nodes.map(n => { const b = n.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; }));
     expect(bounds).toEqual([
         { x: 0, y: 0, width: 639, height: 399 }, { x: 641, y: 0, width: 639, height: 399 },
@@ -48,13 +48,13 @@ test('默认四周期全屏、EMA 颜色、菜单隐藏、更新保持图表实�
     await rememberCharts(page);
     const before = await state(request);
     expect(before.reads.filter((r: any) => r.history)).toHaveLength(4);
-    expect(before.reads.every((r: any) => r.limit === 1500)).toBe(true);
+    expect(before.reads.every((r: any) => r.limit === 1000)).toBe(true);
     expect(before.logins).toBe(1);
     await state(request, { revision: 50 });
     await expect.poll(async () => (await state(request)).reads.filter((r: any) => !r.history).length, { timeout: 9000 }).toBeGreaterThanOrEqual(4);
     expect(await sameCharts(page)).toBe(true);
     const increments = (await state(request)).reads.filter((r: any) => !r.history);
-    expect(increments.every((r: any) => r.limit === 10 && r.since > 1e12)).toBe(true);
+    expect(increments.every((r: any) => r.limit === 5 && r.path === '/ccxt/fetch_ohlcv/latest-limit' && !r.keys.includes('since'))).toBe(true);
     await page.screenshot({ path: 'test-results/crypto-default.png' });
 });
 
@@ -84,8 +84,8 @@ test('菜单覆盖不缩图，取消与非法输入不提交；EMA 和 URL 后�
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.getByRole('button', { name: '无指标', exact: true }).click();
-    await expect(page.locator('.indicator-labels span')).toHaveCount(0);
-    expect(new URL(page.url()).searchParams.get('indicators')).toBe('none');
+    await expect(page.locator('.indicator-labels span')).toHaveCount(12);
+    expect(page.url()).toBe(original);
     expect(await page.locator('.crypto-chart').first().boundingBox()).toEqual(bounds);
     expect(await sameCharts(page)).toBe(true);
     await page.keyboard.press('Escape');
@@ -94,11 +94,11 @@ test('菜单覆盖不缩图，取消与非法输入不提交；EMA 和 URL 后�
     expect((await state(request)).reads.filter((r: any) => r.history)).toHaveLength(4);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await page.getByLabel('EMA 指标').fill('ema,0');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('EMA 周期');
     expect(page.url()).toBe(original); expect(await sameCharts(page)).toBe(true);
     await page.getByRole('button', { name: '无指标', exact: true }).click();
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.indicator-labels span')).toHaveCount(0);
     expect(new URL(page.url()).searchParams.get('indicators')).toBe('none');
     expect(await sameCharts(page)).toBe(true);
@@ -108,7 +108,7 @@ test('菜单覆盖不缩图，取消与非法输入不提交；EMA 和 URL 后�
     expect(page.url()).toBe(original); expect(await sameCharts(page)).toBe(true);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await page.getByLabel('EMA 指标').fill('ema,5;ema,14;ema,50');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.indicator-labels span').first()).toHaveText('EMA5');
     expect(await sameCharts(page)).toBe(true);
 });
@@ -120,7 +120,7 @@ test('单槽周期、品种与布局提交规范 URL，重复周期共用取数'
     await page.getByLabel('品种', { exact: true }).fill('ETH/USDT:USDT');
     await page.getByRole('combobox', { name: '窗口 1', exact: true }).selectOption('15m');
     await page.getByRole('combobox', { name: '布局', exact: true }).selectOption('2x1');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click(); await ready(page, 2);
+    await page.getByRole('button', { name: '应用', exact: true }).click(); await ready(page, 2);
     const url = new URL(page.url());
     expect(url.searchParams.get('symbol')).toBe('ETH/USDT:USDT');
     expect(url.searchParams.get('timeframes')).toBe('15m,30m');
@@ -133,18 +133,18 @@ test('非法 URL 不取行情，菜单可恢复', async ({ page, request }) => {
     await expect(page.getByRole('alert')).toContainText('未知或重复参数');
     expect((await state(request)).reads).toEqual([]);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByRole('button', { name: '应用并更新 URL' }).click(); await ready(page);
+    await page.getByRole('button', { name: '应用', exact: true }).click(); await ready(page);
     expect(page.url()).not.toContain('password');
 });
 
-test('单周期故障保留其它图，恢复后补齐；拖动历史后增量保持时间视口', async ({ page, request }) => {
+test('单周期故障保留其它图，断开后重载；拖动历史后增量保持时间视口', async ({ page, request }) => {
     await page.goto('/?refresh_seconds=1'); await ready(page);
     await rememberCharts(page);
     await state(request, { errors: ['4h'] });
     await expect(page.locator('[data-timeframe="4h"]')).toHaveAttribute('data-phase', 'error');
     expect(await page.locator('.crypto-chart[data-phase="ready"]').count()).toBe(3);
     await state(request, { errors: [], advance: 27, delay: 80 });
-    await expect.poll(async () => (await state(request)).reads.filter((r: any) => !r.history && r.timeframe === '4h').length).toBeGreaterThanOrEqual(4);
+    await expect.poll(async () => (await state(request)).reads.filter((r: any) => r.history && r.timeframe === '4h').length).toBe(2);
     await ready(page);
     expect(await sameCharts(page)).toBe(true);
     await page.mouse.move(350, 180); await page.mouse.down();

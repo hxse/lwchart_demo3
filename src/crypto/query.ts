@@ -1,15 +1,17 @@
 import {
-    normalizeOptions, OPTION_KEYS, LAYOUTS, layoutSlots, parseInteger,
-    indicatorString, MAX_HISTORY_BARS, type DashboardOptions, type Layout,
+    normalizeOptions, optionKeys, LAYOUTS, layoutSlots, parseInteger, changeSource,
+    indicatorString, MAX_HISTORY_BARS, type DashboardOptions, type Layout, type RuntimeOptions,
 } from './options';
 
-export function parseDashboardQuery(search: string, defaults: DashboardOptions): DashboardOptions {
+export function parseDashboardQuery(search: string, runtime: RuntimeOptions): DashboardOptions {
     const params = new URLSearchParams(search);
+    const source = params.get('source') ?? runtime.defaults.source;
+    if (source !== 'ccxt' && source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
+    const allowed = optionKeys(source);
     for (const key of params.keys()) {
-        if (!OPTION_KEYS.includes(key as typeof OPTION_KEYS[number]) || params.getAll(key).length !== 1) {
-            throw new Error('URL 含有未知或重复参数');
-        }
+        if (!allowed.includes(key as typeof allowed[number]) || params.getAll(key).length !== 1) throw new Error('URL 含有未知或重复参数');
     }
+    const defaults = source === runtime.defaults.source ? runtime.defaults : changeSource(runtime.defaults, source, runtime.sources);
     const value: Record<string, unknown> = { ...defaults, timeframes: [...defaults.timeframes] };
     for (const [key, raw] of params) {
         if (!raw) throw new Error('URL 参数不能为空');
@@ -30,22 +32,17 @@ export function parseDashboardQuery(search: string, defaults: DashboardOptions):
     }
     return normalizeOptions(value);
 }
-
 export function serializeDashboardQuery(options: DashboardOptions): string {
     const o = normalizeOptions(options);
     return new URLSearchParams({
-        exchange_name: o.exchange_name, market: o.market, is_live: String(o.is_live), symbol: o.symbol,
-        layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
-        refresh_seconds: String(o.refresh_seconds),
-        history_bars: String(o.history_bars),
-        theme: o.theme,
+        source: o.source,
+        ...(o.source === 'ccxt' ? { exchange_name: o.exchange_name, market: o.market, is_live: String(o.is_live) } : {}),
+        symbol: o.symbol, layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
+        refresh_seconds: String(o.refresh_seconds), history_bars: String(o.history_bars), theme: o.theme, timezone: o.timezone,
     }).toString();
 }
-
 export function changeLayout(options: DashboardOptions, layout: Layout, defaults: DashboardOptions): DashboardOptions {
     const timeframes = options.timeframes.slice(0, layoutSlots(layout));
-    while (timeframes.length < layoutSlots(layout)) {
-        timeframes.push(defaults.timeframes[timeframes.length % defaults.timeframes.length]!);
-    }
-    return normalizeOptions({ ...options, layout, timeframes });
+    while (timeframes.length < layoutSlots(layout)) timeframes.push(defaults.timeframes[timeframes.length % defaults.timeframes.length]!);
+    return { ...options, layout, timeframes };
 }

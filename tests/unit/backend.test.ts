@@ -2,12 +2,12 @@ import { expect, test, spyOn } from 'bun:test';
 import { BackendClient, GatewayError } from '../../scripts/crypto/backend';
 import { createApi } from '../../scripts/crypto/api';
 import type { CryptoConfig } from '../../scripts/crypto/config';
-import { defaults, budget, candle, result, asFetch, deferred } from '../fixtures/data';
+import { defaults, runtime, candle, result, ccxtResult, asFetch, deferred } from '../fixtures/data';
 
 const secret = '  OFFLINE_PRIVATE_$()_MARKER  ';
 const config: CryptoConfig = {
     backend: { base_url: 'http://mock', username: 'user+@example', password: secret, request_timeout_seconds: 1 },
-    server: { host: '127.0.0.1', port: 5174 }, runtime: { defaults, data: budget },
+    server: { host: '127.0.0.1', port: 5174 }, runtime,
 };
 const token = (value = 'jwt-1', seconds = 3600) => Response.json({ access_token: value, token_type: 'bearer', expires_in: seconds });
 const query = new URLSearchParams({ exchange_name: 'binance', market: 'future', is_live: 'true', symbol: defaults.symbol, timeframe: '30m', limit: '1500' });
@@ -26,12 +26,12 @@ test('Password Grant 表单保留字面密码，并发只登录一次', async ()
             return login.promise;
         }
         expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer jwt-1');
-        return Response.json(result([candle(0)]));
+        return Response.json(ccxtResult([candle(0)]));
     }));
     const pending = [client.read('/ccxt/fetch_ohlcv/latest-limit', query), client.read('/ccxt/fetch_ohlcv/latest-limit', query)];
     expect(logins).toBe(1);
     login.resolve(token());
-    expect(await Promise.all(pending)).toEqual([result([candle(0)]), result([candle(0)])]);
+    expect(await Promise.all(pending)).toEqual([ccxtResult([candle(0)]), ccxtResult([candle(0)])]);
 });
 
 test('过期重新登录，旧 token 的迟到 401 不注销新 token', async () => {
@@ -47,7 +47,7 @@ test('过期重新登录，旧 token 的迟到 401 不注销新 token', async ()
         const authorization = new Headers(init?.headers).get('Authorization')!;
         observed.push(authorization);
         if (first) { first = false; started.resolve(); return stale.promise; }
-        return Response.json(result([candle(0)]));
+        return Response.json(ccxtResult([candle(0)]));
     }));
     try {
         const old = client.read('/ccxt/fetch_ohlcv/latest-limit', query);
@@ -100,13 +100,15 @@ test('连接失败、超时、取消和后端稳定领域错误的受控映射',
 test('HTTP 白名单与 runtime 投影，非法 query 或写方法不触发后端', async () => {
     let calls = 0;
     const client = new BackendClient(config.backend, asFetch(async input => {
-        calls++; return String(input).endsWith('/auth/token') ? token() : Response.json(result([candle(0)]));
+        calls++; return String(input).endsWith('/auth/token') ? token() : Response.json(ccxtResult([candle(0)]));
     }));
     const api = createApi(config, client);
     const runtime = (await api(new Request('http://local/api/crypto/runtime')))!;
-    expect(await runtime.json()).toEqual({ defaults, data: budget });
+    expect(await runtime.json()).toEqual(config.runtime);
     for (const [url, method, status] of [
         ['/api/orders', 'GET', 404], ['/api/ccxt/fetch_ohlcv/latest-limit', 'POST', 405],
+        [`/api/ccxt/fetch_ohlcv/since-limit?${query}`, 'GET', 404],
+        [`/api/ccxt/fetch_ohlcv/latest-limit?${query}&since=1718000000000`, 'GET', 400],
         [`/api/ccxt/fetch_ohlcv/latest-limit?${query}&password=SECRET`, 'GET', 400],
         [`/api/ccxt/fetch_ohlcv/latest-limit?${query}&symbol=B`, 'GET', 400],
         ['/api/crypto/runtime?x=y', 'GET', 400],

@@ -1,4 +1,5 @@
 import type { BackendConfig } from './config';
+import { parseTqJson } from './ohlcv';
 
 export class GatewayError extends Error {
     constructor(readonly status: number, readonly code: string, message: string) { super(message); }
@@ -12,6 +13,11 @@ const messages: Record<string, string> = {
     INVALID_PROVIDER_REQUEST: '后端拒绝行情参数', PROVIDER_AUTH_FAILED: '后端交易所鉴权失败',
     INVALID_PROVIDER_DATA: '后端行情数据无效', RESPONSE_ROW_LIMIT_EXCEEDED: '后端响应超出行数限制',
     CACHE_CAPACITY_EXCEEDED: '后端缓存容量不足', PROVIDER_FAILURE: '后端行情服务请求失败',
+    TQ_NOT_READY: '后端 TQ 行情服务尚未就绪', TQ_NETWORK_UNAVAILABLE: '后端 TQ 行情网络不可用',
+    TQ_DATA_TIMEOUT: '后端 TQ 行情请求超时', TQ_UPSTREAM_ERROR: '后端 TQ 上游请求失败',
+    TQ_INVALID_TIME_AXIS: '后端 TQ 行情时间无效', TQ_INVALID_OHLCV_VALUES: '后端 TQ 行情价格无效',
+    TQ_TRADING_STATUS_UNAVAILABLE: '后端无法确认 TQ 休市状态', TQ_INVALID_SYMBOL: '后端拒绝 TQ 品种',
+    TQ_PERMISSION_DENIED: '后端账号没有 TQ 行情权限', TQ_CACHE_READ_FAILED: '后端 TQ 缓存读取失败',
 };
 
 /** 开发中间件与生产服务共用该鉴权客户端，旧 token 失败不能注销新 token。 */
@@ -33,8 +39,8 @@ export class BackendClient {
         if (signal.aborted) return new GatewayError(499, 'REQUEST_CANCELLED', '请求已取消');
         return new GatewayError(502, 'BACKEND_UNAVAILABLE', '无法连接后端');
     }
-    private async json(reply: BackendReply, auth = false): Promise<any> {
-        try { return await reply.response.json(); }
+    private async json(reply: BackendReply, auth = false, tq = false): Promise<any> {
+        try { return tq ? parseTqJson(await reply.response.text()) : await reply.response.json(); }
         catch {
             if (reply.signal.aborted) throw this.connectionError(reply.signal);
             throw new GatewayError(502, auth ? 'BACKEND_AUTH_FAILED' : 'BACKEND_INVALID_RESPONSE', '后端响应格式无效');
@@ -79,9 +85,9 @@ export class BackendClient {
             await reply.response.body?.cancel();
             throw new GatewayError(502, 'BACKEND_AUTH_FAILED', '后端鉴权失败，请检查运行配置');
         }
-        const body = await this.json(reply);
+        const body = await this.json(reply, false, path === '/tq/fetch_ohlcv');
         if (!reply.response.ok) {
-            const rawCode = body?.detail?.code;
+            const rawCode = typeof body?.detail === 'string' ? body.detail : body?.detail?.code;
             const code = typeof rawCode === 'string' && Object.hasOwn(messages, rawCode) ? rawCode : 'BACKEND_ERROR';
             throw new GatewayError(reply.response.status, code, messages[code] || `后端请求失败（${reply.response.status}）`);
         }

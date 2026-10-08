@@ -20,13 +20,11 @@ host = "127.0.0.1"
 port = 5174
 
 [dashboard]
+source = "ccxt"
+# local 跟随浏览器时区；也可用 UTC 或 Asia/Shanghai 等 IANA 时区。
+timezone = "local"
 # 主题：dark 深色、light 浅色；URL 与设置可以覆盖。
 theme = "dark"
-# 默认查看币安 U 本位实盘行情；本任务不提供下单功能。
-exchange_name = "binance"
-market = "future"
-is_live = true
-symbol = "BTC/USDT:USDT"
 # 顺序为左上、右上、左下、右下。
 layout = "2x2"
 timeframes = ["30m", "4h", "1d", "1w"]
@@ -34,8 +32,15 @@ timeframes = ["30m", "4h", "1d", "1w"]
 indicators = ["ema,14", "ema,50", "ema,100"]
 refresh_seconds = 5
 # 初始请求及保留上限：1..10000；URL 和菜单可覆盖，历史不足显示实际返回的数据。
-history_bars = 1500
-# 从实际末根毫秒时间戳含首请求；重叠行以新值覆盖。
-incremental_bars = 10
-# 每个轮询周期最多连续补齐 20 页，达到预算后下个周期继续。
-max_catchup_pages = 20
+history_bars = 1000
+
+[ccxt]
+# CCXT 默认身份。切换到此来源时使用；只读行情，不提供下单。
+exchange_name = "binance"
+market = "future"
+is_live = true
+symbol = "BTC/USDT:USDT"
+
+[tq]
+# TQ 默认螺纹主连；不是天勤账号配置，仍用 backend 的登录鉴权。
+symbol = "KQ.m@SHFE.rb"

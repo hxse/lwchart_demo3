@@ -1,12 +1,13 @@
-import { normalizeOptions, normalizeBudget, type DashboardOptions, type RuntimeOptions, type Timeframe } from '../options';
-import { validateOhlcv, type OhlcvResult } from './ohlcv';
+import { normalizeRuntime, type CcxtDefaults, type RuntimeOptions, type Timeframe } from '../options';
+import { validateBatch, type CandleBatch } from './ohlcv';
 
-export type MarketIdentity = Pick<DashboardOptions, 'exchange_name' | 'market' | 'is_live' | 'symbol'> & { timeframe: Timeframe };
-export interface OhlcvSource {
-    history(identity: MarketIdentity, limit: number, signal: AbortSignal): Promise<OhlcvResult>;
-    increment(identity: MarketIdentity, since: number, limit: number, signal: AbortSignal): Promise<OhlcvResult>;
+export type MarketIdentity = ({ source: 'ccxt' } & CcxtDefaults | { source: 'tq'; symbol: string }) & { timeframe: Timeframe };
+export interface MarketSource { latest(identity: MarketIdentity, limit: number, signal: AbortSignal): Promise<CandleBatch> }
+export function timeframeSeconds(timeframe: Timeframe): number {
+    const units: Record<string, number> = { m: 60, h: 3600, d: 86400, w: 604800 };
+    return Number(timeframe.slice(0, -1)) * units[timeframe.slice(-1)]!;
 }
-export class CryptoClient implements OhlcvSource {
+export class MarketClient implements MarketSource {
     constructor(private fetcher: typeof fetch = fetch.bind(globalThis)) {}
     private async json(path: string, signal?: AbortSignal): Promise<any> {
         const response = await this.fetcher(path, { signal, cache: 'no-store' });
@@ -16,20 +17,21 @@ export class CryptoClient implements OhlcvSource {
         return data;
     }
     async runtime(signal?: AbortSignal): Promise<RuntimeOptions> {
-        const value = await this.json('/api/crypto/runtime', signal);
-        return { defaults: normalizeOptions(value.defaults), data: normalizeBudget(value.data) };
+        return normalizeRuntime(await this.json('/api/crypto/runtime', signal));
     }
-    private async get(identity: MarketIdentity, method: string, limit: number, signal: AbortSignal, since?: number) {
-        const params = new URLSearchParams({ ...identity, is_live: String(identity.is_live), variant: 'default', enable_cache: 'true', limit: String(limit) });
-        if (since !== undefined) params.set('since', String(since));
-        return validateOhlcv(await this.json(`/api/ccxt/fetch_ohlcv/${method}?${params}`, signal), limit);
-    }
-    history(identity: MarketIdentity, limit: number, signal: AbortSignal) {
-        return identity.timeframe === '1w'
-            ? this.get(identity, 'since-limit', limit, signal, 1e12)
-            : this.get(identity, 'latest-limit', limit, signal);
-    }
-    increment(identity: MarketIdentity, since: number, limit: number, signal: AbortSignal) {
-        return this.get(identity, 'since-limit', limit, signal, since);
+    async latest(identity: MarketIdentity, limit: number, signal: AbortSignal): Promise<CandleBatch> {
+        let path: string;
+        let params: URLSearchParams;
+        if (identity.source === 'ccxt') {
+            path = '/api/ccxt/fetch_ohlcv/latest-limit';
+            const { exchange_name, market, is_live, symbol, timeframe } = identity;
+            params = new URLSearchParams({ exchange_name, market, is_live: String(is_live), symbol, timeframe,
+                variant: 'default', enable_cache: 'true', limit: String(limit) });
+        } else {
+            path = '/api/tq/fetch_ohlcv';
+            params = new URLSearchParams({ symbol: identity.symbol, duration_seconds: String(timeframeSeconds(identity.timeframe)),
+                data_length: String(limit), enable_cache: 'true' });
+        }
+        return validateBatch(await this.json(`${path}?${params}`, signal), limit);
     }
 }

@@ -4,14 +4,15 @@
   import { ChartSyncManager } from '../components/lw-chart/logic/ChartSyncManager';
   import CryptoChartPane from './CryptoChartPane.svelte';
   import ControlsMenu from './ControlsMenu.svelte';
-  import { CryptoClient } from './data/client';
+  import { MarketClient } from './data/client';
   import { MarketHub } from './data/MarketHub';
   import type { MarketStream } from './data/MarketStream';
   import { parseDashboardQuery, serializeDashboardQuery } from './query';
   import { LAYOUTS, indicatorString, parseIndicators, type DashboardOptions, type RuntimeOptions } from './options';
   import { themeStyles } from './theme';
+  import { createTimeDisplay } from './time';
 
-  const client = new CryptoClient();
+  const client = new MarketClient();
   const sync = new ChartSyncManager();
   let runtime = $state<RuntimeOptions>();
   let options = $state<DashboardOptions>();
@@ -20,68 +21,37 @@
   let opened = $state(false);
   let menuVersion = $state(0);
   let hub: MarketHub | undefined;
-  let menuStart: { url: string; options: DashboardOptions | undefined; error: string } | undefined;
   const theme = $derived(options?.theme ?? runtime?.defaults.theme ?? 'dark');
-  // 等价指标配置保持同一引用，切换颜色不触发数据重订阅和 setData。
+  const timezone = $derived(options?.timezone ?? runtime?.defaults.timezone ?? 'local');
+  const timeDisplay = $derived(createTimeDisplay(timezone));
   const indicatorKey = $derived(indicatorString(options?.indicators || []));
   const indicators = $derived(parseIndicators(indicatorKey));
   const items = $derived(streams.map((stream, index) => ({
     id: `slot-${index}`, component: CryptoChartPane,
-    props: { slotId: `slot-${index}`, stream, indicators, theme, sync },
+    props: { slotId: `slot-${index}`, stream, indicators, theme, timeDisplay, sync },
   })));
-
-  function urlFor(value: DashboardOptions) {
-    return `${location.pathname}?${serializeDashboardQuery(value)}${location.hash}`;
-  }
-  function rememberMenu() {
-    menuStart = { url: `${location.pathname}${location.search}${location.hash}`,
-      options: options ? structuredClone($state.snapshot(options)) : undefined, error };
-  }
-  function preview(value: DashboardOptions) {
-    const next = urlFor(value);
-    if (`${location.pathname}${location.search}${location.hash}` !== next) history.replaceState(history.state, '', next);
-    if (!options || serializeDashboardQuery(options) !== serializeDashboardQuery(value)) options = value;
-    error = '';
-  }
+  function urlFor(value: DashboardOptions) { return `${location.pathname}?${serializeDashboardQuery(value)}${location.hash}`; }
   function readUrl() {
     if (!runtime) return;
-    try { preview(parseDashboardQuery(location.search, runtime.defaults)); }
-    catch (e) { options = undefined; error = (e as Error).message; }
-    if (opened) { rememberMenu(); menuVersion++; }
-  }
-  function cancel() {
-    if (menuStart) {
-      history.replaceState(history.state, '', menuStart.url);
-      if (menuStart.options) preview(menuStart.options);
-      else { options = undefined; error = menuStart.error; }
-    }
-    opened = false;
-    menuStart = undefined;
-  }
-  function toggle() {
-    if (opened) { cancel(); return; }
-    rememberMenu(); opened = true;
+    try {
+      options = parseDashboardQuery(location.search, runtime);
+      const next = urlFor(options);
+      if (`${location.pathname}${location.search}${location.hash}` !== next) history.replaceState(history.state, '', next);
+      error = '';
+    } catch (e) { options = undefined; error = (e as Error).message; }
+    if (opened) menuVersion++;
   }
   function apply(value: DashboardOptions) {
     const next = urlFor(value);
-    if (menuStart && menuStart.url !== next) {
-      // 预览替换了当前地址，提交时恢复旧历史项，再只新增一次。
-      history.replaceState(history.state, '', menuStart.url);
-      history.pushState(null, '', next);
-    }
-    preview(value);
-    opened = false; menuStart = undefined;
+    if (`${location.pathname}${location.search}${location.hash}` !== next) history.pushState(null, '', next);
+    if (!options || serializeDashboardQuery(options) !== serializeDashboardQuery(value)) options = value;
+    error = ''; opened = false;
   }
   $effect(() => {
     const current = options;
-    const settings = runtime;
-    if (!current || !settings) {
-      hub?.dispose(); hub = undefined; streams = []; sync.clear();
-      return;
-    }
-    if (!hub) hub = new MarketHub(client, settings.data);
-    streams = hub.configure(current);
-    sync.setReady(true);
+    if (!current) { hub?.dispose(); hub = undefined; streams = []; sync.clear(); return; }
+    if (!hub) hub = new MarketHub(client);
+    streams = hub.configure(current); sync.setReady(true);
     document.title = `${current.symbol} · 多周期看盘`;
   });
   onMount(() => {
@@ -94,7 +64,7 @@
   });
 </script>
 
-<main class="dashboard" data-theme={theme} style={themeStyles(theme)} aria-label="加密货币多周期看盘">
+<main class="dashboard" data-theme={theme} style={themeStyles(theme)} aria-label="多周期行情看盘">
   {#if options && streams.length}
     <GridTemplate {items} templateConfig={LAYOUTS[options.layout]} gap="2px" />
   {:else}
@@ -104,9 +74,9 @@
     </div>
   {/if}
   <button class="toggle" aria-label="展开看盘设置" aria-expanded={opened} title="看盘设置"
-    onclick={toggle} disabled={!runtime}>⚙</button>
+    onclick={() => { opened = !opened; }} disabled={!runtime}>⚙</button>
   {#if opened && runtime}
-    <ControlsMenu current={options || runtime.defaults} defaults={runtime.defaults} version={menuVersion} onPreview={preview} onApply={apply} onCancel={cancel} />
+    <ControlsMenu current={options || runtime.defaults} {runtime} version={menuVersion} onApply={apply} onCancel={() => { opened = false; }} />
   {/if}
 </main>
 

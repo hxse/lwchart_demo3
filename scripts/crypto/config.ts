@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import {
-    record, onlyKeys, integer, text, normalizeOptions, normalizeBudget, OPTION_KEYS,
+    record, onlyKeys, integer, text, normalizeOptions, normalizeSources, DASHBOARD_KEYS,
     type RuntimeOptions,
 } from '../../src/crypto/options';
 
@@ -25,7 +25,7 @@ function targetFromConfig(config: Record<string, unknown>) {
 }
 export async function loadCryptoConfig(path: string): Promise<CryptoConfig> {
     const config = await readConfig(path);
-    onlyKeys(config, ['legacy','backend','server','dashboard'], '配置');
+    onlyKeys(config, ['legacy','backend','server','dashboard','ccxt','tq'], '配置');
     targetFromConfig(config);
     const backend = record(config.backend, 'backend');
     onlyKeys(backend, ['base_url','username','password','request_timeout_seconds'], 'backend');
@@ -39,8 +39,9 @@ export async function loadCryptoConfig(path: string): Promise<CryptoConfig> {
     const host = text(server.host, '监听地址');
     if (!['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error('看盘服务只支持回环监听');
     const dashboard = record(config.dashboard, 'dashboard');
-    const budgetKeys = ['incremental_bars','max_catchup_pages'];
-    onlyKeys(dashboard, [...OPTION_KEYS, ...budgetKeys], 'dashboard');
+    onlyKeys(dashboard, DASHBOARD_KEYS, 'dashboard');
+    const sources = normalizeSources({ ccxt: config.ccxt, tq: config.tq });
+    if (dashboard.source !== 'ccxt' && dashboard.source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
     return {
         backend: {
             base_url: url.href.replace(/\/+$/, ''),
@@ -50,8 +51,8 @@ export async function loadCryptoConfig(path: string): Promise<CryptoConfig> {
         },
         server: { host, port: integer(server.port, 1, 65535, '端口') },
         runtime: {
-            defaults: normalizeOptions(Object.fromEntries(OPTION_KEYS.map(k => [k, dashboard[k]]))),
-            data: normalizeBudget(Object.fromEntries(budgetKeys.map(k => [k, dashboard[k]]))),
+            defaults: normalizeOptions({ ...dashboard, ...sources[dashboard.source] }),
+            sources,
         },
     };
 }

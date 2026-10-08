@@ -28,6 +28,7 @@ legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dis
 原 package.json build:lib 退出，不保留同职责包装。
 
 crypto dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
+该入口同时支持 CCXT／TQ 只读看盘，名字保持 crypto。
 crypto build 只构建 dist-crypto，不读凭据、不登录、不请求行情。
 crypto serve 只运行已有 dist-crypto，缺少 index.html 明确失败，不隐式构建。
 开发中间件与 Bun 生产服务共用同一配置、鉴权与 API 实现；生产静态根仅 dist-crypto。
@@ -60,11 +61,15 @@ config.toml 与其备份忽略跟踪，完整公共模板为
 [config.example.toml](../../config.example.toml)。私有值不写进 bundle、库产物或浏览器。
 配置加载、公开参数及 HTTP 契约见 [crypto_dashboard.md](crypto_dashboard.md)。
 用户已有 config.toml 不被运行或测试命令自动覆盖。
+通用默认值位于 dashboard，两个来源的默认身份位于 ccxt／tq；旧来源字段和
+incremental_bars／max_catchup_pages 必须迁移，启动不保留旧配置兼容。
 
 ## 离线验证
 
 `just test` 顺序执行 Bun 逻辑／服务回归和 Playwright 浏览器测试。
 所有数据为本地 fixture；不登录真实后端，不请求外网，不隐式安装浏览器。
+EMA 独立标准结果已保存在 fixture 中。Python 生成器仅用于显式再生参考数据，
+不是 just test 的调用方，不为服务或默认测试引入 Python 依赖。
 浏览器套件构建新页面、旧演示页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
 真实 pyo3-quant 目录。虚拟鉴权后端与开发／生产适配服务只绑定本机测试端口。
 测试结束关闭所属进程、清理临时配置；截图和失败 trace 留在忽略的 test-results。

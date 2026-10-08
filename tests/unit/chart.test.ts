@@ -17,9 +17,13 @@ class FakeSeries {
     dataByIndex(index: number) { return this.rows[index]; }
     seriesType() { return this.kind; }
     setData(rows: any[]) { this.replacements++; this.rows = [...rows]; }
-    update(point: any) {
+    update(point: any, historical = false) {
         this.updates++;
-        if (this.rows.at(-1)?.time === point.time) this.rows[this.rows.length - 1] = point;
+        if (historical) {
+            const index = this.rows.findIndex(row => row.time === point.time);
+            if (index < 0) throw new Error('历史点不存在');
+            this.rows[index] = point;
+        } else if (this.rows.at(-1)?.time === point.time) this.rows[this.rows.length - 1] = point;
         else this.rows.push(point);
     }
     applyOptions() {}
@@ -34,7 +38,7 @@ function fixture() {
     const chart = {
         addSeries(type: { type: string }) { const api = new FakeSeries(type.type); created.push(api); return api; },
         removeSeries(api: FakeSeries) { removed.push(api); },
-        timeScale: () => ({ getVisibleLogicalRange: () => range, setVisibleLogicalRange: (next: typeof range) => { range = next; } }),
+        timeScale: () => ({ getVisibleLogicalRange: () => range, setVisibleLogicalRange: (next: typeof range) => { range = next; }, options: () => ({ rightOffset: 5 }) }),
     } as unknown as IChartApi;
     return { chart, created, removed, get range() { return range; }, set range(value) { range = value; } };
 }
@@ -87,7 +91,7 @@ test('补丁整批先校验，尾根覆盖与追加不重建；空更新无操�
     expect(() => applySeriesData(f.chart, map, bad, false)).toThrow('折线');
     expect(candle.updates).toBe(0);
     for (const patches of [
-        [{ name: 'missing', data: [] }], [{ name: 'candles', data: [point(0)] }],
+        [{ name: 'missing', data: [] }], [{ name: 'candles', data: [point(-1)] }],
         [{ name: 'candles', data: [point(1), point(1)] }], [{ name: 'candles', data: [{ time: point(1).time, value: 1 }] }],
     ]) expect(() => applySeriesData(f.chart, map, patches as SeriesDataPatch[], false)).toThrow();
     // 真实 EMA 首点有预热偏移，dataByIndex 使用全图索引，不能用自身点数推断末根。
@@ -95,12 +99,15 @@ test('补丁整批先校验，尾根覆盖与追加不重建；空更新无操�
     expect(() => applySeriesData(f.chart, map, [
         { name: 'candles', data: [point(1, 120)] },
         { name: 'ema', data: [{ time: point(0).time, value: 100 }] },
-    ], false)).toThrow('当前末根');
+    ], false)).toThrow('已有时间');
     expect(candle.updates).toBe(0);
     applySeriesData(f.chart, map, [{ name: 'candles', data: [point(1, 120), point(2, 130)] }], false);
     expect(candle.rows).toEqual([point(0), point(1, 120), point(2, 130)]);
     expect(candle.replacements).toBe(1);
     expect(candle.updates).toBe(2);
+    applySeriesData(f.chart, map, [{ name: 'candles', data: [point(0, 90), point(1, 115)] }], false);
+    expect(candle.rows).toEqual([point(0, 90), point(1, 115), point(2, 130)]);
+    expect(candle.replacements).toBe(1);
     applySeriesData(f.chart, map, [{ name: 'ema', data: [] }], false);
     expect(ema.rows).toHaveLength(1);
     applySeriesData(f.chart, map, [{ name: 'ema', data: [] }], true);

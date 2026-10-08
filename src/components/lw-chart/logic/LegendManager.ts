@@ -1,4 +1,6 @@
-import type { ISeriesApi, MouseEventParams, IChartApi } from "lightweight-charts";
+import type { ISeriesApi, MouseEventParams, IChartApi, TimeFormatterFn } from "lightweight-charts";
+
+const volumeFormatter = new Intl.NumberFormat('en', { maximumSignificantDigits: 8 });
 
 export interface LegendItemConfig {
     name: string;
@@ -11,6 +13,13 @@ export class LegendManager {
     private seriesMap = new Map<ISeriesApi<any>, LegendItemConfig>();
     private showInAll = false; // 是否在所有同步图表中显示
     private chart: IChartApi | null = null; // 图表实例引用，用于同步时获取数据
+    private timeFormatter: TimeFormatterFn | undefined;
+    private lastParam: MouseEventParams | undefined;
+
+    public setTimeFormatter(formatter: TimeFormatterFn | undefined): void {
+        this.timeFormatter = formatter;
+        if (this.lastParam) this.update(this.lastParam);
+    }
 
     /**
      * 创建 Legend DOM 元素
@@ -83,6 +92,7 @@ export class LegendManager {
      * @param param 十字线移动事件参数
      */
     public update(param: MouseEventParams): void {
+        this.lastParam = param;
         if (!this.legendElement) return;
 
         // 如果不是用户发起的交互（例如程序调用的同步），且未开启 showInAll，隐藏 Legend
@@ -103,7 +113,7 @@ export class LegendManager {
             return;
         }
 
-        let html = "";
+        let html = this.timeFormatter ? `<div class="legend-time">T ${this.timeFormatter(param.time)}</div>` : '';
         let hasContent = false;
 
         this.seriesMap.forEach((config, series) => {
@@ -144,6 +154,10 @@ export class LegendManager {
                     `<span style="${labelStyle}">H</span><span style="${valStyle()}">${data.high.toFixed(2)}</span>` +
                     `<span style="${labelStyle}">L</span><span style="${valStyle()}">${data.low.toFixed(2)}</span>` +
                     `<span style="${labelStyle}">C</span><span style="${valStyle()}">${data.close.toFixed(2)}</span>`;
+                const volume = data.customValues?.volume;
+                if (typeof volume === 'number' && Number.isFinite(volume)) {
+                    valueStr += `<span style="${labelStyle}">V</span><span class="legend-volume" style="${valStyle()}">${volumeFormatter.format(volume)}</span>`;
+                }
             } else if ("value" in data) {
                 // 单值数据 (Line/Area/Histogram)
                 valueStr = `<span style="${labelStyle}">${config.name}</span><span style="${valStyle()}">${data.value.toFixed(2)}</span>`;
@@ -171,5 +185,6 @@ export class LegendManager {
         }
         this.legendElement = null;
         this.seriesMap.clear();
+        this.lastParam = undefined;
     }
 }

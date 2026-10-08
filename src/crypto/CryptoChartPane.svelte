@@ -7,9 +7,10 @@
   import type { MarketStream, StreamStatus } from './data/MarketStream';
   import { EMA_COLORS, type IndicatorSpec, type Theme } from './options';
   import { chartTheme } from './theme';
+  import type { TimeDisplay } from './time';
 
-  let { slotId, stream, indicators, theme, sync }: {
-    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; sync: ChartSyncManager;
+  let { slotId, stream, indicators, theme, timeDisplay, sync }: {
+    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager;
   } = $props();
   let api = $state<ChartApi>();
   let status = $state<StreamStatus>(untrack(() => stream.status));
@@ -24,18 +25,20 @@
     return {
       ...colors,
       layout: { ...colors.layout, attributionLogo: true },
-      timeScale: { ...colors.timeScale, timeVisible: true, secondsVisible: false, rightOffset: 5 },
+      localization: { timeFormatter: timeDisplay.format },
+      timeScale: { ...colors.timeScale, tickMarkFormatter: timeDisplay.ticks, timeVisible: true, secondsVisible: false, rightOffset: 5 },
       rightPriceScale: { ...colors.rightPriceScale, autoScale: true, scaleMargins: { top: 0.03, bottom: 0.03 } },
     };
   });
   $effect(() => { api?.applyOptions(chartTheme(theme)); });
+  $effect(() => { api?.applyOptions({ localization: { timeFormatter: timeDisplay.format }, timeScale: { tickMarkFormatter: timeDisplay.ticks } }); });
   function register(value: ChartApi) {
     unregister?.();
     api = value;
     unregister = sync.register(slotId, {
       ...value,
-      // Lightweight Charts 程序清除光标时不发事件，视图状态同步清空。
-      setCrosshair(param: any) { hoverTime = undefined; value.setCrosshair(param); },
+      // SDK 设置同一根或清除光标时可能不发事件，读取控制器的实际匹配结果。
+      setCrosshair(param: any) { value.setCrosshair(param); hoverTime = value.getCrosshairTime(); },
       clearCrosshair() { hoverTime = undefined; value.clearCrosshair(); },
     });
   }
@@ -70,6 +73,7 @@
 </script>
 
 <section class="crypto-chart" data-slot={slotId} data-timeframe={stream.identity.timeframe}
+  data-source={stream.identity.source} data-timezone={timeDisplay.zone}
   data-phase={status.phase} data-bars={status.count} data-crosshair-time={hoverTime ?? ''}>
   <div class="caption">
     <strong>{stream.identity.symbol}</strong>

@@ -15,6 +15,7 @@ export type SeriesMode = 'replace' | 'reconcile';
 export interface ChartApi {
     setCrosshair: (param: any) => void;
     clearCrosshair: () => void;
+    getCrosshairTime: () => number | undefined;
     scrollToTime: (time: number) => void;
     resetTimeScale: () => void;
     fitContent: () => void;

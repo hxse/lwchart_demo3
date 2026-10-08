@@ -54,10 +54,11 @@ async function launch(action: string, config: string) {
     void child.exited.then(code => { if (!stopping) { console.error(`测试服务退出：${code}`); void stop(1); } });
 }
 
-interface Metrics { logins: number; reads: Array<{ timeframe: string; symbol: string; limit: number; since: number | null; history: boolean }> }
+interface Metrics { logins: number; reads: Array<{ source: string; timeframe: string; symbol: string; limit: number; path: string; keys: string[]; history: boolean }> }
 let metrics: Metrics = { logins: 0, reads: [] };
 let advance = 0;
 let revision = 0;
+let correction = 0;
 let errors: string[] = [];
 let delay = 0;
 const intervals: Record<string, number> = { '1m': 60000, '3m': 180000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '2h': 7200000, '4h': 14400000, '6h': 21600000, '8h': 28800000, '12h': 43200000, '1d': 86400000, '3d': 259200000, '1w': 604800000 };
@@ -65,9 +66,10 @@ function rows(timeframe: string, symbol: string): OhlcvRow[] {
     const step = intervals[timeframe]!;
     const origin = timeframe === '1w' ? Date.UTC(2026, 9, 5) : Math.floor(Date.UTC(2026, 9, 7, 12) / step) * step;
     const count = timeframe === '1w' ? 350 : 3000;
-    const base = symbol.startsWith('ETH') ? 3000 : 60000;
+    const base = symbol.startsWith('KQ.') || symbol.startsWith('SHFE.') ? 3300 : symbol.startsWith('ETH') ? 3000 : 60000;
     return Array.from({ length: count + advance }, (_, index) => {
-        const close = base + index * .8 + Math.sin(index / 13) * 130 + (index === count + advance - 1 ? revision : 0);
+        const close = base + index * .8 + Math.sin(index / 13) * 130 + (index === count + advance - 1 ? revision : 0)
+            + (index === count + advance - 3 ? correction : 0);
         return [origin - (count - 1 - index) * step, close - 6, close + 16, close - 16, close, 100 + index];
     });
 }
@@ -76,7 +78,7 @@ async function main() {
     const example = await Bun.file(join(root, 'config.example.toml')).text();
     const configText = example.replace('username = ""', 'username = "offline-user"').replace('password = ""', `password = '${secret}'`)
         .replace('http://127.0.0.1:5123', 'http://127.0.0.1:43175').replace('port = 5174', 'port = 43174')
-        .replace('max_catchup_pages = 20', 'max_catchup_pages = 2').replace('~/dev/pyo3-quant/data/lwchart', target);
+        .replace('~/dev/pyo3-quant/data/lwchart', target);
     const config = join(directory, 'config.toml');
     const devConfig = join(directory, 'dev.toml');
     await Bun.write(config, configText); await Bun.write(devConfig, configText.replace('port = 43174', 'port = 43176'));
@@ -98,13 +100,14 @@ async function main() {
         if (url.pathname === '/__fixture') {
             if (request.method === 'POST') {
                 const state = await request.json();
-                if (state.reset) { metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; errors = []; delay = 0; }
+                if (state.reset) { metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; correction = 0; errors = []; delay = 0; }
                 if (state.advance !== undefined) advance = state.advance;
                 if (state.revision !== undefined) revision = state.revision;
+                if (state.correction !== undefined) correction = state.correction;
                 if (state.errors !== undefined) errors = state.errors;
                 if (state.delay !== undefined) delay = state.delay;
             }
-            return Response.json({ ...metrics, advance, revision, errors, logs });
+            return Response.json({ ...metrics, advance, revision, correction, errors, logs });
         }
         if (url.pathname === '/legacy.zip') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         if (url.pathname.startsWith('/legacy-assets/')) {
@@ -127,17 +130,21 @@ async function main() {
             if (url.pathname === '/file/list') return Response.json({ files: [{ filename: 'legacy.zip', path: 'fixture/legacy.zip' }] });
             if (url.pathname === '/file/download') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         }
-        if (!url.pathname.startsWith('/ccxt/fetch_ohlcv/') || request.method !== 'GET') return new Response(null, { status: 404 });
+        if (!['/ccxt/fetch_ohlcv/latest-limit', '/tq/fetch_ohlcv'].includes(url.pathname) || request.method !== 'GET') return new Response(null, { status: 404 });
         if (request.headers.get('Authorization') !== 'Bearer offline-jwt') return new Response(null, { status: 401 });
-        const timeframe = url.searchParams.get('timeframe')!;
+        const tq = url.pathname === '/tq/fetch_ohlcv';
+        const timeframe = tq ? Object.keys(intervals).find(key => intervals[key] === Number(url.searchParams.get('duration_seconds')) * 1000)! : url.searchParams.get('timeframe')!;
         const symbol = url.searchParams.get('symbol')!;
-        const limit = Number(url.searchParams.get('limit'));
-        const since = url.searchParams.has('since') ? Number(url.searchParams.get('since')) : null;
-        metrics.reads.push({ timeframe, symbol, limit, since, history: since === null || since === 1e12 });
+        const limit = Number(url.searchParams.get(tq ? 'data_length' : 'limit'));
+        metrics.reads.push({ source: tq ? 'tq' : 'ccxt', timeframe, symbol, limit, path: url.pathname, keys: [...url.searchParams.keys()], history: limit !== 5 });
         if (delay) await Bun.sleep(delay);
         if (errors.includes(timeframe)) return Response.json({ detail: { code: 'SERVICE_NOT_READY', message: secret } }, { status: 503 });
-        const data = rows(timeframe, symbol);
-        const selected = since === null ? data.slice(-limit) : data.filter(r => r[0] >= since).slice(0, limit);
+        const selected = rows(timeframe, symbol).slice(-limit);
+        if (tq) {
+            const body = '[' + selected.map(([time, open, high, low, close, volume], index) =>
+                `{"datetime":${BigInt(time) * 1000000n},"open":${open},"high":${high},"low":${low},"close":${close},"volume":${volume},"id":${index},"duration":${intervals[timeframe]! / 1000}}`).join(',') + ']';
+            return new Response(body, { headers: { 'Content-Type': 'application/json' } });
+        }
         return Response.json({ rows: selected, last_bar_completion_confirmed: selected.length ? false : null });
     } });
     await launch('serve', config); await launch('dev', devConfig);

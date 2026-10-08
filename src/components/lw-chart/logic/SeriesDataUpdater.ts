@@ -16,13 +16,14 @@ export function applySeriesData(
         const kind = series.seriesType();
         if (kind !== 'Candlestick' && kind !== 'Line') throw new Error('数据补丁仅支持蜡烛与折线系列');
         // EMA 预热后的首个点可能不是全图逻辑索引 0，按实际数据获取末根。
-        const last = series.data().at(-1);
+        const existing = series.data();
+        const last = existing.at(-1);
+        const times = new Set(existing.map(point => Number(point.time)));
         let previous = -Infinity;
         for (const point of patch.data) {
             const time = point.time as number;
-            if (!Number.isFinite(time) || time <= previous || (!replace && last && time < Number(last.time))) {
-                throw new Error('图表补丁时间必须递增，且不能早于当前末根');
-            }
+            if (!Number.isFinite(time) || time <= previous) throw new Error('图表补丁时间必须严格递增');
+            if (!replace && last && time < Number(last.time) && !times.has(time)) throw new Error('图表历史修正只能使用已有时间');
             previous = time;
             if (kind === 'Candlestick') {
                 if (!('open' in point) || ![point.open, point.high, point.low, point.close].every(Number.isFinite)
@@ -48,7 +49,13 @@ export function applySeriesData(
     for (const patch of patches) {
         const series = seriesMap.get(patch.name)!;
         if (replace) series.setData(patch.data);
-        else for (const point of patch.data) series.update(point);
+        else {
+            let tail = Number(series.data().at(-1)?.time ?? -Infinity);
+            for (const point of patch.data) {
+                series.update(point, Number(point.time) < tail);
+                tail = Math.max(tail, Number(point.time));
+            }
+        }
     }
     if (range && primary) {
         const nextLength = primary.data().length;
@@ -63,6 +70,10 @@ export function applySeriesData(
                 const shift = nextIndex - anchorIndex;
                 scale.setVisibleLogicalRange({ from: range.from + shift, to: range.to + shift });
             } else if (first === primary.dataByIndex(0)?.time) scale.setVisibleLogicalRange(range);
+            else {
+                const to = nextLength - 1 + scale.options().rightOffset;
+                scale.setVisibleLogicalRange({ from: to - (range.to - range.from), to });
+            }
         } else scale.setVisibleLogicalRange(range);
     }
 }

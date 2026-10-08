@@ -1,12 +1,9 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { changeLayout } from './query';
-  import { serializeDashboardQuery } from './query';
-  import { normalizeOptions, indicatorString, TIMEFRAMES, LAYOUTS, MAX_HISTORY_BARS, type DashboardOptions, type Layout } from './options';
-  let { current, defaults, version, onPreview, onApply, onCancel }: {
-    current: DashboardOptions; defaults: DashboardOptions;
-    version: number;
-    onPreview: (value: DashboardOptions) => void;
+  import { changeLayout, serializeDashboardQuery } from './query';
+  import { normalizeOptions, changeSource, indicatorString, TIMEFRAMES, LAYOUTS, MAX_HISTORY_BARS, type DashboardOptions, type Layout, type RuntimeOptions, type Source } from './options';
+  let { current, runtime, version, onApply, onCancel }: {
+    current: DashboardOptions; runtime: RuntimeOptions; version: number;
     onApply: (value: DashboardOptions) => void; onCancel: () => void;
   } = $props();
   let draft = $state(untrack(() => structuredClone($state.snapshot(current))));
@@ -15,33 +12,19 @@
   let dialog = $state<HTMLDivElement>();
   let published = untrack(() => serializeDashboardQuery(current));
   let navigation = untrack(() => version);
-  let previewTimer: ReturnType<typeof setTimeout> | undefined;
-  function clearPreview() { if (previewTimer) clearTimeout(previewTimer); previewTimer = undefined; }
-  onMount(() => { dialog?.querySelector<HTMLInputElement>('input')?.focus(); return clearPreview; });
+  const localZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  onMount(() => { dialog?.querySelector<HTMLInputElement>('input')?.focus(); });
   $effect(() => {
     const key = serializeDashboardQuery(current);
     const currentNavigation = version;
-    if (key !== published || navigation !== currentNavigation) untrack(() => {
-      clearPreview(); published = key; navigation = currentNavigation;
+    if (key !== published || currentNavigation !== navigation) untrack(() => {
+      published = key; navigation = currentNavigation;
       draft = structuredClone($state.snapshot(current));
       indicators = indicatorString(current.indicators); error = '';
     });
   });
-  function preview(event?: Event) {
-    clearPreview();
-    try {
-      const value = normalizeOptions({ ...draft, indicators });
-      error = '';
-      const publish = () => { published = serializeDashboardQuery(value); onPreview(value); };
-      const target = event?.target;
-      if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) previewTimer = setTimeout(publish, 250);
-      else publish();
-    } catch (e) { error = (e as Error).message; }
-  }
-  function setIndicators(value: string) { indicators = value; preview(); }
   function apply(event: SubmitEvent) {
     event.preventDefault();
-    clearPreview();
     try { onApply(normalizeOptions({ ...draft, indicators })); }
     catch (e) { error = (e as Error).message; }
   }
@@ -50,16 +33,22 @@
 <svelte:window onkeydown={event => { if (event.key === 'Escape') { event.preventDefault(); onCancel(); } }} />
 <div class="menu" bind:this={dialog} role="dialog" aria-modal="true" aria-label="看盘设置" tabindex="-1">
   <div class="heading"><strong>看盘设置</strong><button class="close" aria-label="关闭设置" onclick={onCancel}>×</button></div>
-  <form onsubmit={apply} oninput={preview} onchange={preview}>
-    <label>品种<input name="symbol" bind:value={draft.symbol} placeholder="BTC/USDT:USDT" /></label>
-    <div class="row">
-      <label>交易所<select name="exchange_name" bind:value={draft.exchange_name}><option value="binance">Binance</option><option value="kraken">Kraken</option></select></label>
-      <label>市场<select name="market" bind:value={draft.market}><option value="future">合约</option><option value="spot">现货</option></select></label>
-      <label>环境<select name="is_live" bind:value={draft.is_live}><option value={true}>实盘行情</option><option value={false}>模拟盘行情</option></select></label>
-    </div>
+  <form onsubmit={apply} novalidate>
+    <label>数据源<select name="source" value={draft.source}
+      onchange={event => { draft = changeSource(draft, event.currentTarget.value as Source, runtime.sources); }}>
+      <option value="ccxt">CCXT 加密货币</option><option value="tq">TQ 期货行情</option>
+    </select></label>
+    <label>品种<input name="symbol" bind:value={draft.symbol} placeholder={draft.source === 'tq' ? 'KQ.m@SHFE.rb' : 'BTC/USDT:USDT'} /></label>
+    {#if draft.source === 'ccxt'}
+      <div class="row">
+        <label>交易所<select name="exchange_name" bind:value={draft.exchange_name}><option value="binance">Binance</option><option value="kraken">Kraken</option></select></label>
+        <label>市场<select name="market" bind:value={draft.market}><option value="future">合约</option><option value="spot">现货</option></select></label>
+        <label>环境<select name="is_live" bind:value={draft.is_live}><option value={true}>实盘行情</option><option value={false}>模拟盘行情</option></select></label>
+      </div>
+    {/if}
     <div class="row">
       <label>布局<select name="layout" value={draft.layout}
-        onchange={event => { draft = changeLayout(draft, event.currentTarget.value as Layout, defaults); }}>
+        onchange={event => { draft = changeLayout(draft, event.currentTarget.value as Layout, runtime.defaults); }}>
         {#each Object.keys(LAYOUTS) as layout}<option value={layout}>{layout.replace('x',' × ')}</option>{/each}
       </select></label>
       <label>主题<select name="theme" bind:value={draft.theme}><option value="dark">深色</option><option value="light">浅色</option></select></label>
@@ -71,16 +60,19 @@
         </select></label>
       {/each}
     </div>
+    <label>显示时区<input name="timezone" list="timezones" bind:value={draft.timezone} spellcheck="false" /></label>
+    <datalist id="timezones"><option value="local">本地</option><option value="UTC"></option><option value="Asia/Shanghai"></option><option value="America/New_York"></option><option value="Europe/London"></option></datalist>
+    <div class="hint">local 跟随本地（{localZone}）；也可填 IANA 时区。只改变显示。</div>
     <label>EMA 指标<textarea name="indicators" bind:value={indicators} rows="2" spellcheck="false"></textarea></label>
     <div class="hint">例如 ema,5;ema,14;ema,50</div>
-    <div class="small-actions"><button type="button" onclick={() => setIndicators('none')}>无指标</button>
-      <button type="button" onclick={() => setIndicators(indicatorString(defaults.indicators))}>默认 EMA</button></div>
+    <div class="small-actions"><button type="button" onclick={() => { indicators = 'none'; }}>无指标</button>
+      <button type="button" onclick={() => { indicators = indicatorString(runtime.defaults.indicators); }}>默认 EMA</button></div>
     <label>更新间隔（秒）<input name="refresh_seconds" type="number" min="1" max="3600" bind:value={draft.refresh_seconds} /></label>
     <label>历史 K 线数量<input name="history_bars" type="number" min="1" max={MAX_HISTORY_BARS} bind:value={draft.history_bars} /></label>
     <div class="hint">历史不足时显示实际返回数量；最多 {MAX_HISTORY_BARS} 根。</div>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
-    <div class="hint">有效修改自动同步 URL；取消可恢复打开前设置。</div>
-    <div class="footer"><button type="button" onclick={onCancel}>取消</button><button class="apply" type="submit">应用并更新 URL</button></div>
+    <div class="hint">点击应用后更新图表与地址；关闭或取消丢弃修改。</div>
+    <div class="footer"><button type="button" onclick={onCancel}>取消</button><button class="apply" type="submit">应用</button></div>
   </form>
 </div>
 

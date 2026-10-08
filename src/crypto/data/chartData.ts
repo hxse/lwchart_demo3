@@ -15,7 +15,7 @@ export function chartSeries(indicators: IndicatorSpec[]): SeriesConfig[] {
         }))];
 }
 export function chartPatches(change: DataChange, indicators: IndicatorSpec[]): SeriesDataPatch[] {
-    return [{ name: 'candles', data: change.rows.map(([time, open, high, low, close]) => ({ time: time / 1000 as UTCTimestamp, open, high, low, close })) },
+    return [{ name: 'candles', data: change.rows.map(([time, open, high, low, close, volume]) => ({ time: time / 1000 as UTCTimestamp, open, high, low, close, customValues: { volume } })) },
         ...indicators.map((indicator): SeriesDataPatch => ({ name: `ema-${indicator.period}`,
             data: (change.emas.get(indicator.period) || []).map(point => ({ time: point.time / 1000 as UTCTimestamp, value: point.value })),
         }))];

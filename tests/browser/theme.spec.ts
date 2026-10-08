@@ -51,19 +51,20 @@ test('默认暗色，切换及取消／历史导航同步菜单、URL 和图例�
     await expect(page.getByLabel('品种', { exact: true })).toHaveCSS('background-color', 'rgb(19, 23, 34)');
     await page.screenshot({ path: 'test-results/crypto-dark-settings.png' });
     await select.selectOption('light');
-    await background(page, 'light');
-    expect(new URL(page.url()).searchParams.get('theme')).toBe('light');
+    await background(page, 'dark');
+    expect(page.url()).toBe(original);
     expect(await page.evaluate(() => history.length)).toBe(length);
-    await page.mouse.move(350, 180);
-    await expect(source).toHaveAttribute('data-crosshair-time', time!);
-    await expect(value).toHaveCSS('color', 'rgb(37, 50, 71)');
-    await page.screenshot({ path: 'test-results/crypto-light-settings.png' });
     await page.keyboard.press('Escape');
     await background(page, 'dark');
     expect(page.url()).toBe(original);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await select.selectOption('light');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
+    await background(page, 'light');
+    await page.mouse.move(350, 180);
+    await expect(source).toHaveAttribute('data-crosshair-time', time!);
+    await expect(value).toHaveCSS('color', 'rgb(37, 50, 71)');
+    await page.screenshot({ path: 'test-results/crypto-light-settings.png' });
     expect(await page.evaluate(() => history.length)).toBe(length + 1);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await page.goBack();
@@ -89,7 +90,7 @@ test('浅色 URL 初始生效，切换暗色后仍继续增量更新而不重取
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await expect(page.getByRole('combobox', { name: '主题', exact: true })).toHaveValue('light');
     await page.getByRole('combobox', { name: '主题', exact: true }).selectOption('dark');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
     await background(page, 'dark');
     const before = (await (await request.get(fixture)).json()).reads.length;
     await request.post(fixture, { data: { revision: 40 } });
@@ -108,7 +109,7 @@ test('无效主题 URL 在取数前失败，菜单可恢复为浅色', async ({ 
     }
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await page.getByRole('combobox', { name: '主题', exact: true }).selectOption('light');
-    await page.getByRole('button', { name: '应用并更新 URL' }).click();
+    await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(4);
     await background(page, 'light');
 });

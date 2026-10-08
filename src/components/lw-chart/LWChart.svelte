@@ -41,6 +41,7 @@
   export const replaceSeriesData = (patches: SeriesDataPatch[]) => controller.replaceSeriesData(patches);
   export const updateSeriesData = (patches: SeriesDataPatch[]) => controller.updateSeriesData(patches);
   export const applyOptions = (options: DeepPartial<ChartOptions>) => controller.applyOptions(options);
+  export const getCrosshairTime = () => controller.getCrosshairTime();
 
   // Exported methods for external sync
   export const setCrosshair = (param: any) => {
@@ -89,6 +90,7 @@
       onRegister({
         setCrosshair,
         clearCrosshair,
+        getCrosshairTime,
         scrollToTime,
         resetTimeScale,
         fitContent: doFitContent,

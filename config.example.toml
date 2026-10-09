@@ -1,6 +1,6 @@
 # 复制为项目根目录 config.toml，填写后端登录账号与密码。
 # 账号对应 ccxt-proxy2 的 [users.<username>]，不是交易所 API key。
-# 实际 config.toml 不纳入版本控制，由 Just 运行入口在服务启动时读取。
+# 私有基础与场景覆盖不纳入版本控制，由统一运行入口在服务启动时读取。
 # 字符串中的 $ 和 ${...} 保持字面值，不执行 Shell 或环境变量展开。
 
 [legacy]
@@ -46,3 +46,16 @@ symbol = "BTC/USDT:USDT"
 [tq]
 # TQ 默认螺纹主连；不是天勤账号配置，仍用 backend 的登录鉴权。
 symbol = "KQ.m@SHFE.rb"
+
+# 部署段可省略；不改变宿主开发入口。覆盖文件只填写环境差异。
+[deploy]
+container_network = "trading-net"
+container_name = "lwchart-market"
+image_name = "localhost/lwchart-market"
+publish_host = "127.0.0.1"
+publish_port = 5174
+log_max_size = 10485760
+
+[deploy.remote]
+ssh_host = "rn"
+root_dir = "~/dev/lwchart_demo3"

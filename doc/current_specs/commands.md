@@ -4,7 +4,7 @@
 
 根 `justfile` 为薄编排，默认 `just` 仅显示帮助。
 `scripts/scenario.sh` 统一解析参数，安全透传 argv，不 eval。
-宿主 Bun／Bash 是唯一开发环境；本项目不使用开发或生产容器。
+宿主 Bun／Bash 是唯一开发环境；生产使用 Podman，无开发容器或开机自启。
 
 ```bash
 just legacy                               # 默认 --build
@@ -16,11 +16,15 @@ just market --serve --config=config.toml
 just market --stop                         # 停止本项目当前配置的 dev／serve
 just check
 just test
+just deploy --target=local --build --start
+just deploy --target=remote --upload --build --start
+just test-container
 ```
 
 每个场景支持 --help；动作互斥，未知参数、空配置路径及旧场景的 dev／serve／stop 退出 2。
 帮助不读取配置、不构建、不联网。缺配置／配置非法在绑定服务前退出 2。
-配置在启动时读取，修改后重启；本任务不启用 local／remote 覆盖。
+配置在启动时读取，修改后重启。普通入口使用 dev；生产 local／remote 的覆盖与部署见
+[deployment.md](deployment.md)。
 
 legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dist-lib，复制
 `dist-lib/.` 到目标目录。默认目标 `~/dev/pyo3-quant/data/lwchart`；仅展开开头的 ~/，
@@ -29,10 +33,10 @@ legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dis
 
 market dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
 该入口同时支持 CCXT／TQ 只读看盘，命令名为 market。
-market build 只构建 dist-crypto，不读凭据、不登录、不请求行情。
+market build 共用构建脚本生成 dist-crypto 与 dist-market 独立服务包，不读运行凭据、不登录、不请求行情。
 market serve 只运行已有 dist-crypto，缺少 index.html 明确失败，不隐式构建。
 开发中间件与 Bun 生产服务共用同一配置、鉴权与 API 实现；生产静态根仅 dist-crypto。
-服务只监听回环地址，Ctrl+C 关闭所启动的服务。
+宿主服务只监听回环地址，生产容器内部监听 0.0.0.0、宿主只发布 127.0.0.1；Ctrl+C 关闭宿主服务。
 market stop 不读业务配置，不需要有效凭据。按 Linux /proc 匹配同仓库、同入口、同
 配置路径的 dev／serve；不会按端口杀其它程序。先 SIGTERM，等待最多 5 秒，仍为同一
 进程时 SIGKILL。没有匹配进程时成功退出；--config 可选，默认 config.toml。

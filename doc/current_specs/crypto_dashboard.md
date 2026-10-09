@@ -7,7 +7,8 @@
 内部目录、dist-crypto 产物和 /api/crypto/runtime 路径保留；旧 ZIP／Notebook 入口独立。
 本入口不提供交易、订单、账户或主连映射查询。
 
-宿主 Bun 为唯一服务环境，启动配置来自私有 config.toml；公共模板见
+开发使用宿主 Bun，生产使用独立 Bun 容器；场景覆盖与部署见 [deployment.md](deployment.md)。
+启动配置来自私有 config.toml；公共模板见
 [config.example.toml](../../config.example.toml)。鉴权材料不进入浏览器。
 一个页面一份设置和一个可为空的混合自选，多个组合由浏览器书签管理。
 页面操作不回写 TOML，不使用 localStorage、sessionStorage、IndexedDB。

@@ -1,0 +1,7 @@
+# 本地生产容器差异，基础凭据继续来自 config.toml。
+[backend]
+base_url = "http://ccxt-proxy2:5123"
+[server]
+host = "0.0.0.0"
+[deploy]
+publish_port = 5175

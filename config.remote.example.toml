@@ -1,0 +1,5 @@
+# ssh rn 的生产差异；凭据不进入镜像。
+[backend]
+base_url = "http://ccxt-proxy2:5123"
+[server]
+host = "0.0.0.0"

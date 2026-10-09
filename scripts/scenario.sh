@@ -29,6 +29,7 @@ if [[ "$show_help" == 'true' ]]; then
     fi
     exit 0
 fi
+export APP_CONFIG_PROFILE=dev
 if [[ "$scenario" == 'legacy' ]]; then
     library_target=$(bun scripts/legacy-config.ts "$config_path")
     bun --bun node_modules/vite/bin/vite.js build --config vite.config.lib.ts

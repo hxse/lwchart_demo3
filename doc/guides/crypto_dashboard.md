@@ -126,6 +126,8 @@ Network 响应头 Server-Timing 的 upstream 和 local 可以区分后端等待�
 
 图表上下边距为 3%，按可见蜡烛的 high／low 缩放，EMA 不扩大范围。
 
+本地与 ssh rn 的容器运行及配置覆盖见 [部署指南](deployment.md)。
+
 ## 构建、旧入口与验证
 
 ```bash

@@ -7,7 +7,7 @@ just market   # CCXT／TQ 实时多周期看盘，默认 http://127.0.0.1:5174/
 just legacy   # 构建 Notebook 图表库，复制到 ~/dev/pyo3-quant/data/lwchart
 ```
 
-实时看盘从 config.toml 读取后端鉴权配置，格式见 config.example.toml。
+实时看盘从 config.toml 及对应生产场景覆盖读取后端配置，格式见 config.example.toml。
 默认四图为 30m／4h／日线／周线，显示 EMA14／50／100，初始最新 1000 根，每 5 秒请求最新 5 根。
 默认深色和本地显示时区，右上角设置点击应用后生效；URL 同样可指定来源、品种和显示设置。
 TQ 默认螺纹主连，直接访问 ?source=tq。图例显示时间、OHLC 和成交量，数据时间始终为 UTC。
@@ -23,3 +23,5 @@ just market --build
 ```
 
 测试使用本地模拟后端和已安装的 Chromium，不请求真实交易所。
+
+本地／远程 Podman 生产部署见 [部署指南](doc/guides/deployment.md)。

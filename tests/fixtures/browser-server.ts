@@ -38,7 +38,8 @@ async function run(command: string[]) {
     if (exit) throw new Error(`离线构建失败：${command.slice(0, 3).join(' ')}`);
 }
 async function launch(action: string, config: string) {
-    const child = Bun.spawn(['bun', 'scripts/crypto/entry.ts', action, config], { cwd: root, stdout: 'pipe', stderr: 'pipe' });
+    const command = action === 'serve' ? ['bun', 'dist-market/server.js', config] : ['bun', 'scripts/crypto/entry.ts', action, config];
+    const child = Bun.spawn(command, { cwd: root, stdout: 'pipe', stderr: 'pipe' });
     children.push(child);
     for (const stream of [child.stdout, child.stderr]) void (async () => {
         const decoder = new TextDecoder();

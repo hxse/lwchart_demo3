@@ -1,5 +1,7 @@
 dist-lib/
 dist-crypto/
+dist-market/
+.deploy/
 test-results/
 playwright-report/
 .svelte-check/

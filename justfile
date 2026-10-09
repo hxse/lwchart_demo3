@@ -22,5 +22,13 @@ check:
 
 # 离线逻辑、服务与浏览器回归
 test:
-    @bun test tests/unit
-    @bun --bun node_modules/@playwright/test/cli.js test
+    @APP_CONFIG_PROFILE=dev bun test tests/unit
+    @APP_CONFIG_PROFILE=dev bun --bun node_modules/@playwright/test/cli.js test
+
+# 本地或 SSH 远程生产部署，不启用开机自启
+deploy *args:
+    @bash scripts/deploy/entry.sh "$@"
+
+# 只使用缓存生产镜像和本地 fixture 的容器验证
+test-container:
+    @APP_CONFIG_PROFILE=dev bun tests/container/run.ts

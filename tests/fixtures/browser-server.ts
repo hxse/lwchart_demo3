@@ -98,6 +98,12 @@ async function main() {
     mock = Bun.serve({ hostname: '127.0.0.1', port: 43175, async fetch(request) {
         const url = new URL(request.url);
         if (url.pathname === '/' || url.pathname.startsWith('/assets/')) return oldApp(request);
+        if (url.pathname === '/viewport') {
+            const html = await Bun.file(join(root, 'tests/fixtures/viewport.html')).text();
+            return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures/viewport.ts'))), {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            });
+        }
         if (url.pathname === '/__fixture') {
             if (request.method === 'POST') {
                 const state = await request.json();

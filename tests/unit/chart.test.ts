@@ -30,17 +30,32 @@ class FakeSeries {
     moveToPane() {}
     createPriceLine() {}
     priceScale() { return { applyOptions() {} }; }
+    getPane() {
+        return { getHTMLElement: () => ({ querySelectorAll: () => [{ clientWidth: 600, clientHeight: 300, width: 600 }] }) };
+    }
 }
 function fixture() {
     const created: FakeSeries[] = [];
     const removed: FakeSeries[] = [];
     let range = { from: 0, to: 9 };
+    let primary: FakeSeries | undefined;
+    const spacing = () => 600 / (range.to - range.from + 1);
+    const setRight = (to: number) => { range = { from: to - (range.to - range.from), to }; };
     const chart = {
         addSeries(type: { type: string }) { const api = new FakeSeries(type.type); created.push(api); return api; },
         removeSeries(api: FakeSeries) { removed.push(api); },
-        timeScale: () => ({ getVisibleLogicalRange: () => range, setVisibleLogicalRange: (next: typeof range) => { range = next; }, options: () => ({ rightOffset: 5 }) }),
+        timeScale: () => ({
+            getVisibleLogicalRange: () => range, setVisibleLogicalRange: (next: typeof range) => { range = next; },
+            options: () => ({ rightOffset: 5, barSpacing: spacing() }), width: () => 600,
+            scrollPosition: () => range.to - ((primary?.rows.length || 0) - 1),
+            scrollToPosition: (offset: number) => setRight((primary?.rows.length || 0) - 1 + offset),
+            timeToCoordinate: (time: number) => {
+                const index = primary?.rows.findIndex(point => point.time === time) ?? -1;
+                return index < 0 ? null : 600 - (range.to - index + 0.5) * spacing() - 1;
+            },
+        }),
     } as unknown as IChartApi;
-    return { chart, created, removed, get range() { return range; }, set range(value) { range = value; } };
+    return { chart, created, removed, get range() { return range; }, set range(value) { range = value; }, set primary(value: FakeSeries) { primary = value; } };
 }
 const point = (index: number, close = 100) => ({ time: (1718000000 + index * 1800) as UTCTimestamp, open: close, high: close + 1, low: close - 1, close });
 const config = (name: string, type: 'Candlestick' | 'Line' = 'Candlestick'): SeriesConfig => ({ name, type, pane: 0, data: [], showInLegend: true, options: { color: '#FF9800' } });
@@ -85,11 +100,14 @@ test('协调保留 candle 和已有 EMA，结构增删仅影响目标，静态�
 test('补丁整批先校验，尾根覆盖与追加不重建；空更新无操作、空替换清空', () => {
     const f = fixture();
     const candle = new FakeSeries('Candlestick'); candle.setData([point(0), point(1)]);
+    f.primary = candle;
     const ema = new FakeSeries('Line'); ema.setData([{ time: point(1).time, value: 100 }]);
     const map = new Map([['candles', candle as unknown as ISeriesApi<any>], ['ema', ema as unknown as ISeriesApi<any>]]);
     const bad: SeriesDataPatch[] = [{ name: 'candles', data: [point(1, 120)] }, { name: 'ema', data: [{ time: point(1).time, value: NaN }] }];
+    const originalRange = { ...f.range };
     expect(() => applySeriesData(f.chart, map, bad, false)).toThrow('折线');
     expect(candle.updates).toBe(0);
+    expect(f.range).toEqual(originalRange);
     for (const patches of [
         [{ name: 'missing', data: [] }], [{ name: 'candles', data: [point(-1)] }],
         [{ name: 'candles', data: [point(1), point(1)] }], [{ name: 'candles', data: [{ time: point(1).time, value: 1 }] }],
@@ -114,9 +132,30 @@ test('补丁整批先校验，尾根覆盖与追加不重建；空更新无操�
     expect(ema.rows).toEqual([]);
 });
 
+test('纯折线补丁沿用既有逻辑范围跟随，蜡烛缺失历史锚点时恢复新窗口末尾', () => {
+    const lineFixture = fixture();
+    const line = new FakeSeries('Line');
+    line.setData(Array.from({ length: 10 }, (_, index) => ({ time: point(index).time, value: 100 })));
+    lineFixture.primary = line;
+    lineFixture.range = { from: 3, to: 10 };
+    applySeriesData(lineFixture.chart, new Map([['line', line as unknown as ISeriesApi<any>]]),
+        [{ name: 'line', data: [{ time: point(10).time, value: 100 }] }], false);
+    expect(lineFixture.range).toEqual({ from: 4, to: 11 });
+
+    const f = fixture();
+    const candle = new FakeSeries('Candlestick');
+    candle.setData(Array.from({ length: 10 }, (_, index) => point(index)));
+    f.primary = candle;
+    f.range = { from: 1.25, to: 3.25 };
+    applySeriesData(f.chart, new Map([['candles', candle as unknown as ISeriesApi<any>]]),
+        [{ name: 'candles', data: [point(20), point(21), point(22)] }], true);
+    expect(f.range).toEqual({ from: 5, to: 7 });
+});
+
 test('追加和裁剪保持历史时间锚点，跟随最新时保持跨度及末尾偏移', () => {
     const f = fixture();
     const candle = new FakeSeries('Candlestick'); candle.setData(Array.from({ length: 10 }, (_, i) => point(i)));
+    f.primary = candle;
     const map = new Map([['candles', candle as unknown as ISeriesApi<any>]]);
     f.range = { from: 3.25, to: 5.25 };
     applySeriesData(f.chart, map, [{ name: 'candles', data: [point(9), point(10)] }], false);

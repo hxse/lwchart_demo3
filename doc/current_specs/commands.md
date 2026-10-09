@@ -9,11 +9,11 @@
 ```bash
 just legacy                               # 默认 --build
 just legacy --build --config=config.toml
-just crypto                               # 默认 --dev
-just crypto --dev --config=config.toml
-just crypto --build
-just crypto --serve --config=config.toml
-just crypto --stop                         # 停止本项目当前配置的 dev／serve
+just market                               # 默认 --dev
+just market --dev --config=config.toml
+just market --build
+just market --serve --config=config.toml
+just market --stop                         # 停止本项目当前配置的 dev／serve
 just check
 just test
 ```
@@ -27,13 +27,13 @@ legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dis
 其它 `$` 和 `${...}` 保持字面值，路径空格安全。失败停止，不继续复制。
 原 package.json build:lib 退出，不保留同职责包装。
 
-crypto dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
-该入口同时支持 CCXT／TQ 只读看盘，名字保持 crypto。
-crypto build 只构建 dist-crypto，不读凭据、不登录、不请求行情。
-crypto serve 只运行已有 dist-crypto，缺少 index.html 明确失败，不隐式构建。
+market dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
+该入口同时支持 CCXT／TQ 只读看盘，命令名为 market。
+market build 只构建 dist-crypto，不读凭据、不登录、不请求行情。
+market serve 只运行已有 dist-crypto，缺少 index.html 明确失败，不隐式构建。
 开发中间件与 Bun 生产服务共用同一配置、鉴权与 API 实现；生产静态根仅 dist-crypto。
 服务只监听回环地址，Ctrl+C 关闭所启动的服务。
-crypto stop 不读业务配置，不需要有效凭据。按 Linux /proc 匹配同仓库、同入口、同
+market stop 不读业务配置，不需要有效凭据。按 Linux /proc 匹配同仓库、同入口、同
 配置路径的 dev／serve；不会按端口杀其它程序。先 SIGTERM，等待最多 5 秒，仍为同一
 进程时 SIGKILL。没有匹配进程时成功退出；--config 可选，默认 config.toml。
 
@@ -76,4 +76,4 @@ EMA 独立标准结果已保存在 fixture 中。Python 生成器仅用于显式
 
 浏览器优先用 PLAYWRIGHT_CHROMIUM_EXECUTABLE 或已安装缓存，否则使用 Playwright
 默认安装。NixOS 复用已存在的动态库，不修改系统环境。
-典型验证顺序为 `just check`、`just test`、`just crypto --build`。
+典型验证顺序为 `just check`、`just test`、`just market --build`。

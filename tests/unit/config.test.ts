@@ -18,12 +18,18 @@ test('配置默认值、字面密码与路径、不含凭据的 runtime', async 
         expect(config.runtime).toEqual(runtime);
         expect(config.runtime.defaults.history_bars).toBe(1000);
         expect(config.runtime).not.toHaveProperty('data');
-        expect(config.runtime.sources.tq.symbol).toBe('KQ.m@SHFE.rb');
+        expect(config.runtime.defaults.tq.symbol).toBe('KQ.m@SHFE.rb');
         expect(JSON.stringify(config.runtime)).not.toContain('PRIVATE');
         expect(await legacyTarget(path)).toBe(join(homedir(), 'dev/pyo3-quant/data/lwchart'));
         const configured = await Bun.file(path).text();
+        await Bun.write(path, configured.replace('dock_position = "right"', ''));
+        expect((await loadCryptoConfig(path)).runtime.defaults.dock_position).toBe('right');
+        await Bun.write(path, configured.replace('dock_position = "right"', 'dock_position = "top"'));
+        expect((await loadCryptoConfig(path)).runtime.defaults.dock_position).toBe('top');
+        await Bun.write(path, configured.replace('dock_position = "right"', 'dock_position = "invalid"'));
+        await expect(loadCryptoConfig(path)).rejects.toThrow('按钮栏位置必须');
         await Bun.write(path, configured.replace('source = "ccxt"', 'source = "tq"'));
-        expect((await loadCryptoConfig(path)).runtime.defaults.symbol).toBe('KQ.m@SHFE.rb');
+        expect((await loadCryptoConfig(path)).runtime.defaults.tq.symbol).toBe('KQ.m@SHFE.rb');
         for (const field of ['incremental_bars = 5', 'max_catchup_pages = 2', 'symbol = "WRONG_OWNER"']) {
             await Bun.write(path, configured.replace('[dashboard]', `[dashboard]\n${field}`));
             await expect(loadCryptoConfig(path)).rejects.toThrow('dashboard 含有未知字段');
@@ -53,16 +59,19 @@ test('配置默认值、字面密码与路径、不含凭据的 runtime', async 
 });
 
 test('Just 帮助不读配置、未知与互斥动作退出二，旧 build:lib 已退出', async () => {
-    for (const command of [['just'], ['just', 'legacy', '--help', '--config=/missing'], ['just', 'crypto', '--help', '--config=/missing']]) {
+    for (const command of [['just'], ['just', 'legacy', '--help', '--config=/missing'], ['just', 'market', '--help', '--config=/missing']]) {
         const process = Bun.spawnSync(command);
         expect(process.exitCode).toBe(0);
-        expect(process.stdout.toString()).toMatch(/legacy|crypto/);
+        expect(process.stdout.toString()).toMatch(/legacy|market/);
     }
-    for (const args of [['crypto', '--dev', '--build'], ['crypto', '--stop', '--dev'], ['crypto', '--unknown'], ['crypto', '--config='], ['legacy', '--dev'], ['legacy', '--stop']]) {
+    for (const args of [['market', '--dev', '--build'], ['market', '--stop', '--dev'], ['market', '--unknown'], ['market', '--config='], ['legacy', '--dev'], ['legacy', '--stop'], ['crypto', '--help']]) {
         expect(Bun.spawnSync(['bash', 'scripts/scenario.sh', ...args]).exitCode).toBe(2);
     }
     const pkg = await Bun.file('package.json').json();
     expect(pkg.scripts['build:lib']).toBeUndefined();
+    const old = Bun.spawnSync(['just', 'crypto', '--help']);
+    expect(old.exitCode).not.toBe(0);
+    expect(old.stderr.toString()).toContain('crypto');
 });
 
 test('生产静态仅服务构建目录，拒绝私密文件和越界路径', async () => {

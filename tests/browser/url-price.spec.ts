@@ -10,7 +10,7 @@ test('裸地址与部分参数补全，编辑不提交，应用一次，非法�
     await page.goto('/#watch');
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(4);
     const original = page.url(); const defaults = new URL(original);
-    expect(defaults.searchParams.size).toBe(12);
+    expect(defaults.searchParams.size).toBe(14);
     expect(defaults.searchParams.get('source')).toBe('ccxt');
     expect(defaults.searchParams.get('timezone')).toBe('local');
     expect(defaults.searchParams.get('timeframes')).toBe('30m,4h,1d,1w');
@@ -44,7 +44,7 @@ test('裸地址与部分参数补全，编辑不提交，应用一次，非法�
     await page.goto('/?timeframes=1h&indicators=none#one');
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(1);
     const partial = new URL(page.url());
-    expect(partial.searchParams.size).toBe(12); expect(partial.searchParams.get('layout')).toBe('1x1');
+    expect(partial.searchParams.size).toBe(14); expect(partial.searchParams.get('layout')).toBe('1x1');
     expect(partial.searchParams.get('indicators')).toBe('none'); expect(partial.hash).toBe('#one');
 });
 

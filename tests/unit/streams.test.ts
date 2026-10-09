@@ -3,8 +3,8 @@ import { MarketStream } from '../../src/crypto/data/MarketStream';
 import { MarketHub } from '../../src/crypto/data/MarketHub';
 import type { MarketSource } from '../../src/crypto/data/client';
 import type { CandleBatch } from '../../src/crypto/data/ohlcv';
-import { changeSource } from '../../src/crypto/options';
-import { candle, result, identity, defaults, sources, deferred } from '../fixtures/data';
+import { activeOptions } from '../../src/crypto/options';
+import { candle, result, identity, defaults, runtime, deferred } from '../fixtures/data';
 
 const windowRows = (count: number) => Array.from({ length: count }, (_, index) => candle(index));
 
@@ -139,7 +139,7 @@ test('身份隔离、单周期故障；指标、主题、时区与节拍不重�
         expect(streams[2]!.status.phase).toBe('error'); expect(streams[0]!.status.phase).toBe('ready');
         const themed = hub.configure({ ...configuration, theme: 'light', timezone: 'UTC', indicators: [], refresh_seconds: 7 });
         expect(themed).toEqual(streams); expect(calls).toHaveLength(3);
-        const changed = hub.configure(changeSource(defaults, 'tq', sources));
+        const changed = hub.configure(activeOptions({ ...runtime.defaults, source: 'tq' }));
         await Promise.all(changed.map(stream => stream.poll()));
         expect(changed[0]).not.toBe(streams[0]); expect(changed[0]!.identity.source).toBe('tq');
         expect(streams[0]!.store.rows).toEqual(windowRows(2));

@@ -39,8 +39,8 @@ test('默认四周期全屏、EMA 颜色、菜单隐藏、更新保持图表实�
     expect(await charts.evaluateAll(nodes => nodes.map(n => n.getAttribute('data-bars')))).toEqual(['1000', '1000', '1000', '350']);
     const bounds = await charts.evaluateAll(nodes => nodes.map(n => { const b = n.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; }));
     expect(bounds).toEqual([
-        { x: 0, y: 0, width: 639, height: 399 }, { x: 641, y: 0, width: 639, height: 399 },
-        { x: 0, y: 401, width: 639, height: 399 }, { x: 641, y: 401, width: 639, height: 399 },
+        { x: 0, y: 0, width: 618, height: 399 }, { x: 620, y: 0, width: 618, height: 399 },
+        { x: 0, y: 401, width: 618, height: 399 }, { x: 620, y: 401, width: 618, height: 399 },
     ]);
     expect(await page.evaluate(() => ({ x: document.documentElement.scrollWidth, y: document.documentElement.scrollHeight }))).toEqual({ x: 1280, y: 800 });
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -122,7 +122,7 @@ test('单槽周期、品种与布局提交规范 URL，重复周期共用取数'
     await page.getByRole('combobox', { name: '布局', exact: true }).selectOption('2x1');
     await page.getByRole('button', { name: '应用', exact: true }).click(); await ready(page, 2);
     const url = new URL(page.url());
-    expect(url.searchParams.get('symbol')).toBe('ETH/USDT:USDT');
+    expect(url.searchParams.get('ccxt.symbol')).toBe('ETH/USDT:USDT');
     expect(url.searchParams.get('timeframes')).toBe('15m,30m');
     expect(url.searchParams.get('layout')).toBe('2x1');
     expect(await page.locator('.crypto-chart').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-timeframe')))).toEqual(['15m', '30m']);

@@ -17,19 +17,22 @@ export type Timeframe = typeof TIMEFRAMES[number];
 export type Layout = keyof typeof LAYOUTS;
 export type Theme = 'dark' | 'light';
 export type Source = 'ccxt' | 'tq';
+export const DOCK_POSITIONS = ['top', 'bottom', 'left', 'right'] as const;
+export type DockPosition = typeof DOCK_POSITIONS[number];
 export interface IndicatorSpec { type: 'ema'; period: number }
 export interface CcxtDefaults { exchange_name: 'binance' | 'kraken'; market: 'future' | 'spot'; is_live: boolean; symbol: string }
 export interface TqDefaults { symbol: string }
 interface DisplayOptions {
     symbol: string; layout: Layout; timeframes: Timeframe[]; indicators: IndicatorSpec[];
-    refresh_seconds: number; history_bars: number; theme: Theme; timezone: string;
+    refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition;
 }
 export interface CcxtOptions extends DisplayOptions, CcxtDefaults { source: 'ccxt' }
 export interface TqOptions extends DisplayOptions { source: 'tq' }
 export type DashboardOptions = CcxtOptions | TqOptions;
 export interface SourceDefaults { ccxt: CcxtDefaults; tq: TqDefaults }
-export interface RuntimeOptions { defaults: DashboardOptions; sources: SourceDefaults }
-export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone'] as const;
+export interface DashboardSettings extends Omit<DisplayOptions, 'symbol'>, SourceDefaults { source: Source }
+export interface RuntimeOptions { defaults: DashboardSettings }
+export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position'] as const;
 export const CCXT_KEYS = ['exchange_name','market','is_live'] as const;
 export const DASHBOARD_KEYS = COMMON_KEYS.filter(key => key !== 'symbol');
 export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS] : [...COMMON_KEYS]; }
@@ -103,22 +106,33 @@ export function normalizeOptions(input: unknown): DashboardOptions {
     if (value.source !== 'ccxt' && value.source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
     onlyKeys(value, optionKeys(value.source), '看盘配置');
     if (value.theme !== 'dark' && value.theme !== 'light') throw new Error('主题必须是 dark 或 light');
+    const dock = value.dock_position ?? 'right';
+    if (!DOCK_POSITIONS.includes(dock as DockPosition)) throw new Error('按钮栏位置必须是 top、bottom、left 或 right');
     if (typeof value.layout !== 'string' || !Object.hasOwn(LAYOUTS, value.layout)) throw new Error('未知图表布局');
     const layout = value.layout as Layout;
     if (!Array.isArray(value.timeframes) || value.timeframes.length !== layoutSlots(layout)
         || value.timeframes.some(t => !TIMEFRAMES.includes(t))) throw new Error('周期列表必须匹配布局，且周期受支持');
     const display: DisplayOptions = { symbol: symbol(value.symbol), layout, timeframes: [...value.timeframes], indicators: parseIndicators(value.indicators),
         refresh_seconds: integer(value.refresh_seconds, 1, 3600, '更新间隔'),
-        history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone) };
+        history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone), dock_position: dock as DockPosition };
     if (value.source === 'tq') return { ...display, source: 'tq' };
     const identity = normalizeCcxt(Object.fromEntries([...CCXT_KEYS, 'symbol'].map(key => [key, value[key]])));
     return { ...display, ...identity, source: 'ccxt' };
 }
-export function changeSource(options: DashboardOptions, source: Source, sources: SourceDefaults): DashboardOptions {
-    return { ...Object.fromEntries(COMMON_KEYS.map(key => [key, options[key]])), ...sources[source], source } as DashboardOptions;
+export function activeOptions(settings: DashboardSettings): DashboardOptions {
+    const display = Object.fromEntries(DASHBOARD_KEYS.map(key => [key, settings[key]]));
+    return normalizeOptions({ ...display, ...settings[settings.source] });
+}
+export function normalizeSettings(input: unknown): DashboardSettings {
+    const value = record(input, '页面设置');
+    onlyKeys(value, [...DASHBOARD_KEYS, 'ccxt', 'tq'], '页面设置');
+    if (value.source !== 'ccxt' && value.source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
+    const sources = normalizeSources({ ccxt: value.ccxt, tq: value.tq });
+    const active = normalizeOptions({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, value[key]])), ...sources[value.source] });
+    return { ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, active[key]])), ...sources } as DashboardSettings;
 }
 export function normalizeRuntime(input: unknown): RuntimeOptions {
     const value = record(input, '运行配置');
-    onlyKeys(value, ['defaults', 'sources'], '运行配置');
-    return { defaults: normalizeOptions(value.defaults), sources: normalizeSources(value.sources) };
+    onlyKeys(value, ['defaults'], '运行配置');
+    return { defaults: normalizeSettings(value.defaults) };
 }

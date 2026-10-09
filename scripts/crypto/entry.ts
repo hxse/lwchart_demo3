@@ -22,7 +22,7 @@ async function main() {
         return;
     }
     const directory = resolve(root, 'dist-crypto');
-    if (!await Bun.file(resolve(directory, 'index.html')).exists()) throw new Error('缺少看盘产物，请先运行 just crypto --build');
+    if (!await Bun.file(resolve(directory, 'index.html')).exists()) throw new Error('缺少看盘产物，请先运行 just market --build');
     const api = createApi(config);
     const serveFile = staticHandler(directory);
     const server = Bun.serve({ hostname: config.server.host, port: config.server.port,

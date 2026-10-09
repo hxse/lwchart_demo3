@@ -11,8 +11,8 @@ legacy *args:
     @bash scripts/scenario.sh legacy "$@"
 
 # 新场景：实时多周期看盘；--stop 停止所选配置的进程
-crypto *args:
-    @bash scripts/scenario.sh crypto "$@"
+market *args:
+    @bash scripts/scenario.sh market "$@"
 
 # 全部静态检查，不改写源码
 check:

@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import {
-    record, onlyKeys, integer, text, normalizeOptions, normalizeSources, DASHBOARD_KEYS,
+    record, onlyKeys, integer, text, normalizeSettings, normalizeSources, DASHBOARD_KEYS,
     type RuntimeOptions,
 } from '../../src/crypto/options';
 
@@ -51,8 +51,7 @@ export async function loadCryptoConfig(path: string): Promise<CryptoConfig> {
         },
         server: { host, port: integer(server.port, 1, 65535, '端口') },
         runtime: {
-            defaults: normalizeOptions({ ...dashboard, ...sources[dashboard.source] }),
-            sources,
+            defaults: normalizeSettings({ ...dashboard, ...sources }),
         },
     };
 }

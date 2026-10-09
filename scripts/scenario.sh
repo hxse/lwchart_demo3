@@ -3,6 +3,7 @@ set -euo pipefail
 
 scenario=$1
 shift
+if [[ "$scenario" != 'legacy' && "$scenario" != 'market' ]]; then echo '未知场景，请使用 market 或 legacy' >&2; exit 2; fi
 config_path='config.toml'
 action='dev'
 if [[ "$scenario" == 'legacy' ]]; then action='build'; fi
@@ -24,7 +25,7 @@ if [[ "$show_help" == 'true' ]]; then
     if [[ "$scenario" == 'legacy' ]]; then
         echo 'just legacy [--build] [--config=config.toml]：构建并复制 Notebook 图表库'
     else
-        echo 'just crypto [--dev|--build|--serve|--stop] [--config=config.toml]：运行、构建或停止看盘'
+        echo 'just market [--dev|--build|--serve|--stop] [--config=config.toml]：运行、构建或停止看盘'
     fi
     exit 0
 fi

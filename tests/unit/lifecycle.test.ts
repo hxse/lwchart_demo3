@@ -28,13 +28,13 @@ test('stop 定位本项目对应配置，配置删除后仍可停，保留其它
         }
         expect(ready).toBe(true);
         await rm(configPath);
-        const stop = Bun.spawn(['just', 'crypto', '--stop', `--config=${configPath}`], { stdout: 'pipe', stderr: 'pipe' });
+        const stop = Bun.spawn(['just', 'market', '--stop', `--config=${configPath}`], { stdout: 'pipe', stderr: 'pipe' });
         const output = new Response(stop.stdout).text();
         expect(await stop.exited).toBe(0);
         expect(await output).toContain('已停止看盘进程');
         await server.exited;
         expect(other.exitCode).toBeNull();
-        const again = Bun.spawnSync(['just', 'crypto', '--stop', `--config=${configPath}`]);
+        const again = Bun.spawnSync(['just', 'market', '--stop', `--config=${configPath}`]);
         expect(again.exitCode).toBe(0);
         expect(again.stdout.toString()).toContain('没有运行中的看盘进程');
     } finally {

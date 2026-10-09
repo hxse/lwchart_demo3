@@ -21,6 +21,8 @@ port = 5174
 
 [dashboard]
 source = "ccxt"
+# 按钮栏实际占位；right／left 为竖栏，top／bottom 为横栏。
+dock_position = "right"
 # local 跟随浏览器时区；也可用 UTC 或 Asia/Shanghai 等 IANA 时区。
 timezone = "local"
 # 主题：dark 深色、light 浅色；URL 与设置可以覆盖。
@@ -35,7 +37,7 @@ refresh_seconds = 5
 history_bars = 1000
 
 [ccxt]
-# CCXT 默认身份。切换到此来源时使用；只读行情，不提供下单。
+# CCXT 默认身份。对应 URL 字段缺省时使用；只读行情，不提供下单。
 exchange_name = "binance"
 market = "future"
 is_live = true

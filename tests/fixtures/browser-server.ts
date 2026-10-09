@@ -82,7 +82,7 @@ async function main() {
     const config = join(directory, 'config.toml');
     const devConfig = join(directory, 'dev.toml');
     await Bun.write(config, configText); await Bun.write(devConfig, configText.replace('port = 43174', 'port = 43176'));
-    await run(['just', 'crypto', '--build']);
+    await run(['just', 'market', '--build']);
     await run(['just', 'legacy', '--build', `--config=${config}`]);
     await run(['bun', 'run', 'build']);
     for (const filename of await readdir(join(root, 'dist-lib'))) {

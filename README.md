@@ -3,7 +3,7 @@
 Svelte 与 Lightweight Charts 图表项目，提供两个独立场景，共享绘图、网格和光标同步。
 
 ```bash
-just crypto   # CCXT／TQ 实时多周期看盘，默认 http://127.0.0.1:5174/
+just market   # CCXT／TQ 实时多周期看盘，默认 http://127.0.0.1:5174/
 just legacy   # 构建 Notebook 图表库，复制到 ~/dev/pyo3-quant/data/lwchart
 ```
 
@@ -19,7 +19,7 @@ TQ 默认螺纹主连，直接访问 ?source=tq。图例显示时间、OHLC 和�
 ```bash
 just check
 just test
-just crypto --build
+just market --build
 ```
 
 测试使用本地模拟后端和已安装的 Chromium，不请求真实交易所。

@@ -19,39 +19,89 @@ TQ 默认 KQ.m@SHFE.rb；[tq] 不填写天勤账号，仍用 backend 的鉴权�
 配置修改后重启：
 
 ```bash
-just crypto --stop
-just crypto
+just market --stop
+just market
 ```
 
 打开 http://127.0.0.1:5174/。默认 Binance BTC/USDT:USDT、深色四图：
 左上 30m、右上 4h、左下日线、右下周线；EMA14／50／100 为橙／绿／蓝。
 每 5 秒更新，鼠标时间跨周期联动；看历史时不会被更新拉回末尾。
 
-右上角齿轮展开设置。修改先留在草稿，**点击“应用”才更新图表与地址**；
+按钮栏齿轮展开悬浮设置。修改先留在草稿，**点击“应用”才更新图表与地址**；
 取消、关闭或 Esc 丢弃修改。原行情在编辑期间继续更新。
 浏览器前进／后退会同步图表和打开中的设置，首次打开自动补全完整参数。
 
 5174 被占用时用上述 stop 停止本项目对应实例；自定义配置用
-`just crypto --stop --config=配置路径`，不会按端口停止其它程序。
+`just market --stop --config=配置路径`，不会按端口停止其它程序。
 
 ## 数据源与 URL
 
-在设置的“数据源”选 CCXT 或 TQ。TQ 默认螺纹主连，可填写其它完整品种名，
-例如 SHFE.rb2701；选择 TQ 后不显示 CCXT 的交易所、市场和环境选项。
-后端需启用对应服务，并授予当前账号行情权限。
+设置上方为 CCXT／TQ 两个 Tab，各自填写品种与内部参数；来源区域用细框包围，下方公共设置另用细框包围，配色跟随主题。
+切 Tab 保留两边编辑，点击应用后才切换实际行情。CCXT 的市场是现货／合约，
+环境是实盘／模拟盘；TQ 不使用这些参数。后端需启用对应服务并授予当前账号行情权限。
+
+query 同时保存双方参数，source 选择当前来源。两边共用布局、周期、指标、历史数量、
+更新间隔、主题与时区；切到 TQ 再切回来仍保留之前的 CCXT 选项。
+旧 URL 中裸写的 symbol／exchange_name／market／is_live 要分别改为 ccxt.* 或 tq.symbol。
 
 ```text
-http://127.0.0.1:5174/?symbol=ETH%2FUSDT%3AUSDT
-http://127.0.0.1:5174/?source=tq
-http://127.0.0.1:5174/?source=tq&symbol=KQ.m%40SHFE.rb&timeframes=30m,4h,1d,1w
+http://127.0.0.1:5174/?ccxt.symbol=ETH%2FUSDT%3AUSDT
+http://127.0.0.1:5174/?source=tq&tq.symbol=KQ.m%40SHFE.rb&history_bars=1500
 http://127.0.0.1:5174/?layout=1x2&timeframes=30m,4h&indicators=none
 http://127.0.0.1:5174/?history_bars=500&theme=light&timezone=Asia%2FShanghai
 ```
 
-layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期列表按数量推断布局；
-显式写布局时数量必须一致。指标用 ema,周期，多个用分号连接；none 表示不画指标。
-TQ URL 不写 exchange_name、market、is_live，它们仅适用于 CCXT。
-完整参数规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
+layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按数量推断布局；
+显式布局与周期数量必须一致。指标用 ema,周期，多个用分号连接；none 表示无指标。
+缺省字段从启动配置补全。完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
+
+## 自选与书签
+
+一个页面一份设置、一个自选列表。保存完整 URL 为浏览器书签即可保存这份组合，
+多个设置／自选组合保存成多个书签。页面修改不写入本地配置或浏览器存储。
+
+```text
+http://127.0.0.1:5174/?history_bars=1500#binance,BTC/USDT:USDT;binance,ETH/USDT:USDT;tq,KQ.m@SHFE.rb
+```
+
+hash 中用“来源,品种”填写一项，分号分隔，支持 Binance、Kraken、TQ 混合排序。
+hash 不发送到服务端。没有列表且未平铺时点击右侧小按钮新建；已有列表或开启平铺时点击展开／折叠。
+鼠标进入小按钮后在其下方出现上一项／下一项，在按钮和控制附近 12px 内保持，离开立即消失。
+也可用展开面板标题的按钮导航。
+当前品种不在列表时，下一项从第一项开始，上一项从最后项开始；首尾循环。
+点击条目只更新当前来源、交易所和品种，保留全部其它设置和整个列表。默认未锁定，选择成功或点击外部自动收起。
+标题的锁定按钮可保持列表展开，选择品种和点击外部均不收起；仍可手动折叠。
+锁定状态不进入 URL，刷新恢复未锁定。
+展开列表时自动将当前项尽量滚到中间，首尾停在顶部／底部。
+
+面板“编辑自选”打开独立弹窗，支持新增、修改、删除、拖拽及上下按钮排序。
+保存只更新 URL 的 hash，当前品种、设置和行情保持不变；删除当前品种条目也不切换。
+清空且未平铺时移除 hash；开启平铺则保留模式。关闭／取消／Esc 丢弃编辑；浏览器前进／后退同步地址。
+完整编码 URL 上限为 8192 字符，超限提交会弹窗提示并保留编辑，建议缩短或分成多个书签。
+
+## 按钮栏位置
+
+按钮栏默认在右侧，实际占位 42px，图表填满剩余区域。设置的公共参数“按钮栏位置”
+可选上、下、左、右，点击应用才生效；左右竖排，上下横排，位置保存在 query。
+例如 http://127.0.0.1:5174/?dock_position=left 。URL 未填写时采用启动默认值，默认 right。
+设置和自选展开面板继续悬浮，贴近按钮向图表展开；自选鼠标控制仍是悬浮按钮。
+
+## 平铺按钮栏
+
+在自选面板标题点击平铺按钮，可以将上箭头、下箭头、编辑和每个候选放进实际占位按钮栏。
+设置、自选和每个平铺按钮统一 32×30px；原自选按钮继续打开悬浮面板。
+平铺内容超出按钮栏可用空间时出现细滚动条，不超出则没有滚动条。
+Binance／Kraken 显示 / 前的名称（BTC），TQ 显示最后一个 . 后的名称（rb）；其它情况
+显示完整品种，长名称可悬浮查看完整来源与品种。点击仍按完整身份切换。
+
+模式默认关闭，开启后写入 hash，可随书签保存；编辑列表会保留模式，前进／后退也同步。
+
+```text
+http://127.0.0.1:5174/?history_bars=1500#flat=true;binance,BTC/USDT:USDT;kraken,ETH/USD;tq,KQ.m@SHFE.rb
+```
+
+平铺模式与锁定相互独立：平铺绑定 hash，锁定不保存到 URL。清空列表后仍可用编辑入口
+添加候选，或用原自选按钮展开面板关闭平铺。模式切换不改变当前设置或重新请求行情。
 
 ## 时间与更新
 
@@ -79,8 +129,8 @@ Network 响应头 Server-Timing 的 upstream 和 local 可以区分后端等待�
 ## 构建、旧入口与验证
 
 ```bash
-just crypto --build
-just crypto --serve
+just market --build
+just market --serve
 just legacy
 just check
 just test

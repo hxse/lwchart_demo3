@@ -1,4 +1,4 @@
-import { normalizeOptions, normalizeSources, type CcxtOptions, type RuntimeOptions } from '../../src/crypto/options';
+import { normalizeOptions, normalizeSources, normalizeSettings, DASHBOARD_KEYS, type CcxtOptions, type RuntimeOptions } from '../../src/crypto/options';
 import type { OhlcvRow, CandleBatch } from '../../src/crypto/data/ohlcv';
 import type { MarketIdentity } from '../../src/crypto/data/client';
 
@@ -9,7 +9,7 @@ export const defaults = normalizeOptions({
 }) as CcxtOptions;
 export const sources = normalizeSources({ ccxt: { exchange_name: defaults.exchange_name, market: defaults.market,
     is_live: defaults.is_live, symbol: defaults.symbol }, tq: { symbol: 'KQ.m@SHFE.rb' } });
-export const runtime: RuntimeOptions = { defaults, sources };
+export const runtime: RuntimeOptions = { defaults: normalizeSettings({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, defaults[key]])), ...sources }) };
 export const identity: MarketIdentity = { source: 'ccxt', ...sources.ccxt, timeframe: '30m' };
 export const START = 1718000000000;
 export function candle(index: number, close = 100 + index, step = 1800000): OhlcvRow {

@@ -21,8 +21,8 @@ async function sameCharts(page: Page) {
 test('TQ 默认螺纹主连四周期、最新数量与图例；来源和品种只在应用后修改', async ({ page, request }) => {
     await page.goto('/?source=tq&refresh_seconds=1');
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(4);
-    expect(new URL(page.url()).searchParams.size).toBe(9);
-    expect(new URL(page.url()).searchParams.get('symbol')).toBe('KQ.m@SHFE.rb');
+    expect(new URL(page.url()).searchParams.size).toBe(14);
+    expect(new URL(page.url()).searchParams.get('tq.symbol')).toBe('KQ.m@SHFE.rb');
     await expect(page.locator('.crypto-chart .caption strong').first()).toHaveText('KQ.m@SHFE.rb');
     const before = await (await request.get(fixture)).json();
     expect(before.reads.filter((r: any) => r.history).map((r: any) => r.timeframe)).toEqual(['30m','4h','1d','1w']);
@@ -48,13 +48,13 @@ test('TQ 默认螺纹主连四周期、最新数量与图例；来源和品种�
     await page.mouse.move(390, 190);
     await page.screenshot({ path: 'test-results/tq-default.png' });
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByRole('combobox', { name: '数据源', exact: true }).selectOption('ccxt');
+    await page.getByRole('tab', { name: 'CCXT', exact: true }).click();
     await expect(page.getByLabel('品种', { exact: true })).toHaveValue('BTC/USDT:USDT');
     await expect(page.getByRole('combobox', { name: '交易所', exact: true })).toHaveValue('binance');
     await expect(page.locator('.crypto-chart').first()).toHaveAttribute('data-source', 'tq');
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.crypto-chart[data-source="ccxt"][data-phase="ready"]')).toHaveCount(4);
-    expect(new URL(page.url()).searchParams.size).toBe(12); expect(await sameCharts(page)).toBe(true);
+    expect(new URL(page.url()).searchParams.size).toBe(14); expect(await sameCharts(page)).toBe(true);
 });
 
 test('图例和光标时间按本地／UTC 显示，UTC 时间与视口保持，非法时区不提交', async ({ page, request }) => {

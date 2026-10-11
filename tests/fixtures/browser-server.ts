@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { OhlcvRow } from '../../src/crypto/data/ohlcv';
 import { legacyZip } from './legacy';
+import { legacyIndicatorZip } from './legacy-indicators';
 import { staticHandler } from '../../scripts/crypto/static';
 import { validateDeclarations } from './declaration-consumer';
 import { legacyDisplayZip } from './legacy-display';
@@ -104,6 +105,7 @@ async function main() {
     await validateDeclarations(root, directory, target);
     const zip = await legacyZip();
     const displayZip = legacyDisplayZip();
+    const indicatorZip = legacyIndicatorZip();
     const oldApp = staticHandler(join(root, 'dist'));
     const styles = (await readdir(join(root, 'dist-lib'))).filter(n => n.endsWith('.css'));
     mock = Bun.serve({ hostname: '127.0.0.1', port: 43175, async fetch(request) {
@@ -113,6 +115,12 @@ async function main() {
             const html = await Bun.file(join(root, 'tests/fixtures/viewport.html')).text();
             const module = url.pathname === '/viewport' ? 'viewport.ts' : 'chart-gaps.ts';
             return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures', module))), {
+                headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            });
+        }
+        if (url.pathname === '/indicator-fixture') {
+            const html = await Bun.file(join(root, 'tests/fixtures/indicator-browser.html')).text();
+            return new Response(html.replace('__INDICATOR_MODULE__', encodeURI(join(root, 'tests/fixtures/indicator-browser.ts'))), {
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
             });
         }
@@ -130,14 +138,15 @@ async function main() {
         }
         if (url.pathname === '/legacy.zip') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         if (url.pathname === '/legacy-display.zip') return new Response(new Uint8Array(displayZip).buffer, { headers: { 'Content-Type': 'application/zip' } });
+        if (url.pathname === '/legacy-indicators.zip') return new Response(new Uint8Array(indicatorZip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         if (url.pathname.startsWith('/legacy-assets/')) {
             const filename = url.pathname.slice('/legacy-assets/'.length);
             if (filename.includes('/') || filename.includes('..')) return new Response(null, { status: 404 });
             return new Response(Bun.file(join(root, 'dist-lib', filename)));
         }
-        if (url.pathname === '/legacy' || url.pathname === '/legacy-display') return new Response(`<!doctype html><html><head>${styles.map(s => `<link rel="stylesheet" href="/legacy-assets/${s}">`).join('')}
+        if (['/legacy', '/legacy-display', '/legacy-indicators'].includes(url.pathname)) return new Response(`<!doctype html><html><head>${styles.map(s => `<link rel="stylesheet" href="/legacy-assets/${s}">`).join('')}
             <style>html,body,#old{margin:0;width:100%;height:100%;overflow:hidden}</style></head><body><div id="old"></div>
-            <script src="/legacy-assets/chart-dashboard.umd.js"></script><script>fetch('${url.pathname === '/legacy' ? '/legacy.zip' : '/legacy-display.zip'}').then(r=>r.blob()).then(zipData=>window.ChartDashboardLib.mountDashboard(document.getElementById('old'),{zipData}));</script></body></html>`,
+            <script src="/legacy-assets/chart-dashboard.umd.js"></script><script>fetch('${url.pathname}.zip').then(r=>r.blob()).then(zipData=>window.ChartDashboardLib.mountDashboard(document.getElementById('old'),{zipData${url.pathname === '/legacy-indicators' ? ",config:{show:['0,1,3,0']}" : ''}}));</script></body></html>`,
             { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         if (url.pathname === '/auth/token' && request.method === 'POST') {
             const form = await request.formData();

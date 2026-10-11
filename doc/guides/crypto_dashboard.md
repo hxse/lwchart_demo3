@@ -52,7 +52,10 @@ http://127.0.0.1:5174/?history_bars=500&theme=light&timezone=Asia%2FShanghai
 ```
 
 layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按数量推断布局；
-显式布局与周期数量必须一致。指标用 ema,周期，多个用分号连接；none 表示无指标。
+显式布局与周期数量必须一致。技术指标用紧凑写法，多个用分号连接；none 表示无指标。
+支持 sma、ema、dema、tema、rsi、cci、macd、atr、er、bbands；ADX 暂不可计算，
+输入时明确报错。示例为 ema,14;rsi,14;macd,12,26,9;bbands,20,2，完整参数见
+[指标规范](../current_specs/indicators.md)。
 缺省字段从启动配置补全。完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
 
 ## 自选与书签
@@ -105,7 +108,10 @@ http://127.0.0.1:5174/?history_bars=1500#flat=true;binance,BTC/USDT:USDT;kraken,
 
 ## 时间与更新
 
-左上角图例显示鼠标对应 K 线的开盘时间、OHLC、成交量 V 和 EMA。
+左上角图例显示鼠标对应 K 线的开盘时间、OHLC、成交量 V 和已配置指标。
+均线、布林带叠加主图；RSI、CCI、MACD、ATR、ER 位于独立副图，MACD 两线一柱
+同组。可拖动副图分隔线调整高度。配置列表删除指标会释放实例与独占副图，
+再添加重新初始化；标签不承担临时显隐操作。CCI 平盘未定义时显示缺口，不补零。
 显示时区默认 local，跟随浏览器；也可填 UTC、Asia/Shanghai、America/New_York 等。
 图例、横轴和光标时间使用同一时区。原始数据始终是 UTC 时间戳，显示时区不会
 改变行情、指标计算或光标匹配；切换时区不重新取行情。
@@ -130,7 +136,7 @@ TQ 后端也有两路窗口限制，因此并发不等于同时显示。
 较大的周线数量可能被后端拒绝，前端如实显示错误，不偷偷减少数量或换起点路由。
 Network 响应头 Server-Timing 的 upstream 和 local 可以区分后端等待与本地处理耗时。
 
-图表上下边距为 3%，按可见蜡烛的 high／low 缩放，EMA 不扩大范围。
+图表上下边距为 3%，均线不扩大可见蜡烛的 high／low 范围，布林带上下轨参与缩放。
 
 本地与 ssh rn 的容器运行及配置覆盖见 [部署指南](deployment.md)。
 

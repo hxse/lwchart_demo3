@@ -24,7 +24,8 @@ const palettes = {
 export function chartTheme(theme: Theme): DeepPartial<ChartOptions> {
     const p = palettes[theme];
     return {
-        layout: { background: { type: ColorType.Solid, color: p.background }, textColor: p.secondary },
+        layout: { background: { type: ColorType.Solid, color: p.background }, textColor: p.secondary,
+            panes: { separatorColor: p.divider, separatorHoverColor: p.border } },
         grid: { vertLines: { color: p.grid }, horzLines: { color: p.grid } },
         timeScale: { borderColor: p.border },
         leftPriceScale: { borderColor: p.border }, rightPriceScale: { borderColor: p.border },

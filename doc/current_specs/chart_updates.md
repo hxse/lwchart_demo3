@@ -8,8 +8,10 @@ SeriesRegistry 管理创建／删除；LegendManager 管理图例；TimeScaleHel
 
 `seriesMode?: 'replace' | 'reconcile'` 默认 replace，保留旧 props 静态重建行为。
 静态 replace 允许同名系列，仍按每项独立创建；清理覆盖全部所属实例。
-reconcile 要求非空、唯一的 name；同 name／type／pane 保留实例，协调结构和样式，
+reconcile 要求非空、唯一的 name 和非负整数 pane；同 name／type 保留实例，协调结构和样式，
 不让 props.data 覆盖未变系列。新建系列可用其静态 data。结构改变清理旧图例注册。
+协调期间暂保留空 Pane，按 SDK 实际 Pane 位置移动系列及其画线段，结束后清理超出
+目标范围的空 Pane。前置指标改参数、替换类型、增删或重排不会合并独立副图。
 
 ## 命名数据接口
 
@@ -30,10 +32,15 @@ chartApi.updateSeriesData([
 ]);
 ```
 
-SeriesDataPatch 为 `{name,data}`，仅支持 Candle／Line 的 UTC 秒数据。
+SeriesDataPatch 为 `{name,data}`，支持 Candle／Line／Histogram 的 UTC 秒数据，
+Line／Histogram 可用 time-only WhitespaceData 表达缺口，可携带 customValues 文本。
+value 必须有限；缺口不允许夹带 OHLC 字段，Histogram color 必须为字符串。
 替换可清空系列；空增量无操作。整批提交前校验所有名称、类型、有限值、OHLC 和
-升序唯一时间。增量可修正已经存在的旧时间点，使用 SDK historicalUpdate；不能插入
-未知的历史时间。非法批次明确抛错，不留下半应用结果；补丁不自动创建系列。
+升序唯一时间。增量可修正已经存在的旧时间点；不能插入未知的历史时间。
+时间线包含 SDK data() 不返回的缺口，末根、历史存在性及图例状态均以完整时间线为准。
+有限历史点使用 SDK historicalUpdate；历史缺口覆盖使用完整已提交时间线 setData，
+避免 SDK 在缺口位置插入／重复缺口时覆盖或删除后续有限点。
+非法批次明确抛错，不留下半应用结果；补丁不自动创建系列。
 同时间覆盖，新于末根的时间追加；不变数据由行情状态提前跳过提交。
 
 新场景初始化及身份切换替换数据；普通尾根更新直接 update。窗口裁剪使用既有
@@ -72,8 +79,11 @@ LWChart 导出方法与 onRegister API 提供 `applyOptions(options: DeepPartial
 chartApi.applyOptions({ layout: { textColor: '#d1d4dc' } });
 ```
 
-crypto 主题更新只携带背景、文字、网格、坐标轴边框和光标颜色，不携带初始化缩放、
-边距或 rightOffset；主题切换不替换数据、不 fitContent／reset，不改变用户当前视口。
+crypto 主题更新携带背景、文字、网格、坐标轴边框、Pane 分割线及悬浮颜色和光标颜色，不携带初始化缩放、
+边距或 rightOffset；同时从已提交指标结果重绘当前主题的点颜色，不重新计算或
+请求数据。主题切换不 fitContent／reset，数据重绘复用视窗恢复，当前视口保持。
+Pane 分割线复用入口主题配色，通过 SDK layout.panes 选项更新；共享图表只转发通用
+配置。切换主题保留手动 Pane 高度、分割线拖拽能力及现有图表实例。
 LegendManager 读取继承的 --chart-legend-bg／value／label／border／shadow CSS 变量，
 未提供变量的旧场景继续使用原浅色图例；两场景没有独立图例引擎。
 
@@ -83,9 +93,17 @@ LegendManager 读取继承的 --chart-legend-bg／value／label／border／shado
 时间函数只随时区改变创建，有界缓存同根字符串，不因鼠标移动构造 Intl。
 
 新看盘的 rightPriceScale.scaleMargins 为 `{top:0.03,bottom:0.03}`，以可见蜡烛的
-最高 high／最低 low 缩放。EMA 的 autoscaleInfoProvider 返回 null，线段可在边缘
+最高 high／最低 low 缩放；布林带上下轨纳入价格范围。均线的 autoscaleInfoProvider 返回 null，线段可在边缘
 裁剪，不扩张蜡烛范围。价格显示复用已创建的 Intl.NumberFormat；不在每个刻度重新
 构造 formatter。上述显示设置属于新入口，旧 ZIP／Notebook 的边距配置继续有效。
+
+SeriesConfig.name 是稳定键，displayName 是可选显示名称。通用 valueFormatter 决定
+单值图例格式，paneWeight 决定首次创建 Pane 的高度权重；数据／主题变化不重新
+设置手动拖动后的权重。参考线按描述变化更新／移除，无重复对象或孤立系列。
+Line 内部缺口两侧按连续段绘制；分段沿用原生折线样式，不参与图例、参考线或缩放，
+主系列继续持有数值、轴和标记。缺口恢复、样式变化及删除时同步清理分段。
+图例可读取缺口 customValues.displayValue，鼠标及同步光标都保留状态文本。
+共享图表不认识具体指标名；完整显示定义与文件覆盖规则见 [indicators.md](indicators.md)。
 
 ## 多周期光标
 

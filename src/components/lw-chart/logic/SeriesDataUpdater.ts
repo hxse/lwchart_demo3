@@ -1,6 +1,8 @@
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import type { SeriesDataPatch } from '../../../utils/chartTypes';
 import { latestCandleIsUnclipped } from './CandleVisibility';
+import { seriesTimeline, nextTimeline, commitTimeline, isGap } from './SeriesTimeline';
+import { syncLineSegments } from './LineSegments';
 
 // SDK 的公开滚动接口到下一帧才应用；同帧下一批须使用已请求的偏移。
 // SDK 应用偏移或用户拖动／缩放后，实际值发生变化，自动重新以 SDK 为准。
@@ -19,9 +21,9 @@ export function applySeriesData(
         if (!series || names.has(patch.name)) throw new Error('未知或重复的系列名称');
         names.add(patch.name);
         const kind = series.seriesType();
-        if (kind !== 'Candlestick' && kind !== 'Line') throw new Error('数据补丁仅支持蜡烛与折线系列');
-        // EMA 预热后的首个点可能不是全图逻辑索引 0，按实际数据获取末根。
-        const existing = series.data();
+        if (!['Candlestick', 'Line', 'Histogram'].includes(kind)) throw new Error('数据补丁仅支持蜡烛、折线与柱系列');
+        // 单值系列可能有预热或缺口，实际值不必从全图索引 0 开始。
+        const existing = [...seriesTimeline(series).values()];
         const last = existing.at(-1);
         const times = new Set(existing.map(point => Number(point.time)));
         let previous = -Infinity;
@@ -34,7 +36,10 @@ export function applySeriesData(
                 if (!('open' in point) || ![point.open, point.high, point.low, point.close].every(Number.isFinite)
                     || point.high < Math.max(point.open, point.close, point.low)
                     || point.low > Math.min(point.open, point.close)) throw new Error('无效的蜡烛数据');
-            } else if (!('value' in point) || !Number.isFinite(point.value)) throw new Error('无效的折线数据');
+            } else if ('value' in point) {
+                if (!Number.isFinite(point.value)) throw new Error('无效的折线或柱数据');
+                if ('color' in point && point.color !== undefined && typeof point.color !== 'string') throw new Error('无效的柱颜色');
+            } else if (Object.keys(point).some(key => !['time', 'customValues'].includes(key))) throw new Error('无效的单值缺口数据');
         }
     }
 
@@ -62,14 +67,22 @@ export function applySeriesData(
     }
     for (const patch of patches) {
         const series = seriesMap.get(patch.name)!;
-        if (replace) series.setData(patch.data);
+        const previous = [...seriesTimeline(series).values()];
+        let tail = Number(previous.at(-1)?.time ?? -Infinity);
+        const old = new Map(previous.map(point => [Number(point.time), point]));
+        const next = nextTimeline(series, patch.data, replace);
+        // SDK historicalUpdate 无法正确在缺口位置插入值，重复缺口也可能删除后一根值。
+        const historicalGap = patch.data.some(point => Number(point.time) < tail
+            && (isGap(point) || (old.has(Number(point.time)) && isGap(old.get(Number(point.time))!))));
+        if (replace || historicalGap) series.setData([...next.values()] as any);
         else {
-            let tail = Number(series.data().at(-1)?.time ?? -Infinity);
             for (const point of patch.data) {
                 series.update(point, Number(point.time) < tail);
                 tail = Math.max(tail, Number(point.time));
             }
         }
+        commitTimeline(series, next);
+        syncLineSegments(chart, series);
     }
     if (range && primary) {
         const nextLength = primary.data().length;

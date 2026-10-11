@@ -65,7 +65,8 @@ describe('共享指标定义与参数', () => {
         expect(marketSeriesKey(spec, 'histogram')).toBe('market/macd,12,26,9/histogram');
         expect(() => parseIndicatorAnnotation({ id: '1-bad', spec, output: 'histogram' })).toThrow('id');
         expect(() => parseIndicatorAnnotation({ id: 'a', spec, output: 'value' })).toThrow('输出角色');
-        expect(() => parseIndicators('rsi,14')).toThrow('当前阶段');
+        expect(parseIndicators('rsi,14')).toEqual([{ type: 'rsi', period: 14 }]);
+        expect(() => parseIndicators('adx,14')).toThrow('当前不支持');
         expect(parseIndicators('ema,14;ema,50')).toEqual([{ type: 'ema', period: 14 }, { type: 'ema', period: 50 }]);
     });
     test('显示、格式和主题来自定义，不以名称影响系列身份', () => {

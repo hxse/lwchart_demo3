@@ -93,7 +93,7 @@ test('菜单覆盖不缩图，取消与非法输入不提交；EMA 和 URL 后�
     await expect(page.locator('.indicator-labels span')).toHaveCount(12);
     expect((await state(request)).reads.filter((r: any) => r.history)).toHaveLength(4);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByLabel('EMA 指标').fill('ema,0');
+    await page.getByLabel('技术指标').fill('ema,0');
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('EMA 周期');
     expect(page.url()).toBe(original); expect(await sameCharts(page)).toBe(true);
@@ -107,7 +107,7 @@ test('菜单覆盖不缩图，取消与非法输入不提交；EMA 和 URL 后�
     await expect(page.locator('.indicator-labels span')).toHaveCount(12);
     expect(page.url()).toBe(original); expect(await sameCharts(page)).toBe(true);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByLabel('EMA 指标').fill('ema,5;ema,14;ema,50');
+    await page.getByLabel('技术指标').fill('ema,5;ema,14;ema,50');
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.indicator-labels span').first()).toHaveText('EMA5');
     expect(await sameCharts(page)).toBe(true);

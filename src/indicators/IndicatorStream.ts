@@ -18,6 +18,7 @@ export class IndicatorStream {
     private count = 0;
     private initializing = true;
     private points = new Map<IndicatorOutput, IndicatorPoint[]>();
+    private previous = new Map<IndicatorOutput, IndicatorPoint>();
     constructor(spec: IndicatorSpec, inputs: readonly IndicatorInput[] = []) {
         this.spec = parseIndicator(spec);
         this.native = createNativeIndicator(this.spec);
@@ -26,7 +27,7 @@ export class IndicatorStream {
         this.initializing = false;
     }
     get inputCount() { return this.count; }
-    snapshot(): IndicatorResults { return { spec: this.spec, outputs: new Map(this.points) }; }
+    snapshot(): IndicatorResults { return { spec: this.spec, outputs: new Map(this.points), previous: new Map(this.previous) }; }
     add(input: IndicatorInput) {
         if (this.last && input.time <= this.last.time) throw new Error('指标追加时间必须晚于末根');
         return this.update(input, false);
@@ -74,6 +75,10 @@ export class IndicatorStream {
         return delta;
     }
     trim(firstTime: number) {
-        for (const [role, points] of this.points) this.points.set(role, points.filter(point => point.time >= firstTime));
+        for (const [role, points] of this.points) {
+            const first = points.findIndex(point => point.time >= firstTime);
+            if (first > 0) this.previous.set(role, points[first - 1]!);
+            this.points.set(role, points.filter(point => point.time >= firstTime));
+        }
     }
 }

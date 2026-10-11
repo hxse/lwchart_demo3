@@ -61,6 +61,7 @@ export function parseIndicatorAnnotation(input: unknown): IndicatorAnnotation {
     const value = input as Record<string, unknown>;
     if (Object.keys(value).some(k => !['id', 'spec', 'output'].includes(k))) throw new Error('indicator 含未知字段');
     if (typeof value.id !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value.id)) throw new Error('指标组 id 格式无效');
+    if (!value.spec || typeof value.spec !== 'object' || Array.isArray(value.spec)) throw new Error('indicator.spec 必须是参数对象');
     const spec = parseIndicator(value.spec);
     const output = indicatorDefinition(spec.type).outputs.find(role => role.key === value.output);
     if (!output) throw new Error('未知指标输出角色');

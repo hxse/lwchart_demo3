@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { computableIndicatorTypes, unavailableIndicatorTypes, indicatorSupport } from '../indicators/support';
+  import { indicatorDefinition } from '../indicators/definitions';
   import { onMount, untrack } from 'svelte';
   import { changeLayout, serializeDashboardQuery } from './query';
   import { normalizeSettings, indicatorString, TIMEFRAMES, LAYOUTS, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions, type DockPosition } from './options';
@@ -75,7 +77,11 @@
     <label>显示时区<input name="timezone" list="timezones" bind:value={draft.timezone} spellcheck="false" /></label>
     <datalist id="timezones"><option value="local">本地</option><option value="UTC"></option><option value="Asia/Shanghai"></option><option value="America/New_York"></option><option value="Europe/London"></option></datalist>
     <div class="hint">local 跟随本地（{localZone}）；也可填 IANA 时区。只改变显示。</div>
-    <label>EMA 指标<textarea name="indicators" bind:value={indicators} rows="2" spellcheck="false"></textarea></label>
+    <label>技术指标<textarea name="indicators" bind:value={indicators} rows="3" spellcheck="false"></textarea></label>
+    <p class="hint">支持 {computableIndicatorTypes().join('、')}；如 ema,14;rsi,14;macd,12,26,9。最多 12 项。</p>
+    {#each unavailableIndicatorTypes() as type}
+      <p class="hint">{indicatorDefinition(type).title} 暂不支持计算：{indicatorSupport(type).reason}。</p>
+    {/each}
     <div class="hint">例如 ema,5;ema,14;ema,50</div>
     <div class="small-actions"><button type="button" onclick={() => { indicators = 'none'; }}>无指标</button>
       <button type="button" onclick={() => { indicators = indicatorString(runtime.defaults.indicators); }}>默认 EMA</button></div>

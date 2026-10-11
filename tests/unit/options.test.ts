@@ -17,7 +17,7 @@ describe('URL 与菜单的统一配置', () => {
         const value = parseDashboardQuery('?ccxt.symbol=ETH%2FUSDT%3AUSDT&tq.symbol=SHFE.rb2701&indicators=ema%2C5%3Bema%2C14', runtime);
         expect(value.ccxt.symbol).toBe('ETH/USDT:USDT');
         expect(value.tq.symbol).toBe('SHFE.rb2701');
-        expect(value.indicators.map(i => i.period)).toEqual([5, 14]);
+        expect(value.indicators.map(i => 'period' in i ? i.period : undefined)).toEqual([5, 14]);
         expect(parseDashboardQuery(serializeDashboardQuery(value), runtime)).toEqual(value);
         expect(new URLSearchParams(serializeDashboardQuery(value)).size).toBe(14);
         expect(runtime.defaults.ccxt.symbol).toBe('BTC/USDT:USDT');

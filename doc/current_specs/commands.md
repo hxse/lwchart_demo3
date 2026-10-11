@@ -30,6 +30,9 @@ legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dis
 `dist-lib/.` 到目标目录。默认目标 `~/dev/pyo3-quant/data/lwchart`；仅展开开头的 ~/，
 其它 `$` 和 `${...}` 保持字面值，路径空格安全。失败停止，不继续复制。
 原 package.json build:lib 退出，不保留同职责包装。
+同次构建使用 TypeScript 7 生成 chart-dashboard.d.ts、chart-dashboard.es.d.ts、
+chart-dashboard.umd.d.ts 及 types/，复制包含全部声明；失败时不复制不完整产物。
+声明范围及消费示例见 [技术指标使用](../guides/indicators.md)。
 
 market dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
 该入口同时支持 CCXT／TQ 只读看盘，命令名为 market。
@@ -77,6 +80,7 @@ indicator-golden.json 保留固定期望，来源与读取口径见 [indicators.
 旧 EMA 专用参考 fixture 与 Python 生成器已退出，不提供再生入口。
 浏览器套件构建新页面、旧演示页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
 真实 pyo3-quant 目录。虚拟鉴权后端与开发／生产适配服务只绑定本机测试端口。
+测试递归核对库复制内容，并从临时目标消费 ES／UMD 声明，验证合法写法和反向类型报错。
 测试结束关闭所属进程、清理临时配置；截图和失败 trace 留在忽略的 test-results。
 
 浏览器优先用 PLAYWRIGHT_CHROMIUM_EXECUTABLE 或已安装缓存，否则使用 Playwright

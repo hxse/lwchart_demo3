@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import type { OhlcvRow } from '../../src/crypto/data/ohlcv';
 import { legacyZip } from './legacy';
 import { staticHandler } from '../../scripts/crypto/static';
+import { validateDeclarations } from './declaration-consumer';
+import { legacyDisplayZip } from './legacy-display';
 
 // 此服务仅由离线测试显式启动，不进入生产 API 或构建。
 const root = resolve(import.meta.dirname, '../..');
@@ -14,6 +16,13 @@ const children: ReturnType<typeof Bun.spawn>[] = [];
 let mock: ReturnType<typeof Bun.serve> | undefined;
 let stopping = false;
 const logs: string[] = [];
+async function artifactFiles(base: string, prefix = ''): Promise<string[]> {
+    const entries = await readdir(join(base, prefix), { withFileTypes: true });
+    return (await Promise.all(entries.map(entry => {
+        const path = join(prefix, entry.name);
+        return entry.isDirectory() ? artifactFiles(base, path) : [path];
+    }))).flat();
+}
 async function stop(code = 0) {
     if (stopping) return;
     stopping = true;
@@ -86,21 +95,24 @@ async function main() {
     await run(['just', 'market', '--build']);
     await run(['just', 'legacy', '--build', `--config=${config}`]);
     await run(['bun', 'run', 'build']);
-    for (const filename of await readdir(join(root, 'dist-lib'))) {
+    for (const filename of await artifactFiles(join(root, 'dist-lib'))) {
         const original = await Bun.file(join(root, 'dist-lib', filename)).bytes();
         const copied = await Bun.file(join(target, filename)).bytes();
         if (Buffer.compare(original, copied)) throw new Error('旧库复制不完整');
         if (new TextDecoder().decode(original).includes(secret)) throw new Error('测试凭据进入旧产物');
     }
+    await validateDeclarations(root, directory, target);
     const zip = await legacyZip();
+    const displayZip = legacyDisplayZip();
     const oldApp = staticHandler(join(root, 'dist'));
     const styles = (await readdir(join(root, 'dist-lib'))).filter(n => n.endsWith('.css'));
     mock = Bun.serve({ hostname: '127.0.0.1', port: 43175, async fetch(request) {
         const url = new URL(request.url);
         if (url.pathname === '/' || url.pathname.startsWith('/assets/')) return oldApp(request);
-        if (url.pathname === '/viewport') {
+        if (url.pathname === '/viewport' || url.pathname === '/chart-gaps') {
             const html = await Bun.file(join(root, 'tests/fixtures/viewport.html')).text();
-            return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures/viewport.ts'))), {
+            const module = url.pathname === '/viewport' ? 'viewport.ts' : 'chart-gaps.ts';
+            return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures', module))), {
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
             });
         }
@@ -117,14 +129,15 @@ async function main() {
             return Response.json({ ...metrics, advance, revision, correction, errors, logs });
         }
         if (url.pathname === '/legacy.zip') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
+        if (url.pathname === '/legacy-display.zip') return new Response(new Uint8Array(displayZip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         if (url.pathname.startsWith('/legacy-assets/')) {
             const filename = url.pathname.slice('/legacy-assets/'.length);
             if (filename.includes('/') || filename.includes('..')) return new Response(null, { status: 404 });
             return new Response(Bun.file(join(root, 'dist-lib', filename)));
         }
-        if (url.pathname === '/legacy') return new Response(`<!doctype html><html><head>${styles.map(s => `<link rel="stylesheet" href="/legacy-assets/${s}">`).join('')}
+        if (url.pathname === '/legacy' || url.pathname === '/legacy-display') return new Response(`<!doctype html><html><head>${styles.map(s => `<link rel="stylesheet" href="/legacy-assets/${s}">`).join('')}
             <style>html,body,#old{margin:0;width:100%;height:100%;overflow:hidden}</style></head><body><div id="old"></div>
-            <script src="/legacy-assets/chart-dashboard.umd.js"></script><script>fetch('/legacy.zip').then(r=>r.blob()).then(zipData=>window.ChartDashboardLib.mountDashboard(document.getElementById('old'),{zipData}));</script></body></html>`,
+            <script src="/legacy-assets/chart-dashboard.umd.js"></script><script>fetch('${url.pathname === '/legacy' ? '/legacy.zip' : '/legacy-display.zip'}').then(r=>r.blob()).then(zipData=>window.ChartDashboardLib.mountDashboard(document.getElementById('old'),{zipData}));</script></body></html>`,
             { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         if (url.pathname === '/auth/token' && request.method === 'POST') {
             const form = await request.formData();

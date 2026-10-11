@@ -1,6 +1,7 @@
 import { parseZipFile, type ParsedFileContent } from "../../../utils/zipParser";
 import { parseChartData } from "../../../utils/chartDataHelper";
 import type { ChartConfigJSON } from "../chartDashboard.types";
+import { validateLegacyIndicators } from '../../../indicators/legacy';
 
 export interface ProcessedDataResult {
     files: ParsedFileContent[];
@@ -42,6 +43,8 @@ export class ChartDataProcessor {
             if (!config || !Array.isArray(config.chart)) {
                 throw new Error("Invalid chartConfig.json: Missing 'chart' array.");
             }
+            validateLegacyIndicators(config.chart, 'chart');
+            if (config.bottomRowChart) validateLegacyIndicators(config.bottomRowChart, 'bottomRowChart');
         } catch (e: any) {
             throw new Error(`Failed to parse chartConfig.json: ${e.message}`);
         }

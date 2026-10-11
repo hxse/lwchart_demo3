@@ -1,4 +1,4 @@
-import type { SeriesStyle } from '../../utils/seriesStyles';
+import type { LegacyDisplayInput } from '../../indicators/legacy';
 export type { CandleOption, BarOption, LineOption, HistogramOption, VolumeOption, AreaOption, BaselineOption, HorizontalLine, VerticalLine } from '../../utils/seriesStyles';
 
 export interface GridItem {
@@ -41,12 +41,10 @@ export interface DashboardOverride {
 // --- Chart Config & Series Options ---
 
 // 文件配置在通用样式之上只增加数据源与覆盖字段。
-export interface SeriesItemConfig extends SeriesStyle {
+export interface SeriesItemConfig extends LegacyDisplayInput {
     idx?: number;
     fileName?: string;
     dataName?: string | string[];
-    show: boolean;
-    showInLegend?: boolean;
 }
 
 // Chart 配置 JSON

@@ -1,7 +1,9 @@
 import { GridTemplateType, gridTemplates } from '../components/grid-template/gridTemplates';
 import { validateTimezone } from './time';
 import { parseIndicatorList } from '../indicators/parameters';
-import type { IndicatorSpec as SharedIndicatorSpec } from '../indicators/types';
+import type { IndicatorSpec } from '../indicators/types';
+import { assertComputable } from '../indicators/support';
+export type { IndicatorSpec } from '../indicators/types';
 export { indicatorListString as indicatorString } from '../indicators/parameters';
 
 export const TIMEFRAMES = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w'] as const;
@@ -21,8 +23,6 @@ export type Theme = 'dark' | 'light';
 export type Source = 'ccxt' | 'tq';
 export const DOCK_POSITIONS = ['top', 'bottom', 'left', 'right'] as const;
 export type DockPosition = typeof DOCK_POSITIONS[number];
-// 元数据阶段暂时收窄公开类型，完整显示接入后退出此限制。
-export type IndicatorSpec = Extract<SharedIndicatorSpec, { type: 'ema' }>;
 export interface CcxtDefaults { exchange_name: 'binance' | 'kraken'; market: 'future' | 'spot'; is_live: boolean; symbol: string }
 export interface TqDefaults { symbol: string }
 interface DisplayOptions {
@@ -84,8 +84,8 @@ export function normalizeSources(input: unknown): SourceDefaults {
 }
 export function parseIndicators(input: unknown): IndicatorSpec[] {
     const result = parseIndicatorList(input);
-    if (result.some(indicator => indicator.type !== 'ema')) throw new Error('当前阶段 market 仅支持 EMA');
-    return result as IndicatorSpec[];
+    result.forEach(assertComputable);
+    return result;
 }
 export function layoutSlots(layout: Layout) { return gridTemplates[LAYOUTS[layout]].slots; }
 export function normalizeOptions(input: unknown): DashboardOptions {

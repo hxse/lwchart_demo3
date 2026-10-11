@@ -17,7 +17,7 @@ test('裸地址与部分参数补全，编辑不提交，应用一次，非法�
     expect(defaults.searchParams.get('history_bars')).toBe('1000'); expect(defaults.hash).toBe('#watch');
     const length = await page.evaluate(() => history.length);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByLabel('EMA 指标').fill('ema,5'); await page.waitForTimeout(350);
+    await page.getByLabel('技术指标').fill('ema,5'); await page.waitForTimeout(350);
     expect(page.url()).toBe(original); await expect(page.locator('.indicator-labels span')).toHaveCount(12);
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.indicator-labels span')).toHaveCount(4);
@@ -25,7 +25,7 @@ test('裸地址与部分参数补全，编辑不提交，应用一次，非法�
     expect(await page.evaluate(() => history.length)).toBe(length + 1);
     const valid = page.url();
     await page.getByRole('button', { name: '展开看盘设置' }).click();
-    await page.getByLabel('EMA 指标').fill('ema,0');
+    await page.getByLabel('技术指标').fill('ema,0');
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('EMA 周期'); expect(page.url()).toBe(valid);
     await page.getByRole('button', { name: '取消', exact: true }).click();

@@ -54,7 +54,7 @@ Tab 只改变草稿的 source，来回切换不丢弃双方编辑。应用整体
 | ccxt.symbol、tq.symbol | 各自完整品种，非空、至多 128 字符、无控制字符 |
 | layout | 1x1、1x2、2x1、1x3、3x1、2x2，行×列 |
 | timeframes | 按槽顺序逗号分隔，允许重复周期 |
-| indicators | none 或 ema,5;ema,14;ema,50；周期 1..100000，至多 12 项且不重复 |
+| indicators | none 或技术指标紧凑列表；参数、可用类型与显示见 indicators.md，至多 12 项且同配置不重复 |
 | refresh_seconds | 1..3600 严格整数 |
 | history_bars | 1..10000 严格整数，两来源共用 |
 | theme | dark／light |
@@ -192,9 +192,8 @@ TQ 精确解析纳秒整数 token，再无损转毫秒；核心 null／非法值
 修正后的唯一输入，避免原生首根 replace 状态缺陷；窗口裁剪不改变累计输入数量。
 EMA 从第一根价格递推，第 period 根起显示原生结果，不再采用 SMA 播种。
 
-计算层已提供十种通过准入的指标；ADX 的零波幅会污染后续平滑，暂不开放
-market 计算，有明确拒绝与离线最小复现。当前公开设置暂时仍为 EMA 子集，
-其余计算适配由离线测试使用，完整显示接入后才开放。
+计算及公开设置已支持十种通过准入的指标；ADX 的零波幅会污染后续平滑，暂不
+开放 market 计算，有明确拒绝与离线最小复现。legacy 可展示全部候选的文件数值。
 参数、构造与结果／身份规则见 [indicators.md](indicators.md)。
 
 CCI 的合法 NaN 作为 undefined 保留原始值与时间，绘图缺口、不补零、不发起

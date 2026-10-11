@@ -3,11 +3,11 @@
  * 用于 LWChart 组件和 GridItemBuilder
  */
 
-import type { CandlestickData, LineData, UTCTimestamp, ChartOptions, DeepPartial } from 'lightweight-charts';
+import type { CandlestickData, LineData, HistogramData, WhitespaceData, UTCTimestamp, ChartOptions, DeepPartial } from 'lightweight-charts';
 
 export interface SeriesDataPatch {
     name: string;
-    data: CandlestickData<UTCTimestamp>[] | LineData<UTCTimestamp>[];
+    data: (CandlestickData<UTCTimestamp> | LineData<UTCTimestamp> | HistogramData<UTCTimestamp> | WhitespaceData<UTCTimestamp>)[];
 }
 
 export type SeriesMode = 'replace' | 'reconcile';
@@ -31,6 +31,8 @@ export interface SeriesConfig {
     options?: any;
     name?: string;
     displayName?: string;
+    valueFormatter?: (value: number) => string;
+    paneWeight?: number;
     priceLines?: any[];
     markers?: any[];  // 仓位进出场标记
     showInLegend?: boolean;

@@ -1,4 +1,5 @@
 import type { ISeriesApi, MouseEventParams, IChartApi, TimeFormatterFn } from "lightweight-charts";
+import { timelinePoint } from './SeriesTimeline';
 
 const volumeFormatter = new Intl.NumberFormat('en', { maximumSignificantDigits: 8 });
 
@@ -6,7 +7,9 @@ export interface LegendItemConfig {
     name: string;
     color: string;
     showInLegend: boolean;
+    formatter?: (value: number) => string;
 }
+const escaped = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 export class LegendManager {
     private legendElement: HTMLElement | null = null;
@@ -113,14 +116,15 @@ export class LegendManager {
             return;
         }
 
-        let html = this.timeFormatter ? `<div class="legend-time">T ${this.timeFormatter(param.time)}</div>` : '';
+        const time = param.time;
+        let html = this.timeFormatter ? `<div class="legend-time">T ${this.timeFormatter(time)}</div>` : '';
         let hasContent = false;
 
         this.seriesMap.forEach((config, series) => {
             if (!config.showInLegend) return;
 
             // 优先使用 param 中的数据，如果没有则尝试从图表获取
-            let data = param.seriesData?.get(series);
+            let data = timelinePoint(series, time) ?? param.seriesData?.get(series);
 
             // 如果 seriesData 中没有数据（同步情况），尝试通过时间获取
             // 注意：时间已在 setCrosshair 中匹配，这里直接使用
@@ -160,7 +164,9 @@ export class LegendManager {
                 }
             } else if ("value" in data) {
                 // 单值数据 (Line/Area/Histogram)
-                valueStr = `<span style="${labelStyle}">${config.name}</span><span style="${valStyle()}">${data.value.toFixed(2)}</span>`;
+                valueStr = `<span style="${labelStyle}">${escaped(config.name)}</span><span style="${valStyle()}">${escaped(config.formatter ? config.formatter(data.value) : data.value.toFixed(2))}</span>`;
+            } else if (typeof data.customValues?.displayValue === 'string') {
+                valueStr = `<span style="${labelStyle}">${escaped(config.name)}</span><span style="${valStyle()}">${escaped(data.customValues.displayValue)}</span>`;
             }
 
             if (valueStr) {

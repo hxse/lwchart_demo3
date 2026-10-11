@@ -2,6 +2,9 @@
  * 系列数据提取器
  * 负责从原始文件数据中提取并转换为图表系列所需的数据格式
  */
+import { histogramColors } from '../../../indicators/histogram';
+import type { IndicatorTheme } from '../../../indicators/types';
+import { indicatorStateLabels } from '../../../indicators/presentation';
 
 /**
  * 提取后的系列数据
@@ -21,7 +24,10 @@ export interface ExtractedSeriesData {
 export function extractValueSeriesData(
     fileData: any[],
     dataName: string,
-    seriesType?: string
+    seriesType?: string,
+    fixedColor?: string,
+    theme: IndicatorTheme = 'light',
+    preserveIndicatorGaps = false
 ): ExtractedSeriesData {
     const rawData = fileData.map((row: any) => {
         const val = row[dataName];
@@ -32,17 +38,19 @@ export function extractValueSeriesData(
     });
 
     // 过滤掉 time 或 value 为 null 的数据点
-    let seriesData = rawData.filter((d: any) => {
+    let seriesData: any[] = rawData.filter((d: any) => {
         const validTime = d.time !== null && d.time !== undefined;
         const validValue = d.value !== null && d.value !== undefined && !isNaN(d.value);
-        return validTime && validValue;
-    });
+        return validTime && (validValue || preserveIndicatorGaps);
+    }).map(point => point.value === null
+        ? { time: point.time, customValues: { displayValue: indicatorStateLabels.undefined } }
+        : { time: point.time, value: point.value });
 
     // Volume 类型：自动设置涨跌颜色
     if (seriesType === 'volume') {
         seriesData = applyVolumeColors(seriesData, fileData);
     } else if (seriesType === 'histogram') {
-        seriesData = applyHistogramColors(seriesData);
+        seriesData = histogramColors(seriesData, theme, fixedColor);
     }
 
     return {
@@ -102,28 +110,3 @@ function applyVolumeColors(volumeData: any[], fileData: any[]): any[] {
     });
 }
 
-/**
- * 为 Histogram (如 MACD) 数据应用零轴与动能颜色
- * @param histogramData histogram 系列数据
- * @returns 带颜色的 histogram 数据
- */
-function applyHistogramColors(histogramData: any[]): any[] {
-    return histogramData.map((data: any, index: number) => {
-        // 与前一根K线比较，判断动能是增强还是减弱
-        const prevValue = index > 0 ? histogramData[index - 1].value : 0;
-        const isIncreasing = data.value >= prevValue;
-        let color = '#26A69A'; 
-        // 经典的 MACD 4 色标准盘面视觉：
-        if (data.value >= 0) {
-            // 零轴上方：动能增强深绿，动能衰竭浅绿/空心绿
-            color = isIncreasing ? '#26a69a' : '#b2dfdb'; 
-        } else {
-            // 零轴下方：动能增强(更负)深红，动能衰竭(趋零)浅红/空心红
-            color = !isIncreasing ? '#ef5350' : '#ffcdd2'; 
-        }
-        return {
-            ...data,
-            color
-        };
-    });
-}

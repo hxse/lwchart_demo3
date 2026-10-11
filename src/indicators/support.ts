@@ -19,3 +19,6 @@ export function assertComputable(spec: IndicatorSpec) {
 export function computableIndicatorTypes(): IndicatorType[] {
     return Object.values(indicatorDefinitions).filter(d => indicatorSupport(d.type).available).map(d => d.type);
 }
+export function unavailableIndicatorTypes(): IndicatorType[] {
+    return Object.values(indicatorDefinitions).filter(d => !indicatorSupport(d.type).available).map(d => d.type);
+}

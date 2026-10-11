@@ -6,9 +6,8 @@
 import type { GridItem, SeriesItemConfig } from "../chartDashboard.types";
 import type { ParsedFileContent } from "../../../utils/zipParser";
 import type { SeriesConfig } from "../../../utils/chartTypes";
-import { mapSeriesType } from "../../../components/lw-chart/logic/SeriesTypeMapper";
-import { getOptionsForType } from "../../../components/lw-chart/logic/SeriesOptionsBuilder";
-import { extractValueSeriesData, extractMultiKeySeriesData } from "./SeriesDataExtractor";
+import { legacyGroups } from '../../../indicators/legacy';
+import { buildLegacyPane } from './LegacyPaneBuilder';
 import LWChart from "../../../components/lw-chart/LWChart.svelte";
 import EmptyGridItem from "../../../components/EmptyGridItem.svelte";
 
@@ -17,61 +16,6 @@ interface SyncHandlers {
     onRegister: (id: string, api: any) => void;
     onSync: (id: string, param: any) => void;
     onBottomClick?: (time: number) => void;
-}
-
-/**
- * 从配置构建底部栏系列
- * @param paneSeriesList 单个 Pane 的系列配置列表
- * @param files 解析后的文件内容
- * @param paneIdx Pane 索引
- * @returns 系列配置数组
- */
-function buildBottomRowPaneSeries(
-    paneSeriesList: SeriesItemConfig[],
-    files: ParsedFileContent[],
-    paneIdx: number
-): SeriesConfig[] {
-    const paneSeries: SeriesConfig[] = [];
-
-    paneSeriesList.forEach(itemConfig => {
-        // 与 GridItemBuilder 保持一致：show 或 showInLegend 任一为 true 时都需要处理
-        if (!itemConfig.show && !itemConfig.showInLegend) return;
-        if (!itemConfig.fileName || !itemConfig.dataName) return;
-
-        const file = files.find(f => f.filename === itemConfig.fileName);
-        if (!file) {
-            console.warn(`[BottomRow] File not found: ${itemConfig.fileName}`);
-            return;
-        }
-        if (!Array.isArray(file.data)) return;
-
-        // 提取数据
-        let extracted;
-        if (typeof itemConfig.dataName === 'string') {
-            extracted = extractValueSeriesData(file.data, itemConfig.dataName);
-        } else if (Array.isArray(itemConfig.dataName)) {
-            extracted = extractMultiKeySeriesData(file.data, itemConfig.dataName);
-        } else {
-            return;
-        }
-
-        const lwcType = mapSeriesType(itemConfig.type) as any;
-        const options = {
-            ...getOptionsForType(itemConfig),
-            visible: !!itemConfig.show  // 控制系列是否可见
-        };
-
-        paneSeries.push({
-            type: lwcType,
-            data: extracted.data,
-            pane: paneIdx,
-            options: options,
-            name: extracted.name,
-            showInLegend: itemConfig.showInLegend ?? false  // 传递 showInLegend 配置
-        });
-    });
-
-    return paneSeries;
 }
 
 /**
@@ -92,10 +36,11 @@ export function buildBottomRowGridItem(
 
     bottomRowConfig.forEach((slotPanes, slotIdx) => {
         const allPaneSeries: SeriesConfig[][] = [];
+        const groups = legacyGroups(slotPanes, 'bottomRowChart slot ' + slotIdx);
 
         // 遍历 Panes
         slotPanes.forEach((paneSeriesList, paneIdx) => {
-            const paneSeries = buildBottomRowPaneSeries(paneSeriesList, files, paneIdx);
+            const paneSeries = buildLegacyPane(paneSeriesList, paneIdx, slotIdx, files, groups, undefined, false);
             if (paneSeries.length > 0) {
                 allPaneSeries.push(paneSeries);
             }

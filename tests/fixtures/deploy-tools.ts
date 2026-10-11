@@ -52,7 +52,8 @@ else if (args[0] === 'ps') output = state.imageReferenced ? 'other-container' : 
 else if (args[0] === 'rmi') state.removedImages.push(args[1]);
 else if (args[0] === 'port') output = '5174/tcp -> 127.0.0.1:5175';
 else if (args[0] === 'logs') output = 'offline-service-log';
-else if (args[0] !== 'build') code = 2;
+else if (args[0] === 'build') state.noImage = false;
+else code = 2;
 await writeFile(path, JSON.stringify(state));
 if (output) console.log(output);
 process.exit(code);

@@ -45,9 +45,8 @@ start_instance() {
     config_id=$(jq -r .configuration_id "$plan")
     new_image=$(podman image inspect "$image" --format '{{.Id}}')
     [[ $(jq -r .configuration_id <<< "$runtime") == "$config_id" ]] || { echo '配置在准备后已改变，请重新准备部署' >&2; return 2; }
-    podman network exists "$network" || { echo '共享网络不存在，请先准备后端网络' >&2; return 2; }
+    podman network exists "$network" || { echo '共享容器网络不存在，请先准备配置指定的网络' >&2; return 2; }
     [[ $(podman network inspect "$network" --format '{{.DNSEnabled}}') == 'true' ]] || { echo '共享网络必须启用 DNS' >&2; return 2; }
-    image_check "$image" --probe-backend "$network"
     if [[ -f "$deploy_state/active.json" ]]; then old_name=$(jq -r .container_name "$deploy_state/active.json"); fi
     if [[ "$old_name" != "$container" ]] && podman container exists "$container"; then echo '目标名称已被占用，拒绝创建第二个实例' >&2; return 2; fi
     if podman container exists "$old_name"; then

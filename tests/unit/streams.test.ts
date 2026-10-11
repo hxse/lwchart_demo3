@@ -1,4 +1,5 @@
-import { expect, test, spyOn } from 'bun:test';
+import { expect, test, spyOn, beforeEach, afterEach } from 'bun:test';
+import { EMA } from 'trading-signals';
 import { MarketStream } from '../../src/crypto/data/MarketStream';
 import { MarketHub } from '../../src/crypto/data/MarketHub';
 import type { MarketSource } from '../../src/crypto/data/client';
@@ -7,6 +8,9 @@ import { activeOptions } from '../../src/crypto/options';
 import { candle, result, identity, defaults, runtime, deferred } from '../fixtures/data';
 
 const windowRows = (count: number) => Array.from({ length: count }, (_, index) => candle(index));
+let warn: ReturnType<typeof spyOn>;
+beforeEach(() => { warn = spyOn(console, 'warn').mockImplementation(() => {}); });
+afterEach(() => { warn.mockRestore(); });
 
 test('最新五根覆盖和追加；无交集时仅一次重载，旧窗口不参与拼接', async () => {
     let rows = windowRows(3);
@@ -15,10 +19,12 @@ test('最新五根覆盖和追加；无交集时仅一次重载，旧窗口不�
     stream.store.setIndicators([{ type: 'ema', period: 3 }]);
     try {
         await stream.poll();
-        rows = [candle(0), candle(1, 110), candle(2, 130), candle(3), candle(4)];
+        rows = [candle(0), candle(1), candle(2, 130), candle(3), candle(4)];
         await stream.poll();
         expect(stream.store.rows).toEqual(rows);
-        expect(stream.store.emas.get(3)!.points.at(-1)!.value).toBeCloseTo(106.0833333333);
+        const native = new EMA(3);
+        for (const row of rows) native.add(row[4]);
+        expect(Object.is(stream.store.indicators.get('ema,3')!.outputs.get('value')!.at(-1)!.value, native.getResultOrThrow())).toBe(true);
         rows = Array.from({ length: 6 }, (_, index) => candle(20 + index));
         await stream.poll();
         expect(limits).toEqual([1500, 5, 5, 1500]);

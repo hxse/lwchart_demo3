@@ -86,7 +86,7 @@ test('图例和光标时间按本地／UTC 显示，UTC 时间与视口保持，
     expect((await (await request.get(fixture)).json()).reads).toHaveLength(4);
 });
 
-test('最近五根中的较旧蜡烛修正实际显示，保持画布且不重取历史', async ({ page, request }) => {
+test('最近五根中的较旧蜡烛修正警告并重载完整窗口，保持画布', async ({ page, request }) => {
     await page.goto('/?timeframes=30m&history_bars=100&refresh_seconds=1&timezone=UTC');
     const chart = page.locator('.crypto-chart');
     await expect(chart).toHaveAttribute('data-phase', 'ready'); await remember(page);
@@ -107,6 +107,6 @@ test('最近五根中的较旧蜡烛修正实际显示，保持画布且不重�
         return close.textContent();
     }).toBe((original + 40).toFixed(2));
     expect(await sameCharts(page)).toBe(true);
-    expect((await (await request.get(fixture)).json()).reads.filter((r: any) => r.history)).toHaveLength(1);
+    expect((await (await request.get(fixture)).json()).reads.filter((r: any) => r.history)).toHaveLength(2);
     await expect(chart).toHaveAttribute('data-phase', 'ready');
 });

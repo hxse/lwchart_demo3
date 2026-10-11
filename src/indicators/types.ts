@@ -60,3 +60,4 @@ export interface IndicatorResults {
     spec: IndicatorSpec;
     outputs: Map<IndicatorOutput, IndicatorPoint[]>;
 }
+export interface IndicatorInput { time: number; high: number; low: number; close: number }

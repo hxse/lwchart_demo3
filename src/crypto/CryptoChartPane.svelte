@@ -7,6 +7,7 @@
   import type { MarketStream, StreamStatus } from './data/MarketStream';
   import type { IndicatorSpec, Theme } from './options';
   import { indicatorLabel, indicatorColor } from '../indicators/presentation';
+  import { indicatorKey } from '../indicators/parameters';
   import { chartTheme } from './theme';
   import type { TimeDisplay } from './time';
 
@@ -17,7 +18,7 @@
   let status = $state<StreamStatus>(untrack(() => stream.status));
   let renderError = $state('');
   let hoverTime = $state<number | undefined>();
-  let warmedPeriods = $state<Set<number>>(new Set());
+  let warmedIndicators = $state<Set<string>>(new Set());
   let unregister: (() => void) | undefined;
   const series = $derived(chartSeries(indicators));
   const labels: Record<string,string> = { '1d': '日线', '1w': '周线' };
@@ -56,7 +57,8 @@
     let queue = Promise.resolve();
     const unsubscribe = current.subscribe(event => {
       status = current.status;
-      warmedPeriods = new Set([...current.store.emas].filter(([, ema]) => ema.points.length > 0).map(([period]) => period));
+      warmedIndicators = new Set([...current.store.indicators].filter(([, result]) => [...result.outputs.values()]
+        .some(points => points.at(-1)?.state === 'value')).map(([key]) => key));
       if (event.kind === 'status') return;
       // 等子组件完成系列协调，再按顺序提交已捕获的数据页。
       queue = queue.then(async () => {
@@ -81,7 +83,7 @@
     <span class="period">{labels[stream.identity.timeframe] || stream.identity.timeframe}</span>
     <span class="indicator-labels">
       {#each indicators as indicator, index (indicator.period)}
-        <span style:color={indicatorColor('primary', index, theme)}>{indicatorLabel(indicator)}{#if status.count && !warmedPeriods.has(indicator.period)}（预热）{/if}</span>
+        <span style:color={indicatorColor('primary', index, theme)}>{indicatorLabel(indicator)}{#if status.count && !warmedIndicators.has(indicatorKey(indicator))}（预热）{/if}</span>
       {/each}
     </span>
   </div>

@@ -30,6 +30,7 @@
     "hyparquet-compressors": "^1.1.2",
     "lightweight-charts": "^5.2.1",
     "tabulator-tables": "^6.6.1",
+    "trading-signals": "8.3.0",
     "universal-router": "^10.0.3"
   }
 }

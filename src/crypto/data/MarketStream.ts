@@ -1,7 +1,10 @@
 import { CandleStore, type DataChange } from './CandleStore';
 import { validateBatch } from './ohlcv';
 import type { MarketIdentity, MarketSource } from './client';
-import { UPDATE_BARS, type IndicatorSpec } from '../options';
+import { UPDATE_BARS } from '../options';
+import type { IndicatorSpec } from '../../indicators/types';
+import { IndicatorCalculationError } from '../../indicators/IndicatorStream';
+import { indicatorKey } from '../../indicators/parameters';
 
 export type StreamPhase = 'loading' | 'ready' | 'empty' | 'reloading' | 'error';
 export interface StreamStatus { phase: StreamPhase; message: string; count: number; updatedAt: number | null }
@@ -19,6 +22,8 @@ export class MarketStream {
     private disposed = false;
     private refreshSeconds = 0;
     private reload = true;
+    private calculationStopped = false;
+    private failedIndicator: string | undefined;
     constructor(readonly identity: MarketIdentity, private source: MarketSource, readonly historyBars: number) {
         this.store = new CandleStore(historyBars);
     }
@@ -31,10 +36,23 @@ export class MarketStream {
         this.status = { phase, message, count: this.store.rows.length, updatedAt: success ? Date.now() : this.status.updatedAt };
         this.emit({ kind: 'status' });
     }
+    private fail(error: unknown, configuring = false) {
+        this.calculationStopped = configuring || error instanceof IndicatorCalculationError;
+        this.failedIndicator = error instanceof IndicatorCalculationError ? error.indicator : undefined;
+        // 配置初始化失败时取消旧请求，避免迟到响应按旧配置提交或清除错误。
+        if (this.calculationStopped) this.controller?.abort();
+        const message = error instanceof Error ? error.message : '行情更新失败';
+        this.setStatus('error', `${message}${this.calculationStopped ? '；自动更新已暂停，请移除问题指标或刷新重试' : ''}`);
+    }
     configure(indicators: IndicatorSpec[], refreshSeconds: number) {
-        const old = [...this.store.emas.keys()].sort((a,b) => a-b).join(',');
-        this.store.setIndicators(indicators);
-        if (old !== [...this.store.emas.keys()].sort((a,b) => a-b).join(',')) this.emit(this.store.snapshot());
+        try {
+            const changed = this.store.setIndicators(indicators);
+            const recovering = this.calculationStopped;
+            this.calculationStopped = !!this.failedIndicator && indicators.some(spec => indicatorKey(spec) === this.failedIndicator);
+            if (!this.calculationStopped) this.failedIndicator = undefined;
+            if (changed) this.emit(this.store.snapshot());
+            if ((changed || recovering) && this.store.rows.length && !this.calculationStopped) this.setStatus('ready', '');
+        } catch (error) { this.fail(error, true); }
         if (this.refreshSeconds !== refreshSeconds || !this.timer) {
             if (this.timer) clearInterval(this.timer);
             this.refreshSeconds = refreshSeconds;
@@ -42,18 +60,21 @@ export class MarketStream {
         }
     }
     poll(): Promise<void> {
-        if (this.disposed) return Promise.resolve();
+        if (this.disposed || this.calculationStopped) return Promise.resolve();
         if (this.inFlight) return this.inFlight;
         this.controller = new AbortController();
         const signal = this.controller.signal;
         this.inFlight = this.fetchCycle(signal).catch(error => {
-            if (!this.disposed && !signal.aborted) this.setStatus('error', (error as Error).message || '行情更新失败');
+            if (!this.disposed && !signal.aborted) this.fail(error);
         }).finally(() => { this.inFlight = null; this.controller = null; });
         return this.inFlight;
     }
     private async replaceWindow(signal: AbortSignal) {
         const response = validateBatch(await this.source.latest(this.identity, this.historyBars, signal), this.historyBars);
         if (this.disposed || signal.aborted) return;
+        if (response.rows.length && this.store.tail !== undefined && response.rows.at(-1)![0] < this.store.tail) {
+            throw new Error('完整窗口的最新时间早于已有行情，保留当前窗口');
+        }
         this.emit(this.store.initialize(response.rows));
         this.reload = response.rows.length === 0;
         this.setStatus(response.rows.length ? 'ready' : 'empty', response.rows.length ? '' : '暂无历史数据，等待下一次更新', true);
@@ -62,14 +83,14 @@ export class MarketStream {
         if (this.reload) { await this.replaceWindow(signal); return; }
         const response = validateBatch(await this.source.latest(this.identity, UPDATE_BARS, signal), UPDATE_BARS);
         if (this.disposed || signal.aborted) return;
-        if (response.rows.length && response.rows.at(-1)![0] < this.store.tail!) throw new Error('返回的最新时间早于已有行情，保留当前窗口');
         const change = this.store.merge(response.rows);
-        if (change) {
-            if (change.kind === 'replace' || change.rows.length || [...change.emas.values()].some(points => points.length)) this.emit(change);
+        if (change.kind !== 'reload') {
+            if (change.kind === 'replace' || change.rows.length || change.indicators.size) this.emit(change);
             this.setStatus('ready', '', true);
             return;
         }
         this.reload = true;
+        console.warn('行情校验异常，重新获取完整窗口', { ...change, ...this.identity });
         this.setStatus('reloading', '行情窗口断开，正在重新加载…');
         await this.replaceWindow(signal);
     }

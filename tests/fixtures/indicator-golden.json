@@ -1,0 +1,18 @@
+{
+  "version": "8.3.0",
+  "provenance": "独立固定小样本：按冻结的原生播种与 IEEE 754 数值口径人工核对的静态期望；不由生产适配或库程序生成。更改版本必须重新核对。",
+  "definitionSource": "https://github.com/bennycode/trading-signals/tree/a6893630d0565483bb6b12f7a55f2dee0cfd378e/packages/trading-signals/src",
+  "cases": [
+    {"spec": "sma,3", "prices": [1,2,3], "expected": {"value": 2}},
+    {"spec": "ema,3", "prices": [1,2,3], "expected": {"value": 2.25}},
+    {"spec": "dema,3", "prices": [1,2,3], "expected": {"value": 2.75}},
+    {"spec": "tema,1", "prices": [1,2,3], "expected": {"value": 3}},
+    {"spec": "rsi,2", "prices": [1,2,3], "expected": {"value": 100}},
+    {"spec": "cci,2", "prices": [99,101], "expected": {"value": 66.66666666666667}},
+    {"spec": "macd,1,3,1", "prices": [1,2,3], "expected": {"macd": 0.75, "signal": 0.75, "histogram": 0}},
+    {"spec": "atr,2", "prices": [1,2], "expected": {"value": 0.5}},
+    {"spec": "adx,2", "prices": [1,2,3], "expected": {"value": 100}},
+    {"spec": "er,2", "prices": [1,3], "expected": {"value": 1}},
+    {"spec": "bbands,2,2", "prices": [1,3], "expected": {"lower": 0, "middle": 2, "upper": 4}}
+  ]
+}

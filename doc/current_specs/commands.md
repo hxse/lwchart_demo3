@@ -72,8 +72,9 @@ incremental_bars／max_catchup_pages 必须迁移，启动不保留旧配置兼�
 
 `just test` 顺序执行 Bun 逻辑／服务回归和 Playwright 浏览器测试。
 所有数据为本地 fixture；不登录真实后端，不请求外网，不隐式安装浏览器。
-EMA 独立标准结果已保存在 fixture 中。Python 生成器仅用于显式再生参考数据，
-不是 just test 的调用方，不为服务或默认测试引入 Python 依赖。
+指标使用 trading-signals 的原生类完整重放，与应用增量结果严格对齐；
+indicator-golden.json 保留固定期望，来源与读取口径见 [indicators.md](indicators.md)。
+旧 EMA 专用参考 fixture 与 Python 生成器已退出，不提供再生入口。
 浏览器套件构建新页面、旧演示页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
 真实 pyo3-quant 目录。虚拟鉴权后端与开发／生产适配服务只绑定本机测试端口。
 测试结束关闭所属进程、清理临时配置；截图和失败 trace 留在忽略的 test-results。

@@ -10,6 +10,7 @@
         "hyparquet-compressors": "^1.1.2",
         "lightweight-charts": "^5.2.1",
         "tabulator-tables": "^6.6.1",
+        "trading-signals": "8.3.0",
         "universal-router": "^10.0.3",
       },
       "devDependencies": {
@@ -232,6 +233,8 @@
     "tabulator-tables": ["tabulator-tables@6.6.1", "", {}, "sha512-8A77aN30vJS34w1P5h4HtgEajB7vX2v0AD1fXFIKxp6SxplpGGfKn0Y4ouY91+6gdGK8/quqXoCA2LkrhBVE3A=="],
 
     "tinyglobby": ["tinyglobby@0.2.17", "", { "dependencies": { "fdir": "^6.5.0", "picomatch": "^4.0.4" } }, "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g=="],
+
+    "trading-signals": ["trading-signals@8.3.0", "", {}, "sha512-C2DigYcuaBmTfLJ4KkCgM6TPZwKoFYz9Tyj2BWnTgMVMb3u21udF80oGPhqGyyd57RPJnrst3pc0ShA09XVUAw=="],
 
     "typescript": ["@typescript/typescript6@6.0.2", "", { "dependencies": { "@typescript/old": "npm:typescript@^6" }, "bin": { "tsc6": "bin/tsc6" } }, "sha512-mbCddXd+jm7hfx7w2YU64/Av4/NqqeG3GoRZgxPcgoTxYjhrcfJRw9ULch71SS4G+Q3bOXFhRvPqjguN0Hyp5w=="],
 

@@ -2,7 +2,7 @@ import type { UTCTimestamp } from 'lightweight-charts';
 import type { SeriesConfig, SeriesDataPatch } from '../../utils/chartTypes';
 import type { IndicatorSpec } from '../options';
 import { indicatorSeries } from '../../indicators/presentation';
-import { marketSeriesKey } from '../../indicators/parameters';
+import { marketSeriesKey, indicatorKey } from '../../indicators/parameters';
 import type { DataChange } from './CandleStore';
 
 const formatter = new Intl.NumberFormat('en', { maximumSignificantDigits: 8 });
@@ -15,6 +15,7 @@ export function chartSeries(indicators: IndicatorSpec[]): SeriesConfig[] {
 export function chartPatches(change: DataChange, indicators: IndicatorSpec[]): SeriesDataPatch[] {
     return [{ name: 'candles', data: change.rows.map(([time, open, high, low, close, volume]) => ({ time: time / 1000 as UTCTimestamp, open, high, low, close, customValues: { volume } })) },
         ...indicators.map((indicator): SeriesDataPatch => ({ name: marketSeriesKey(indicator, 'value'),
-            data: (change.emas.get(indicator.period) || []).map(point => ({ time: point.time / 1000 as UTCTimestamp, value: point.value })),
+            data: (change.indicators.get(indicatorKey(indicator))?.outputs.get('value') ?? []).filter(point => point.state === 'value')
+                .map(point => ({ time: point.time / 1000 as UTCTimestamp, value: point.value! })),
         }))];
 }

@@ -74,6 +74,7 @@ function createViewportFixture() {
     }
     function submit(count: number) {
         const change = store.merge([store.rows.at(-1)!, ...Array.from({ length: count }, () => point(next++))])!;
+        if (change.kind === 'reload') throw new Error('视窗追加样本不应断开');
         applySeriesData(chart, registry.seriesMap, chartPatches(change, []), change.kind === 'replace');
     }
     async function append(count = 1) {
@@ -89,7 +90,14 @@ function createViewportFixture() {
     async function revise(historical = false) {
         const row = [...store.rows.at(historical ? -3 : -1)!] as OhlcvRow;
         row[4] += 0.5;
-        const change = store.merge(historical ? [row, store.rows.at(-1)!] : [row])!;
+        // 通用图表仍能历史更新，独立于 market 的历史异常重载协议。
+        if (historical) {
+            store.initialize(store.rows.map(old => old[0] === row[0] ? row : old));
+            applySeriesData(chart, registry.seriesMap, chartPatches({ kind: 'update', rows: [row], indicators: new Map() }, []), false);
+            await painted(); return snapshot();
+        }
+        const change = store.merge([row]);
+        if (change.kind === 'reload') throw new Error('视窗末根覆盖不应断开');
         applySeriesData(chart, registry.seriesMap, chartPatches(change, []), change.kind === 'replace');
         await painted();
         return snapshot();

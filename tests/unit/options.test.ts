@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { normalizeOptions, normalizeSettings, normalizeRuntime, activeOptions, parseIndicators, EMA_COLORS, MAX_HISTORY_BARS, UPDATE_BARS } from '../../src/crypto/options';
+import { normalizeOptions, normalizeSettings, normalizeRuntime, activeOptions, parseIndicators, MAX_HISTORY_BARS, UPDATE_BARS } from '../../src/crypto/options';
+import { movingAverageColors } from '../../src/indicators/presentation';
 import { parseDashboardQuery, serializeDashboardQuery, changeLayout } from '../../src/crypto/query';
 import { validateBatch } from '../../src/crypto/data/ohlcv';
 import { MarketClient } from '../../src/crypto/data/client';
@@ -12,7 +13,7 @@ describe('URL 与菜单的统一配置', () => {
         expect(defaults.timeframes).toEqual(['30m', '4h', '1d', '1w']);
         expect([defaults.refresh_seconds, defaults.history_bars, UPDATE_BARS]).toEqual([5, 1000, 5]);
         expect(defaults.timezone).toBe('local');
-        expect(EMA_COLORS).toEqual(['#FF9800', '#4CAF50', '#2196F3']);
+        expect(movingAverageColors).toEqual(['#FF9800', '#4CAF50', '#2196F3']);
         const value = parseDashboardQuery('?ccxt.symbol=ETH%2FUSDT%3AUSDT&tq.symbol=SHFE.rb2701&indicators=ema%2C5%3Bema%2C14', runtime);
         expect(value.ccxt.symbol).toBe('ETH/USDT:USDT');
         expect(value.tq.symbol).toBe('SHFE.rb2701');

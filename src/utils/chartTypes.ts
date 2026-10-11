@@ -30,6 +30,7 @@ export interface SeriesConfig {
     pane: number; // 0 for main, 1+ for extra panes
     options?: any;
     name?: string;
+    displayName?: string;
     priceLines?: any[];
     markers?: any[];  // 仓位进出场标记
     showInLegend?: boolean;

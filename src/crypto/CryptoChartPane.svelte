@@ -5,7 +5,8 @@
   import { ChartSyncManager } from '../components/lw-chart/logic/ChartSyncManager';
   import { chartSeries, chartPatches } from './data/chartData';
   import type { MarketStream, StreamStatus } from './data/MarketStream';
-  import { EMA_COLORS, type IndicatorSpec, type Theme } from './options';
+  import type { IndicatorSpec, Theme } from './options';
+  import { indicatorLabel, indicatorColor } from '../indicators/presentation';
   import { chartTheme } from './theme';
   import type { TimeDisplay } from './time';
 
@@ -80,7 +81,7 @@
     <span class="period">{labels[stream.identity.timeframe] || stream.identity.timeframe}</span>
     <span class="indicator-labels">
       {#each indicators as indicator, index (indicator.period)}
-        <span style:color={EMA_COLORS[index % EMA_COLORS.length]}>EMA{indicator.period}{#if status.count && !warmedPeriods.has(indicator.period)}（预热）{/if}</span>
+        <span style:color={indicatorColor('primary', index, theme)}>{indicatorLabel(indicator)}{#if status.count && !warmedPeriods.has(indicator.period)}（预热）{/if}</span>
       {/each}
     </span>
   </div>

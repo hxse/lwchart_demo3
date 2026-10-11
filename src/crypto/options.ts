@@ -1,5 +1,8 @@
 import { GridTemplateType, gridTemplates } from '../components/grid-template/gridTemplates';
 import { validateTimezone } from './time';
+import { parseIndicatorList } from '../indicators/parameters';
+import type { IndicatorSpec as SharedIndicatorSpec } from '../indicators/types';
+export { indicatorListString as indicatorString } from '../indicators/parameters';
 
 export const TIMEFRAMES = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w'] as const;
 export const LAYOUTS = {
@@ -10,7 +13,6 @@ export const LAYOUTS = {
     '3x1': GridTemplateType.VERTICAL_1x1x1,
     '2x2': GridTemplateType.GRID_2x2,
 } as const;
-export const EMA_COLORS = ['#FF9800', '#4CAF50', '#2196F3'];
 export const MAX_HISTORY_BARS = 10000;
 export const UPDATE_BARS = 5;
 export type Timeframe = typeof TIMEFRAMES[number];
@@ -19,7 +21,8 @@ export type Theme = 'dark' | 'light';
 export type Source = 'ccxt' | 'tq';
 export const DOCK_POSITIONS = ['top', 'bottom', 'left', 'right'] as const;
 export type DockPosition = typeof DOCK_POSITIONS[number];
-export interface IndicatorSpec { type: 'ema'; period: number }
+// 元数据阶段暂时收窄公开类型，完整显示接入后退出此限制。
+export type IndicatorSpec = Extract<SharedIndicatorSpec, { type: 'ema' }>;
 export interface CcxtDefaults { exchange_name: 'binance' | 'kraken'; market: 'future' | 'spot'; is_live: boolean; symbol: string }
 export interface TqDefaults { symbol: string }
 interface DisplayOptions {
@@ -80,25 +83,9 @@ export function normalizeSources(input: unknown): SourceDefaults {
     return { ccxt: normalizeCcxt(value.ccxt), tq: { symbol: symbol(tq.symbol) } };
 }
 export function parseIndicators(input: unknown): IndicatorSpec[] {
-    if (input === 'none') return [];
-    const values = typeof input === 'string' ? input.split(';') : input;
-    if (!Array.isArray(values) || values.length > 12) throw new Error('指标必须是至多 12 项的 EMA 列表');
-    const result = values.map((item): IndicatorSpec => {
-        if (typeof item === 'string') {
-            const fields = item.split(',');
-            if (fields.length !== 2 || fields[0] !== 'ema') throw new Error('指标写法必须是 ema,周期');
-            return { type: 'ema', period: parseInteger(fields[1]!, 1, 100000, 'EMA 周期') };
-        }
-        const value = record(item, '指标');
-        onlyKeys(value, ['type', 'period'], '指标');
-        if (value.type !== 'ema') throw new Error('目前仅支持 EMA 指标');
-        return { type: 'ema', period: integer(value.period, 1, 100000, 'EMA 周期') };
-    });
-    if (new Set(result.map(i => i.period)).size !== result.length) throw new Error('EMA 周期不能重复');
-    return result;
-}
-export function indicatorString(indicators: IndicatorSpec[]) {
-    return indicators.length ? indicators.map(i => `ema,${i.period}`).join(';') : 'none';
+    const result = parseIndicatorList(input);
+    if (result.some(indicator => indicator.type !== 'ema')) throw new Error('当前阶段 market 仅支持 EMA');
+    return result as IndicatorSpec[];
 }
 export function layoutSlots(layout: Layout) { return gridTemplates[LAYOUTS[layout]].slots; }
 export function normalizeOptions(input: unknown): DashboardOptions {

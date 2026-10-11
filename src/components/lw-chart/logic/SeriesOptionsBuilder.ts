@@ -3,16 +3,7 @@
  * 负责根据配置构建各种类型系列的选项对象
  */
 
-import type {
-    SeriesItemConfig,
-    CandleOption,
-    LineOption,
-    HistogramOption,
-    VolumeOption,
-    AreaOption,
-    BaselineOption,
-    BarOption
-} from "../../../pages/ChartDashboard/chartDashboard.types";
+import type { SeriesStyle, CandleOption } from '../../../utils/seriesStyles';
 
 /** 默认顶部边距 */
 export const DEFAULT_SCALE_MARGIN_TOP = 0.005;
@@ -46,7 +37,7 @@ export function applyDefaultScaleMargins(
  * @param config 系列配置项
  * @returns 构建好的选项对象
  */
-export function getOptionsForType(config: SeriesItemConfig): any {
+export function getOptionsForType(config: SeriesStyle): any {
     // 蜡烛图和柱状图的默认值
     const DEFAULT_CANDLE_OPTIONS: CandleOption = {
         upColor: "#26a69a",

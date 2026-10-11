@@ -62,7 +62,7 @@ export class SeriesRegistry {
                 } catch (error) { console.warn('[ScaleMargins] Failed to apply:', error); }
             }
             if (config.showInLegend) legend?.registerSeries(record.api, {
-                name: config.name || 'Unnamed',
+                name: config.displayName ?? config.name ?? 'Unnamed',
                 color: config.options?.color || '#2962FF',
                 showInLegend: true,
             });

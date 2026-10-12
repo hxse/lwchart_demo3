@@ -40,7 +40,7 @@ just market
 切 Tab 保留两边编辑，点击应用后才切换实际行情。CCXT 的市场是现货／合约，
 环境是实盘／模拟盘；TQ 不使用这些参数。后端需启用对应服务并授予当前账号行情权限。
 
-query 同时保存双方参数，source 选择当前来源。两边共用布局、周期、指标、历史数量、
+query 同时保存双方参数，source 选择当前来源。两边共用布局、周期、公共指标及窗口覆盖、历史数量、
 更新间隔、主题与时区；切到 TQ 再切回来仍保留之前的 CCXT 选项。
 旧 URL 中裸写的 symbol／exchange_name／market／is_live 要分别改为 ccxt.* 或 tq.symbol。
 
@@ -58,6 +58,18 @@ layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按�
 示例为 ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2，完整参数见
 [指标规范](../current_specs/indicators.md)。
 缺省字段从启动配置补全。完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
+
+窗口设置用 Tab 选择位置，分别配置周期和指标模式：继承公共、独立配置、无指标。
+缺省继承公共“技术指标”；独立输入沿用同一写法，即使暂时与公共相同也保持独立。
+URL 使用 `chart.1.indicators` 等窗口位置参数，缺参数继承、none 明确关闭：
+
+```text
+http://127.0.0.1:5174/?timeframes=30m,30m&indicators=ema,14&chart.1.indicators=rsi,14&chart.2.indicators=macd,12,26,9
+```
+
+这两个窗口共享三十分钟行情，分别显示 RSI 和 MACD；只改指标不重新请求历史。
+配置跟随窗口位置，减少布局删除多余覆盖，新增窗口继承；保存书签或前进后退
+恢复组合。TOML 继续只提供公共默认指标，不保存逐窗口覆盖。
 
 公共设置的“主图占比”使用大于 0、小于 1 的小数，默认 0.7。例如 RSI 与 MACD
 两个副图时，主图默认七成，两个副图各约一成半；无副图时主图占满。

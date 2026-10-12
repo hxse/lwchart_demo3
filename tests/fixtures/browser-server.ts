@@ -67,6 +67,8 @@ async function launch(action: string, config: string) {
 
 interface Metrics { logins: number; reads: Array<{ source: string; timeframe: string; symbol: string; limit: number; path: string; keys: string[]; history: boolean }> }
 let metrics: Metrics = { logins: 0, reads: [] };
+let tokenEpoch = 0;
+const token = () => `offline-jwt-${tokenEpoch}`;
 let advance = 0;
 let revision = 0;
 let correction = 0;
@@ -127,7 +129,8 @@ async function main() {
         if (url.pathname === '/__fixture') {
             if (request.method === 'POST') {
                 const state = await request.json();
-                if (state.reset) { metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; correction = 0; errors = []; delay = 0; }
+                // 每个用例拒绝旧令牌，让服务端缓存通过正常 401 流程刷新，避免测试顺序影响登录计数。
+                if (state.reset) { tokenEpoch++; metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; correction = 0; errors = []; delay = 0; }
                 if (state.advance !== undefined) advance = state.advance;
                 if (state.revision !== undefined) revision = state.revision;
                 if (state.correction !== undefined) correction = state.correction;
@@ -152,15 +155,15 @@ async function main() {
             const form = await request.formData();
             if (form.get('username') !== 'offline-user' || form.get('password') !== secret || form.get('grant_type') !== 'password') return new Response(null, { status: 401 });
             metrics.logins++;
-            return Response.json({ access_token: 'offline-jwt', token_type: 'bearer', expires_in: 3600 });
+            return Response.json({ access_token: token(), token_type: 'bearer', expires_in: 3600 });
         }
         if (url.pathname.startsWith('/file/') && request.method === 'GET') {
-            if (request.headers.get('Authorization') !== 'Bearer offline-jwt') return new Response(null, { status: 401 });
+            if (request.headers.get('Authorization') !== `Bearer ${token()}`) return new Response(null, { status: 401 });
             if (url.pathname === '/file/list') return Response.json({ files: [{ filename: 'legacy.zip', path: 'fixture/legacy.zip' }] });
             if (url.pathname === '/file/download') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
         }
         if (!['/ccxt/fetch_ohlcv/latest-limit', '/tq/fetch_ohlcv'].includes(url.pathname) || request.method !== 'GET') return new Response(null, { status: 404 });
-        if (request.headers.get('Authorization') !== 'Bearer offline-jwt') return new Response(null, { status: 401 });
+        if (request.headers.get('Authorization') !== `Bearer ${token()}`) return new Response(null, { status: 401 });
         const tq = url.pathname === '/tq/fetch_ohlcv';
         const timeframe = tq ? Object.keys(intervals).find(key => intervals[key] === Number(url.searchParams.get('duration_seconds')) * 1000)! : url.searchParams.get('timeframe')!;
         const symbol = url.searchParams.get('symbol')!;

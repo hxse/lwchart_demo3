@@ -118,7 +118,7 @@ test('单槽周期、品种与布局提交规范 URL，重复周期共用取数'
     expect((await state(request)).reads.filter((r: any) => r.history)).toHaveLength(1);
     await page.getByRole('button', { name: '展开看盘设置' }).click();
     await page.getByLabel('品种', { exact: true }).fill('ETH/USDT:USDT');
-    await page.getByRole('combobox', { name: '窗口 1', exact: true }).selectOption('15m');
+    await page.getByRole('combobox', { name: '周期', exact: true }).selectOption('15m');
     await page.getByRole('combobox', { name: '布局', exact: true }).selectOption('2x1');
     await page.getByRole('button', { name: '应用', exact: true }).click(); await ready(page, 2);
     const url = new URL(page.url());

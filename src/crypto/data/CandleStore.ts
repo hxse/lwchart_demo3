@@ -1,4 +1,4 @@
-import { UPDATE_BARS } from '../options';
+import { UPDATE_BARS, MAX_COMPUTED_INDICATORS } from '../options';
 import { IndicatorStream } from '../../indicators/IndicatorStream';
 import { indicatorKey, indicatorListString, parseIndicatorList } from '../../indicators/parameters';
 import { assertComputable } from '../../indicators/support';
@@ -27,7 +27,7 @@ export class CandleStore {
     get tail() { return this.rows.at(-1)?.[0]; }
     snapshot(): DataChange { return { kind: 'replace', rows: this.rows, indicators: this.indicators }; }
     setIndicators(indicators: readonly IndicatorSpec[]): boolean {
-        const specs = parseIndicatorList(indicators);
+        const specs = parseIndicatorList(indicators,MAX_COMPUTED_INDICATORS);
         specs.forEach(assertComputable);
         const key = indicatorListString(specs);
         if (key === this.configuration) return false;

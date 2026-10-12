@@ -10,7 +10,8 @@
   import { MarketHub } from './data/MarketHub';
   import type { MarketStream } from './data/MarketStream';
   import { parseDashboardQuery, serializeDashboardQuery } from './query';
-  import { LAYOUTS, indicatorString, parseIndicators, activeOptions, type DashboardSettings, type RuntimeOptions } from './options';
+  import { LAYOUTS, activeOptions, type DashboardSettings, type RuntimeOptions } from './options';
+  import { chartIndicators } from './chartIndicators';
   import { parseWatchlist, serializeWatchlist, selectWatch, assertUrlLength, type WatchEntry, type WatchlistState } from './watchlist';
   import { themeStyles } from './theme';
   import { createTimeDisplay } from './time';
@@ -36,12 +37,10 @@
   const dockPosition = $derived(settings?.dock_position ?? runtime?.defaults.dock_position ?? 'right');
   const timezone = $derived(options?.timezone ?? runtime?.defaults.timezone ?? 'local');
   const timeDisplay = $derived(createTimeDisplay(timezone));
-  const indicatorKey = $derived(indicatorString(options?.indicators || []));
-  const indicators = $derived(parseIndicators(indicatorKey));
   const mainPaneRatio = $derived(options?.main_pane_ratio);
   const items = $derived(streams.map((stream, index) => ({
     id: `slot-${index}`, component: CryptoChartPane,
-    props: { slotId: `slot-${index}`, stream, indicators, theme, timeDisplay, sync, mainPaneRatio },
+    props: { slotId: `slot-${index}`, stream, indicators:options ? chartIndicators(options,index) : [], theme, timeDisplay, sync, mainPaneRatio },
   })));
   function urlFor(value: DashboardSettings) { return `${location.origin}${location.pathname}?${serializeDashboardQuery(value)}${location.hash}`; }
   function validLength(url: string) {

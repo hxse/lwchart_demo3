@@ -85,6 +85,8 @@ incremental_bars／max_catchup_pages 必须迁移，启动不保留旧配置兼�
 公共 main_pane_ratio 缺省为 0.7，TOML 必须使用严格在零和一之间的有限数值；
 local／remote 覆盖共用加载与校验。浏览器设置和 query 只改变页面默认布局，
 不回写文件或保存手动拖动高度；写法见 [看盘说明](../guides/crypto_dashboard.md)。
+逐窗口指标覆盖仅在页面／query 设置，TOML 继续提供公共 indicators，不增加
+chart_indicators 文件字段；服务公开默认值提供空映射，各窗口默认继承公共。
 
 ## 离线验证
 

@@ -23,7 +23,7 @@ test('MarketHub 新增指标初始化失败隔离单周期，其他周期提交�
         expect(streams[0]!.store.snapshot()).toEqual(committed);
         for (const stream of streams.slice(1)) {
             expect(stream.status.phase).toBe('ready');
-            expect([...stream.store.indicators.keys()]).toEqual(['sma,2', 'bbands,2,1e+308']);
+            expect([...stream.store.indicators.keys()]).toEqual(['bbands,2,1e+308', 'sma,2']);
         }
         advance = true; await Promise.all(streams.map(stream => stream.poll()));
         expect(calls.map(call => call.timeframe)).toEqual([...options.timeframes, ...options.timeframes.slice(1)]);

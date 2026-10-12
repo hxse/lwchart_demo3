@@ -2,19 +2,23 @@ import {
     normalizeSettings, DASHBOARD_KEYS, CCXT_KEYS, LAYOUTS, layoutSlots, parseInteger, parseMainPaneRatio,
     indicatorString, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions,
 } from './options';
+import { trimChartIndicators } from './chartIndicators';
 
 const identityKeys = [...CCXT_KEYS, 'symbol'] as const;
 const queryKeys = [...DASHBOARD_KEYS, ...identityKeys.map(key => `ccxt.${key}`), 'tq.symbol'];
+const chartKey = /^chart\.([1-9]\d*)\.indicators$/;
 
 export function parseDashboardQuery(search: string, runtime: RuntimeOptions): DashboardSettings {
     const params = new URLSearchParams(search);
     for (const key of params.keys()) {
-        if (!queryKeys.includes(key) || params.getAll(key).length !== 1) throw new Error('URL 含有未知或重复参数');
+        if ((!queryKeys.includes(key) && !chartKey.test(key)) || params.getAll(key).length !== 1) throw new Error('URL 含有未知或重复参数');
     }
     const value = normalizeSettings(runtime.defaults);
+    const overrides: Record<string,string> = {};
     for (const [key, raw] of params) {
         if (!raw) throw new Error('URL 参数不能为空');
-        if (key.startsWith('ccxt.')) {
+        if (chartKey.test(key)) overrides[chartKey.exec(key)![1]!]=raw;
+        else if (key.startsWith('ccxt.')) {
             const field = key.slice(5);
             if (field === 'is_live') {
                 if (raw !== 'true' && raw !== 'false') throw new Error('is_live 必须是 true 或 false');
@@ -33,7 +37,7 @@ export function parseDashboardQuery(search: string, runtime: RuntimeOptions): Da
     } else if (params.has('timeframes') && !params.has('layout') && value.timeframes.length !== runtime.defaults.timeframes.length) {
         value.layout = ({ 1: '1x1', 2: '1x2', 3: '1x3', 4: '2x2' } as Record<number, Layout>)[value.timeframes.length]!;
     }
-    return normalizeSettings(value);
+    return normalizeSettings({...value,chart_indicators:overrides});
 }
 export function serializeDashboardQuery(settings: DashboardSettings): string {
     const o = normalizeSettings(settings);
@@ -44,10 +48,12 @@ export function serializeDashboardQuery(settings: DashboardSettings): string {
         layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
         refresh_seconds: String(o.refresh_seconds), history_bars: String(o.history_bars), theme: o.theme, timezone: o.timezone, dock_position: o.dock_position,
         main_pane_ratio: String(o.main_pane_ratio),
+        ...Object.fromEntries(Object.entries(o.chart_indicators).sort(([a],[b]) => Number(a)-Number(b))
+            .map(([key,list]) => [`chart.${key}.indicators`,indicatorString(list)])),
     }).toString();
 }
 export function changeLayout(options: DashboardSettings, layout: Layout, defaults: DashboardSettings): DashboardSettings {
     const timeframes = options.timeframes.slice(0, layoutSlots(layout));
     while (timeframes.length < layoutSlots(layout)) timeframes.push(defaults.timeframes[timeframes.length % defaults.timeframes.length]!);
-    return { ...options, layout, timeframes };
+    return { ...options, layout, timeframes, chart_indicators:trimChartIndicators(options.chart_indicators,timeframes.length) };
 }

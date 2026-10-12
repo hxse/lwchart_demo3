@@ -5,13 +5,13 @@
   import { ChartSyncManager } from '../components/lw-chart/logic/ChartSyncManager';
   import { chartSeries, chartPatches } from './data/chartData';
   import type { MarketStream, StreamStatus } from './data/MarketStream';
-  import type { IndicatorSpec, Theme } from './options';
+  import { indicatorString, parseIndicators, type IndicatorSpec, type Theme } from './options';
   import { indicatorLabel, indicatorColor, indicatorResultState, indicatorStateLabels } from '../indicators/presentation';
   import { indicatorKey } from '../indicators/parameters';
   import { chartTheme } from './theme';
   import type { TimeDisplay } from './time';
 
-  let { slotId, stream, indicators, theme, timeDisplay, sync, mainPaneRatio }: {
+  let { slotId, stream, indicators: configuredIndicators, theme, timeDisplay, sync, mainPaneRatio }: {
     slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager; mainPaneRatio?: number;
   } = $props();
   let api = $state<ChartApi>();
@@ -20,6 +20,8 @@
   let hoverTime = $state<number | undefined>();
   let indicatorStates = $state<Map<string, 'warmup' | 'value' | 'undefined'>>(new Map());
   let unregister: (() => void) | undefined;
+  const configuration = $derived(indicatorString(configuredIndicators));
+  const indicators = $derived(parseIndicators(configuration));
   const series = $derived(chartSeries(indicators, theme, mainPaneRatio));
   const labels: Record<string,string> = { '1d': '日线', '1w': '周线' };
   const chartOptions = $derived.by(() => {

@@ -1,6 +1,8 @@
 import { indicatorDefinition } from './definitions';
 import type { IndicatorAnnotation, IndicatorParameter, IndicatorSpec } from './types';
 
+export const MAX_INDICATORS_PER_LIST = 12;
+
 function parameter(value: unknown, definition: IndicatorParameter, fromString: boolean) {
     let numeric = value;
     if (fromString) {
@@ -38,10 +40,10 @@ export function indicatorKey(spec: IndicatorSpec): string {
     const values = spec as unknown as Record<string, number | string>;
     return [spec.type, ...indicatorDefinition(spec.type).parameters.map(p => values[p.name])].join(',');
 }
-export function parseIndicatorList(input: unknown): IndicatorSpec[] {
+export function parseIndicatorList(input: unknown, maxItems = MAX_INDICATORS_PER_LIST): IndicatorSpec[] {
     if (input === 'none') return [];
     const values = typeof input === 'string' ? input.split(';') : input;
-    if (!Array.isArray(values) || values.length > 12) throw new Error('指标必须是至多 12 项的列表');
+    if (!Array.isArray(values) || values.length > maxItems) throw new Error(`指标必须是至多 ${maxItems} 项的列表`);
     const result = values.map(parseIndicator);
     if (new Set(result.map(indicatorKey)).size !== result.length) throw new Error('相同指标配置不能重复');
     return result;

@@ -1,10 +1,11 @@
 import { GridTemplateType, gridTemplates } from '../components/grid-template/gridTemplates';
 import { validateTimezone } from './time';
-import { parseIndicatorList } from '../indicators/parameters';
+import { MAX_INDICATORS_PER_LIST } from '../indicators/parameters';
 import type { IndicatorSpec } from '../indicators/types';
-import { assertComputable } from '../indicators/support';
+import { parseIndicators, parseChartIndicators, type ChartIndicatorOverrides } from './chartIndicators';
 export type { IndicatorSpec } from '../indicators/types';
 export { indicatorListString as indicatorString } from '../indicators/parameters';
+export { parseIndicators } from './chartIndicators';
 
 export const TIMEFRAMES = ['1m','3m','5m','15m','30m','1h','2h','4h','6h','8h','12h','1d','3d','1w'] as const;
 export const LAYOUTS = {
@@ -15,6 +16,8 @@ export const LAYOUTS = {
     '3x1': GridTemplateType.VERTICAL_1x1x1,
     '2x2': GridTemplateType.GRID_2x2,
 } as const;
+export const MAX_CHARTS = Math.max(...Object.values(LAYOUTS).map(layout => gridTemplates[layout].slots));
+export const MAX_COMPUTED_INDICATORS = MAX_CHARTS * MAX_INDICATORS_PER_LIST;
 export const MAX_HISTORY_BARS = 10000;
 export const UPDATE_BARS = 5;
 export const DEFAULT_MAIN_PANE_RATIO = 0.7;
@@ -29,6 +32,7 @@ export interface TqDefaults { symbol: string }
 interface DisplayOptions {
     symbol: string; layout: Layout; timeframes: Timeframe[]; indicators: IndicatorSpec[];
     refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition; main_pane_ratio: number;
+    chart_indicators: ChartIndicatorOverrides;
 }
 export interface CcxtOptions extends DisplayOptions, CcxtDefaults { source: 'ccxt' }
 export interface TqOptions extends DisplayOptions { source: 'tq' }
@@ -39,7 +43,7 @@ export interface RuntimeOptions { defaults: DashboardSettings }
 export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position','main_pane_ratio'] as const;
 export const CCXT_KEYS = ['exchange_name','market','is_live'] as const;
 export const DASHBOARD_KEYS = COMMON_KEYS.filter(key => key !== 'symbol');
-export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS] : [...COMMON_KEYS]; }
+export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS, 'chart_indicators'] : [...COMMON_KEYS, 'chart_indicators']; }
 
 export function record(value: unknown, label: string): Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} 必须是表`);
@@ -93,11 +97,6 @@ export function normalizeSources(input: unknown): SourceDefaults {
     onlyKeys(tq, ['symbol'], 'TQ 身份');
     return { ccxt: normalizeCcxt(value.ccxt), tq: { symbol: symbol(tq.symbol) } };
 }
-export function parseIndicators(input: unknown): IndicatorSpec[] {
-    const result = parseIndicatorList(input);
-    result.forEach(assertComputable);
-    return result;
-}
 export function layoutSlots(layout: Layout) { return gridTemplates[LAYOUTS[layout]].slots; }
 export function normalizeOptions(input: unknown): DashboardOptions {
     const value = record(input, '看盘配置');
@@ -113,22 +112,23 @@ export function normalizeOptions(input: unknown): DashboardOptions {
     const display: DisplayOptions = { symbol: symbol(value.symbol), layout, timeframes: [...value.timeframes], indicators: parseIndicators(value.indicators),
         refresh_seconds: integer(value.refresh_seconds, 1, 3600, '更新间隔'),
         history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone), dock_position: dock as DockPosition,
-        main_pane_ratio: validateMainPaneRatio(value.main_pane_ratio === undefined ? DEFAULT_MAIN_PANE_RATIO : value.main_pane_ratio) };
+        main_pane_ratio: validateMainPaneRatio(value.main_pane_ratio === undefined ? DEFAULT_MAIN_PANE_RATIO : value.main_pane_ratio),
+        chart_indicators: parseChartIndicators(value.chart_indicators,layoutSlots(layout)) };
     if (value.source === 'tq') return { ...display, source: 'tq' };
     const identity = normalizeCcxt(Object.fromEntries([...CCXT_KEYS, 'symbol'].map(key => [key, value[key]])));
     return { ...display, ...identity, source: 'ccxt' };
 }
 export function activeOptions(settings: DashboardSettings): DashboardOptions {
     const display = Object.fromEntries(DASHBOARD_KEYS.map(key => [key, settings[key]]));
-    return normalizeOptions({ ...display, ...settings[settings.source] });
+    return normalizeOptions({ ...display, ...settings[settings.source], chart_indicators: settings.chart_indicators });
 }
 export function normalizeSettings(input: unknown): DashboardSettings {
     const value = record(input, '页面设置');
-    onlyKeys(value, [...DASHBOARD_KEYS, 'ccxt', 'tq'], '页面设置');
+    onlyKeys(value, [...DASHBOARD_KEYS, 'ccxt', 'tq', 'chart_indicators'], '页面设置');
     if (value.source !== 'ccxt' && value.source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
     const sources = normalizeSources({ ccxt: value.ccxt, tq: value.tq });
-    const active = normalizeOptions({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, value[key]])), ...sources[value.source] });
-    return { ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, active[key]])), ...sources } as DashboardSettings;
+    const active = normalizeOptions({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, value[key]])), ...sources[value.source], chart_indicators: value.chart_indicators });
+    return { ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, active[key]])), ...sources, chart_indicators: active.chart_indicators } as DashboardSettings;
 }
 export function normalizeRuntime(input: unknown): RuntimeOptions {
     const value = record(input, '运行配置');

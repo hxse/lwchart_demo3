@@ -4,14 +4,14 @@ import {parseIndicator} from '../../src/indicators/parameters';
 import {directResults} from '../fixtures/indicator-reference';
 import type {IndicatorInput} from '../../src/indicators/types';
 
-const candidates=['sma,5','ema,5','dema,5','tema,5','rsi,5','cci,5','macd,3,7,4','atr,5','er,5','bbands,5,2'];
+const candidates=['sma,5','ema,5','dema,5','tema,5','rsi,5','cci,5','macd,3,7,4','atr,5','adx,5','er,5','bbands,5,2'];
 const dataset=(prices:number[]):IndicatorInput[]=>prices.map((close,index)=>({
     time:Date.UTC(2026,0,1)+index*60000+(index>=40?172800000:0),high:close+2,low:close-2,close,
 }));
 for(const [name,values] of Object.entries({constant:Array(90).fill(100),up:Array.from({length:90},(_,i)=>100+i*.17),
     down:Array.from({length:90},(_,i)=>100-i*.17),alternating:Array.from({length:90},(_,i)=>100+(i%2?3.3:-2.1)),
     jump:Array.from({length:90},(_,i)=>100+(i>=40?15.7:0)+i*.13)})){
-    test(`${name} 合法行情及时间跳空：十种指标各角色严格对齐`,()=>{
+    test(`${name} 合法行情及时间跳空：十一种指标各角色严格对齐`,()=>{
         const inputs=dataset(values);
         for(const text of candidates){
             const spec=parseIndicator(text); const stream=new IndicatorStream(spec,inputs.slice(0,30));

@@ -16,12 +16,14 @@ market *args:
 
 # 全部静态检查，不改写源码
 check:
+    @bun scripts/indicators/check-dependency.ts
     @bun run check:svelte
     @bun run check:ts
     @bun run check:runtime
 
 # 离线逻辑、服务与浏览器回归
 test:
+    @bun scripts/indicators/check-dependency.ts
     @APP_CONFIG_PROFILE=dev bun test tests/unit
     @APP_CONFIG_PROFILE=dev bun --bun node_modules/@playwright/test/cli.js test
 

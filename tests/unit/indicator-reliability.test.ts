@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { MACD, EMA, ADX, WSMA } from 'trading-signals';
+import { MACD, EMA, ADX, DX, WSMA } from 'trading-signals';
 import golden from '../fixtures/indicator-golden.json';
 import { IndicatorStream, IndicatorCalculationError } from '../../src/indicators/IndicatorStream';
 import { parseIndicator } from '../../src/indicators/parameters';
@@ -42,13 +42,13 @@ test('根可用状态冻结首点，MACD 不等待内部 signal 独立预热', (
 });
 
 test('合法常量窗口、有效零及 CCI 未定义后的恢复不会补零或污染后值', () => {
-    for (const name of ['sma','ema','dema','tema','rsi','atr','er']) {
+    for (const name of ['sma','ema','dema','tema','rsi','atr','adx','er']) {
         const inputs = prices(Array(20).fill(100));
         const stream = new IndicatorStream(parseIndicator(`${name},3`), inputs);
         const actual = stream.snapshot().outputs.get('value')!.at(-1)!;
         expect(actual.state).toBe('value');
         expect(Number.isFinite(actual.value)).toBe(true);
-        if (name === 'atr' || name === 'er') expect(Object.is(actual.value, 0)).toBe(true);
+        if (['atr','adx','er'].includes(name)) expect(Object.is(actual.value, 0)).toBe(true);
     }
     const inputs = prices([100,101]);
     const cci = new IndicatorStream(parseIndicator('cci,2'), inputs);
@@ -63,20 +63,24 @@ test('合法常量窗口、有效零及 CCI 未定义后的恢复不会补零或
         directResults(parseIndicator('cci,2'), inputs).get('value')!.at(-1)!.value)).toBe(true);
 });
 
-test('ADX 8.3.0 的零波幅导致 NaN 且后续平滑不恢复，属于单指标不准入证据', () => {
+test('ADX 依赖补丁：原生 DX 平盘返回有效零，ADX 平滑恢复符合固定小样本', () => {
+    const dx = new DX(2, WSMA);
+    for (const input of prices([100,100,100])) dx.add(input);
+    expect(dx.isStable).toBe(true);
+    expect(Object.is(dx.getResultOrThrow(), 0)).toBe(true);
+    expect(Object.is(dx.pdi, 0)).toBe(true); expect(Object.is(dx.mdi, 0)).toBe(true);
     const native = new ADX(2, WSMA);
-    for (const input of prices([100,100,100])) native.add(input);
-    expect(native.isStable).toBe(true); expect(Number.isNaN(native.getResultOrThrow())).toBe(true);
-    for (const input of prices([101,102,103,104])) native.add(input);
-    expect(Number.isNaN(native.getResultOrThrow())).toBe(true);
-    const candidate = new IndicatorStream(parseIndicator('adx,2'));
-    candidate.add(prices([100])[0]!); candidate.add(prices([100,100])[1]!);
-    try { candidate.add(prices([100,100,100])[2]!); throw new Error('应当拒绝非白名单 NaN'); }
-    catch (error) {
-        expect(error).toBeInstanceOf(IndicatorCalculationError);
-        expect((error as IndicatorCalculationError).indicator).toBe('adx,2');
-        expect((error as IndicatorCalculationError).output).toBe('value');
-    }
+    const inputs = prices([100,100,100,101,102,103,104]);
+    const values: number[] = [];
+    for (const input of inputs) { native.add(input); if (native.isStable) values.push(native.getResultOrThrow()); }
+    const expected = [0,50,75,87.5,93.75];
+    expect(values).toHaveLength(expected.length);
+    values.forEach((value, index) => expect(Object.is(value, expected[index])).toBe(true));
+    const points = new IndicatorStream(parseIndicator('adx,2'), inputs).snapshot().outputs.get('value')!;
+    expect(points.slice(0,2).map(point => point.state)).toEqual(['warmup','warmup']);
+    points.slice(2).forEach((point, index) => {
+        expect(point.state).toBe('value'); expect(Object.is(point.value, expected[index])).toBe(true);
+    });
 });
 
 test('有限行情导致不可表达结果时明确计算失败，不过滤 Infinity', () => {
@@ -84,6 +88,17 @@ test('有限行情导致不可表达结果时明确计算失败，不过滤 Infi
     stream.add({ time: 1, high: 1e308, low: 1e308, close: 1e308 });
     expect(() => stream.add({ time: 2, high: 1e308, low: 1e308, close: 1e308 })).toThrow(IndicatorCalculationError);
     expect(stream.snapshot().outputs.get('value')).toEqual([{ time: 1, state: 'warmup' }]);
+});
+
+test('ADX 补丁只处理全零边界，其他非有限结果仍明确失败', () => {
+    try {
+        new IndicatorStream(parseIndicator('adx,2'), prices([-1e308,1e308,0]));
+        throw new Error('应拒绝非有限 ADX 输出');
+    } catch (error) {
+        expect(error).toBeInstanceOf(IndicatorCalculationError);
+        expect((error as IndicatorCalculationError).indicator).toBe('adx,2');
+        expect((error as IndicatorCalculationError).output).toBe('value');
+    }
 });
 
 test('零的符号参与末根输入和原始数值的严格对齐', () => {

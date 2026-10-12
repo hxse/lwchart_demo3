@@ -27,6 +27,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "trading-signals@8.3.0": "patches/trading-signals@8.3.0.patch",
+  },
   "packages": {
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "1.5.5", "@jridgewell/trace-mapping": "0.3.31" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 

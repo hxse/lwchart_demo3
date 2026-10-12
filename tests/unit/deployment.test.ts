@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdtemp, mkdir, rm, writeFile, readFile, symlink } from 'node:fs/promises';
+import { join, resolve, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { configProfile, mergeConfig, overridePath, configurationFiles, configurationId } from '../../scripts/config-profile';
 import { loadCryptoConfig } from '../../scripts/crypto/config';
@@ -56,6 +56,8 @@ test('源码清单只含白名单，配置／缓存／历史不进入；同内�
     const root = resolve(import.meta.dirname, '../..');
     const manifest = await sourceManifest(root);
     expect(manifest.files.some(file => file.path === 'scripts/crypto/production.ts')).toBe(true);
+    const patchPaths = Object.values((await Bun.file(join(root,'package.json')).json()).patchedDependencies) as string[];
+    expect(manifest.files.filter(file => file.path.startsWith('patches/')).map(file => file.path)).toEqual(patchPaths);
     expect(manifest.files.every(file => !/config(?:\.local|\.remote)?\.toml|node_modules|\.git|\.jj|doc\//.test(file.path))).toBe(true);
     expect((await sourceManifest(root)).id).toBe(manifest.id);
     const prepared = await prepareInputs(root);
@@ -65,12 +67,34 @@ test('源码清单只含白名单，配置／缓存／历史不进入；同内�
     expect(await Bun.file(join(prepared.directory, 'config.toml')).exists()).toBe(false);
     const directory = await mkdtemp(join(tmpdir(), 'lwchart-source-'));
     try {
-        for (const file of manifest.files.filter(file => !file.path.includes('/'))) await writeFile(join(directory, file.path), await readFile(join(root, file.path)));
+        for (const file of manifest.files.filter(file => !file.path.includes('/') || patchPaths.includes(file.path))) {
+            await mkdir(dirname(join(directory,file.path)),{recursive:true});
+            await writeFile(join(directory, file.path), await readFile(join(root, file.path)));
+        }
         await mkdir(join(directory, 'src')); await mkdir(join(directory, 'scripts'));
         await writeFile(join(directory, 'src/example.ts'), 'export const value = 1;');
         const previous = (await sourceManifest(directory)).id;
         await writeFile(join(directory, 'src/example.ts'), 'export const value = 2;');
         expect((await sourceManifest(directory)).id).not.toBe(previous);
+        const patch = patchPaths[0]!;
+        expect(await readFile(join(prepared.directory,patch),'utf8')).toBe(await readFile(join(root,patch),'utf8'));
+        const beforePatch = (await sourceManifest(directory)).id;
+        await writeFile(join(directory,patch), 'changed patch');
+        expect((await sourceManifest(directory)).id).not.toBe(beforePatch);
+        await writeFile(join(directory,'patches/unregistered.patch'),'private unregistered input');
+        expect((await sourceManifest(directory)).files.some(file => file.path.endsWith('unregistered.patch'))).toBe(false);
+        for (const path of ['../private.patch','/tmp/private.patch','patches/../private.patch','patches/nested/private.patch']) {
+            await writeFile(join(directory,'package.json'),JSON.stringify({patchedDependencies:{'trading-signals@8.3.0':path}}));
+            await expect(sourceManifest(directory)).rejects.toThrow('依赖补丁必须是 patches/');
+        }
+        await writeFile(join(directory,'package.json'),await readFile(join(root,'package.json')));
+        await rm(join(directory,patch));
+        await expect(sourceManifest(directory)).rejects.toThrow('ENOENT');
+        await symlink(join(root,patch),join(directory,patch));
+        await expect(sourceManifest(directory)).rejects.toThrow('不允许符号链接');
+        await rm(join(directory,'patches'),{recursive:true});
+        await symlink(join(root,'patches'),join(directory,'patches'));
+        await expect(sourceManifest(directory)).rejects.toThrow('不允许符号链接');
     } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

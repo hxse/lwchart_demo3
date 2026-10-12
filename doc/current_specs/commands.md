@@ -26,7 +26,7 @@ just test-container
 配置在启动时读取，修改后重启。普通入口使用 dev；生产 local／remote 的覆盖与部署见
 [deployment.md](deployment.md)。
 
-legacy 只校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dist-lib，复制
+legacy 在依赖文件校验通过后校验 legacy.library_target_dir，按 `vite.config.lib.ts` 构建 dist-lib，复制
 `dist-lib/.` 到目标目录。默认目标 `~/dev/pyo3-quant/data/lwchart`；仅展开开头的 ~/，
 其它 `$` 和 `${...}` 保持字面值，路径空格安全。失败停止，不继续复制。
 原 package.json build:lib 退出，不保留同职责包装。
@@ -48,11 +48,23 @@ package.json 只保留依赖、工具级 dev／build／preview 和原子检查�
 check:svelte 检查全部前端；check:ts 检查 Vite／Playwright 配置；check:runtime 严格
 检查 Bun 服务及测试，允许由 Bun 转译的 TypeScript class 语法。
 Just 串行组织检查，均不格式化或改写源码。
+`just check`、`just test` 首先执行共享指标依赖校验；market dev／build 在加载配置、
+监听或编译前执行，legacy build 在构建与复制前执行。校验规则见下节。
 
 ## 依赖与构建工具
 
 package.json 与 bun.lock 是唯一项目依赖链，安装使用 `bun install --frozen-lockfile`，
 显式升级使用 `bun update --latest`；本项目没有 uv 管理的 Python 依赖。
+trading-signals 精确锁定 8.3.0，唯一依赖补丁是 ADX 零波幅修复，见
+[指标规范](indicators.md)。`patchedDependencies` 登记的 patches 文件随源码和锁文件
+跟踪，冻结安装自动应用；不手工修改 node_modules 作为正式安装方式。
+维护补丁使用 [Bun 正式 patch 流程](https://bun.com/docs/pm/cli/patch)，先准备包副本，
+再编辑并提交，避免修改缓存硬链接。补丁和版本变更均须重新通过指标准入。
+`scripts/indicators/check-dependency.ts` 是唯一文件校验器：实际安装版本必须符合
+指标准入版本，补丁后整个 DX.js 的原始字节 SHA-256 必须等于代码中固定的审核值。
+缺文件、版本不符或内容变化时报错并停止后续操作；不自动安装、修改文件或刷新指纹。
+可先冻结安装恢复；有意变更则重新审核和准入后手动更新指纹。
+帮助、停止和消费已有产物的 serve／生产服务不要求安装库，不执行该源码校验。
 Vite 使用正式 8 系列，旧 rolldown-vite 别名与 override 退出；crypto 明确加载
 根目录 svelte.config.js。旧浏览器构建用 rolldownOptions 将表格库独立成包，
 Notebook 库仍输出原 ES／UMD 文件名和全局名。
@@ -78,6 +90,9 @@ incremental_bars／max_catchup_pages 必须迁移，启动不保留旧配置兼�
 指标使用 trading-signals 的原生类完整重放，与应用增量结果严格对齐；
 indicator-golden.json 保留固定期望，来源与读取口径见 [indicators.md](indicators.md)。
 旧 EMA 专用参考 fixture 与 Python 生成器已退出，不提供再生入口。
+ADX 安装回归使用新的临时目录和已有缓存，离线冻结安装生产白名单中的依赖与补丁，
+执行相同文件校验并直接验证原生零波幅恢复；缺失补丁安装失败，不隐式联网。
+文件漂移和命令阻断回归使用临时依赖副本，不修改工作区 node_modules 或共享缓存。
 浏览器套件构建新页面、旧演示页面和原 Notebook 库，用临时配置验证旧复制目标，不能写入用户
 真实 pyo3-quant 目录。虚拟鉴权后端与开发／生产适配服务只绑定本机测试端口。
 测试递归核对库复制内容，并从临时目标消费 ES／UMD 声明，验证合法写法和反向类型报错。

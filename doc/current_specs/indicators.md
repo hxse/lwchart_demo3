@@ -7,11 +7,21 @@ src/indicators/ 拥有指标参数、输出角色、原生调用描述、系列�
 legacy 页面或文件路径模型。legacy 原公开样式类型转出同一个定义，不维护副本。
 
 定义包含十一种候选：sma、ema、dema、tema、rsi、cci、macd、atr、adx、er、bbands。
-计算唯一使用 trading-signals 8.3.0，构造与读取由原生适配绑定元数据；SMA、EMA、
-DEMA、TEMA、RSI、CCI、MACD、ATR、ER、BBANDS 已通过计算准入。ADX 零波幅的
-NaN 会持续污染平滑，暂不开放 market 计算，支持清单及拒绝原因只在 support.ts。
-market 的设置／URL／TOML 已开放这十种指标，暂不支持 ADX 时明确拒绝整个提交，
-不静默删除、不补零或调用备用算法。默认仍为 EMA14／50／100，标签与配色保持。
+计算唯一使用 trading-signals 8.3.0，构造与读取由原生适配绑定元数据；全部十一种
+指标已通过计算准入，支持清单只在 support.ts。market 的设置／URL／TOML 共用
+准入与参数校验，不静默删除、不补零或调用备用算法。默认仍为 EMA14／50／100。
+
+唯一依赖补丁例外为 `patches/trading-signals@8.3.0.patch`，由 Bun patchedDependencies
+和锁文件登记。它只修复原生 DX：可用阶段在除法前判断 ATR、平滑正负方向移动
+均严格为零，通过原有 setResult(0, replace) 设置 DX、pdi 和 mdi 为零。
+ADX 因而在平盘预热后为有效零，行情恢复后正常平滑；其他输入沿用原生公式。
+不对任意 NaN 补零，不改 ADX／WSMA 递推，不增加应用公式或运行时补丁。
+未来官方修复重新通过严格准入后再移除补丁，不直接升级替换。
+
+开发启动、正式检查与构建在使用依赖前，复用 scripts/indicators/check-dependency.ts
+核对实际库版本和补丁后完整 DX.js 的固定 SHA-256。任意字节变化、缺文件或版本
+不符都明确失败，不自动更新预期指纹。校验属于构建工具，不进入浏览器计算链路；
+更改补丁或版本须审核并重新通过数值准入后手动维护固定指纹。
 
 ## 参数与身份
 
@@ -22,6 +32,7 @@ parseIndicator 是单项参数唯一校验，parseIndicatorList 负责 market �
 ```text
 ema,14;ema,50;ema,100
 none
+ema,14;rsi,14;adx,14
 ```
 
 规范化配置键按 type 与元数据参数顺序形成。market 系列键为
@@ -48,6 +59,8 @@ IndicatorStream 独立持有原生实例，只调用 add／replace／isStable／
 完整初始化新建实例；仅计算起点的一根覆盖使用新实例 add，不恢复历史检查点。
 计数随追加增加，显示裁剪不重置原生状态；新增／改参数只初始化对应实例。
 MACD 固定三个独立 EMA，根可用时三角色同时显示，不等待内部 signal 独立预热。
+ADX 使用原生 ADX(period, WSMA)，HLC 输入、value 输出；周期为至少 2 的整数，
+根可用阶段读取结果，独立副图使用数值格式与 25 参考线，显示不识别指标名称。
 
 结果区分 warmup／value／undefined。CCI 根 NaN 唯一允许为合法 undefined，保留
 原始 NaN，不填零、不请求重载，后续有限值可恢复；其他非有限输出明确失败。
@@ -55,6 +68,8 @@ MACD 固定三个独立 EMA，根可用时三角色同时显示，不等待内�
 
 严格对齐以独立原生完整重放作参考，逐时间／角色／状态按 Object.is 比较，
 无容差。固定极小期望与确定性模拟序列默认离线；暂不支持指标保留明确诊断断言。
+ADX 零波幅固定样本和反复末根平盘／波动切换须严格对齐，默认测试同时验证新目录
+离线冻结安装后的实际原生结果，不能仅以工作区 node_modules 已被修改证明补丁生效。
 
 ## 配置与显式覆盖
 

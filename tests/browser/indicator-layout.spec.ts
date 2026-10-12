@@ -42,7 +42,8 @@ test('实际设置修改前置参数、替换类型、重排及增删，独立�
     const initial = 'rsi,14;macd,12,26,9';
     await page.goto(`/?timeframes=30m&history_bars=100&refresh_seconds=60&indicators=${encodeURIComponent(initial)}`);
     await verify(page, initial);
-    for (const list of ['rsi,20;macd,12,26,9', 'cci,20;macd,12,26,9', 'atr,14;cci,20;macd,12,26,9',
+    for (const list of ['rsi,20;macd,12,26,9', 'rsi,20;macd,12,26,9;adx,14', 'rsi,20;macd,12,26,9;adx,20',
+        'adx,20;macd,12,26,9', 'macd,12,26,9;adx,20', 'cci,20;macd,12,26,9', 'atr,14;cci,20;macd,12,26,9',
         'macd,12,26,9;cci,20', 'macd,12,26,9', initial]) {
         await page.getByRole('button', { name: '展开看盘设置' }).click();
         await page.getByLabel('技术指标').fill(list);

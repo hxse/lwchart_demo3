@@ -1,4 +1,4 @@
-import { createChart, type IChartApi } from 'lightweight-charts';
+import { createChart, type IChartApi, type UTCTimestamp } from 'lightweight-charts';
 import { MarketStream } from '../../src/crypto/data/MarketStream';
 import { SeriesRegistry } from '../../src/components/lw-chart/logic/SeriesRegistry';
 import { applySeriesData } from '../../src/components/lw-chart/logic/SeriesDataUpdater';
@@ -10,7 +10,7 @@ import type { Theme } from '../../src/crypto/options';
 import type { IndicatorPoint } from '../../src/indicators/types';
 import { LegendManager } from '../../src/components/lw-chart/logic/LegendManager';
 
-const list='sma,5;ema,5;dema,5;tema,5;rsi,5;cci,5;macd,3,7,4;atr,5;er,5;bbands,5,2';
+const list='sma,5;ema,5;dema,5;tema,5;rsi,5;cci,5;macd,3,7,4;atr,5;adx,5;er,5;bbands,5,2';
 const specs=parseIndicatorList(list);
 const input=(row:OhlcvRow)=>({time:row[0],high:row[2],low:row[3],close:row[4]});
 const rows=(count:number):OhlcvRow[]=>simulatedInputs(count).map(point=>[point.time,point.close-.5,point.high,point.low,point.close,10]);
@@ -59,12 +59,29 @@ function report(){
         }
     }
     return {aligned,plotted,limits:[...limits],phase:stream.status.phase,bars:stream.store.rows.length,panes:chart.panes().length,
+        references:[...registry.seriesMap].map(([key,api])=>({key,prices:api.priceLines().map(line=>line.options().price)})),
         referenceRows:referenceRows.map(row=>[...row]),results:[...stream.store.indicators].map(([key,result])=>({key,
             outputs:[...result.outputs].map(([role,points])=>({role,points:points.map(encoded)}))}))};
 }
 
 async function run(action:string){
     omit=undefined; failFull=false;
+    if(action==='flat-initial'){
+        sourceRows=rows(80).map(row=>[row[0],100,100,100,100,row[5]]);
+        referenceRows=sourceRows.slice(-32);
+    }
+    if(action.startsWith('flat-revise-')){
+        const close=action==='flat-revise-up'?101:action==='flat-revise-down'?99:100;
+        const last=sourceRows.at(-1)!; sourceRows[sourceRows.length-1]=[last[0],close,close,close,close,last[5]];
+        referenceRows[referenceRows.length-1]=sourceRows.at(-1)!;
+    }
+    if(action==='flat-append'){
+        const fresh:OhlcvRow[]=[1,2].map(offset=>{
+            const last=sourceRows.at(-1)!; const close=last[4]+offset;
+            return [last[0]+offset*60000,close,close,close,close,last[5]+offset];
+        });
+        sourceRows.push(...fresh); referenceRows.push(...fresh);
+    }
     if(action==='initial')referenceRows=sourceRows.slice(-32);
     if(action==='revise'){
         const last=sourceRows.at(-1)!; sourceRows[sourceRows.length-1]=[last[0],last[1],last[2]+.3,last[3],last[4]+.2,last[5]];
@@ -88,5 +105,12 @@ function recolor(next:Theme){
     applySeriesData(chart,registry.seriesMap,chartPatches(stream.store.snapshot(),specs,theme),true);
     return report();
 }
-declare global {interface Window {indicatorFixture:{run:typeof run;report:typeof report;recolor:typeof recolor}}}
-window.indicatorFixture={run,report,recolor};
+async function coordinates(key:string){
+    await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+    const point=stream.store.indicators.get(key)!.outputs.get('value')!.at(-1)!;
+    const rectangle=registry.seriesMap.get(`market/${key}/value`)!.getPane().getHTMLElement()!.getBoundingClientRect();
+    return {x:document.getElementById('chart')!.getBoundingClientRect().x+chart.timeScale().timeToCoordinate(point.time/1000 as UTCTimestamp)!,
+        y:rectangle.y+rectangle.height/2};
+}
+declare global {interface Window {indicatorFixture:{run:typeof run;report:typeof report;recolor:typeof recolor;coordinates:typeof coordinates}}}
+window.indicatorFixture={run,report,recolor,coordinates};

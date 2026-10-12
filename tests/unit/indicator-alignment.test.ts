@@ -44,6 +44,30 @@ for (const candidate of candidates) test(`${candidate} 原生完整重放与末�
     }
 });
 
+for (const period of [2,14]) for (const capacity of [1,17]) {
+    test(`ADX${period} 零波幅与波动切换，反复覆盖及容量 ${capacity} 裁剪严格对齐`, () => {
+        const spec = parseIndicator(`adx,${period}`);
+        const prices = [...Array(35).fill(100), ...Array.from({length:20}, (_,i) => 101+i),
+            ...Array(15).fill(120), ...Array.from({length:20}, (_,i) => i%2 ? 105 : 130)];
+        const inputs = prices.map((close,index) => ({time:index+1,high:close,low:close,close}));
+        const full: IndicatorInput[] = [];
+        const stream = new IndicatorStream(spec);
+        let firstTime = -Infinity;
+        for (const input of inputs) {
+            full.push({...input}); stream.add(input); identical(stream, spec, full, firstTime);
+            // 在 ATR 为零的预热边界及可用边界反复离开／返回全零状态。
+            for (const offset of [.75,-1.25,0]) {
+                const close = input.close+offset;
+                full[full.length-1] = {...input,high:close,low:close,close};
+                stream.replace(full.at(-1)!); identical(stream, spec, full, firstTime);
+            }
+            firstTime = full[Math.max(0,full.length-capacity)]!.time;
+            stream.trim(firstTime); identical(stream, spec, full, firstTime);
+            expect(stream.inputCount).toBe(full.length);
+        }
+    });
+}
+
 test('仅覆盖当前末根；当前窗口一根不改变累计输入数量', () => {
     const spec = parseIndicator('ema,3');
     const data = simulatedInputs(20);

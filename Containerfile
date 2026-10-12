@@ -2,6 +2,7 @@ FROM docker.io/oven/bun:1.4.2-slim@sha256:debbe76858f2e398d2937c1eceeb82c571ac1f
 USER root
 WORKDIR /build
 COPY package.json bun.lock ./
+COPY patches/ ./patches/
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun scripts/crypto/entry.ts build

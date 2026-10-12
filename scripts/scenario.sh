@@ -31,6 +31,7 @@ if [[ "$show_help" == 'true' ]]; then
 fi
 export APP_CONFIG_PROFILE=dev
 if [[ "$scenario" == 'legacy' ]]; then
+    bun scripts/indicators/check-dependency.ts
     library_target=$(bun scripts/legacy-config.ts "$config_path")
     bun --bun node_modules/vite/bin/vite.js build --config vite.config.lib.ts
     mkdir -p -- "$library_target"

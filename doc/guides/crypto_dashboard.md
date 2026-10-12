@@ -53,8 +53,8 @@ http://127.0.0.1:5174/?history_bars=500&theme=light&timezone=Asia%2FShanghai
 
 layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按数量推断布局；
 显式布局与周期数量必须一致。技术指标用紧凑写法，多个用分号连接；none 表示无指标。
-支持 sma、ema、dema、tema、rsi、cci、macd、atr、er、bbands；ADX 暂不可计算，
-输入时明确报错。示例为 ema,14;rsi,14;macd,12,26,9;bbands,20,2，完整参数见
+支持 sma、ema、dema、tema、rsi、cci、macd、atr、adx、er、bbands，非法参数明确报错。
+示例为 ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2，完整参数见
 [指标规范](../current_specs/indicators.md)。
 缺省字段从启动配置补全。完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
 

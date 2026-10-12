@@ -1,0 +1,30 @@
+diff --git a/dist/trend/DX/DX.js b/dist/trend/DX/DX.js
+index a8f10c4843a3c688c4beec40cee0c574eba4253a..41d8ffc6d02b44fcbbb51b95cc84ab306c3f499c 100644
+--- a/dist/trend/DX/DX.js
++++ b/dist/trend/DX/DX.js
+@@ -51,8 +51,17 @@ export class DX extends IndicatorSeries {
+         const mdm = noLowerLows || highsRise ? 0 : lowerLow;
+         this.#updateState(candle, pdm, mdm, replace);
+         if (this.#movesUp.isStable) {
+-            this.pdi = this.#movesUp.getResultOrThrow() / this.#atr.getResultOrThrow();
+-            this.mdi = this.#movesDown.getResultOrThrow() / this.#atr.getResultOrThrow();
++            const atr = this.#atr.getResultOrThrow();
++            const movesUp = this.#movesUp.getResultOrThrow();
++            const movesDown = this.#movesDown.getResultOrThrow();
++            // 合法平盘先处理全零边界，避免 0/0 污染 ADX 的后续平滑。
++            if (atr === 0 && movesUp === 0 && movesDown === 0) {
++                this.pdi = 0;
++                this.mdi = 0;
++                return this.setResult(0, replace);
++            }
++            this.pdi = movesUp / atr;
++            this.mdi = movesDown / atr;
+             const dmDiff = Math.abs(this.pdi - this.mdi);
+             const dmSum = this.pdi + this.mdi;
+             if (dmSum === 0) {
+@@ -63,4 +72,3 @@ export class DX extends IndicatorSeries {
+         return null;
+     }
+ }
+-//# sourceMappingURL=DX.js.map
+\ No newline at end of file

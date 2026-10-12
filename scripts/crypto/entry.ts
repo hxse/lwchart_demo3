@@ -1,12 +1,14 @@
 import { resolve } from 'node:path';
-import { loadCryptoConfig } from './config';
+import { checkIndicatorDependency } from '../indicators/check-dependency';
 
 const root = resolve(import.meta.dirname, '../..');
 const action = process.argv[2] || 'dev';
 async function main() {
+    if (action === 'dev' || action === 'build') await checkIndicatorDependency(root);
     if (action === 'build') { await (await import('./build')).buildMarket(root); return; }
     if (action === 'serve') { await (await import('./serve')).serve(process.argv[3] || 'config.toml', resolve(root, 'dist-crypto')); return; }
     if (action !== 'dev') throw new Error('未知运行模式');
+    const { loadCryptoConfig } = await import('./config');
     const config = await loadCryptoConfig(process.argv[3] || 'config.toml');
     const { createServer } = await import('vite');
     const { cryptoApiPlugin } = await import('./middleware');

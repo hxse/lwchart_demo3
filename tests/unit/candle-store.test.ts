@@ -25,8 +25,8 @@ function matches(store: CandleStore, spec: IndicatorSpec, history: OhlcvRow[]) {
     }
 }
 
-test('只覆盖旧末根并追加；十种可计算指标持续裁剪与同起点原生重放严格一致', () => {
-    const specs = ['sma,3','ema,3','dema,3','tema,3','rsi,3','cci,3','macd,2,4,2','atr,3','er,3','bbands,3,2'].map(parseIndicator);
+test('只覆盖旧末根并追加；十一种可计算指标持续裁剪与同起点原生重放严格一致', () => {
+    const specs = ['sma,3','ema,3','dema,3','tema,3','rsi,3','cci,3','macd,2,4,2','atr,3','adx,3','er,3','bbands,3,2'].map(parseIndicator);
     const history = Array.from({ length: 7 }, (_, i) => candle(i));
     const store = new CandleStore(5); store.setIndicators(specs); store.initialize(history);
     for (let next = 7; next < 24; next += 2) {
@@ -106,10 +106,13 @@ test('原子提交：后续一根计算失败时行情和展示都保持；更�
     expect(store.merge([rows[1]!,candle(2)]).kind).toBe('update');
 });
 
-test('不合格 ADX 明确拒绝，其余十种支持且库精确锁定；没有旧算法回退', () => {
+test('十一指标统一准入，ADX 沿用原生链路，依赖版本及唯一补丁精确登记', () => {
     expect(manifest.dependencies['trading-signals']).toBe(tradingSignalsVersion);
-    expect(computableIndicatorTypes()).toEqual(['sma','ema','dema','tema','rsi','cci','macd','atr','er','bbands']);
+    expect(manifest.patchedDependencies).toEqual({'trading-signals@8.3.0':'patches/trading-signals@8.3.0.patch'});
+    expect(computableIndicatorTypes()).toEqual(['sma','ema','dema','tema','rsi','cci','macd','atr','adx','er','bbands']);
     const spec = parseIndicator('adx,14');
-    expect(() => assertComputable(spec)).toThrow('ADX 当前不支持');
-    expect(() => new CandleStore(10).setIndicators([spec])).toThrow('后续平滑不能恢复');
+    expect(() => assertComputable(spec)).not.toThrow();
+    const store = new CandleStore(40); store.setIndicators([spec]);
+    const rows = Array.from({length:32}, (_,i) => candle(i)); store.initialize(rows);
+    matches(store, spec, rows);
 });

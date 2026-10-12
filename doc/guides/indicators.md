@@ -7,21 +7,26 @@
 默认仍是 EMA14／50／100。示例：
 
 ```text
-ema,14;rsi,14;macd,12,26,9;bbands,20,2
+ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2
 ```
 
 ```toml
 [dashboard]
-indicators = ["ema,14", "rsi,14", "macd,12,26,9", "bbands,20,2"]
+indicators = ["ema,14", "rsi,14", "macd,12,26,9", "adx,14", "bbands,20,2"]
 ```
 
 ```text
-http://127.0.0.1:5174/?indicators=ema%2C14%3Brsi%2C14%3Bmacd%2C12%2C26%2C9
+http://127.0.0.1:5174/?indicators=ema%2C14%3Brsi%2C14%3Badx%2C14
 ```
 
-目前可计算 sma、ema、dema、tema、rsi、cci、macd、atr、er、bbands。
-ADX 在平盘后的结果无法恢复，暂不支持 market 计算；输入时拒绝整个提交，
-保留原配置和地址，不会默默删掉该项。
+目前可计算 sma、ema、dema、tema、rsi、cci、macd、atr、adx、er、bbands。
+ADX 写作 `adx,14`，周期至少为 2；使用独立副图与 25 参考线。平盘预热后显示 0，
+出现波动后正常更新。ADX 使用随依赖安装的零波幅补丁，不需要手动修改库。
+非法参数拒绝整个提交，保留原配置和地址，不会默默删掉该项。
+
+开发启动、检查和构建会核对安装库版本与补丁后 DX.js 的完整文件指纹。
+出现“ADX 依赖校验失败”时可先运行 `bun install --frozen-lockfile` 恢复，随后运行
+`just check`；有意调整依赖或补丁时，须重新审核和通过指标测试后手动更新预期指纹。
 
 均线和布林带叠加主图，其余使用独立副图；MACD 两线一柱共用一个副图。
 拖动分隔线调整高度。配置删除会释放实例与独占副图，重新添加从当前窗口
@@ -51,7 +56,7 @@ indicator；同一 chart 的 id 识别文件组，spec 描述参数，output 指
 
 同组的两条线使用 type=line、output=macd／signal 和各自文件列，保持相同 id、
 spec 和 Pane。只展示一个角色也合法；不同 id 可以使用相同参数。
-ADX 等暂不能在 market 计算的指标仍可展示外部已有数值。
+包括 ADX 在内的全部指标注记均可展示外部已有数值。
 不加注记的旧文件配置继续有效。
 
 显式样式、Pane、show／showInLegend 和旧索引覆盖优先。固定柱色可增加

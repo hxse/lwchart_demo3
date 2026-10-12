@@ -109,11 +109,11 @@ test('注记错误在正确位置失败，不猜列名或静默处理', () => {
     expect(()=>legacyGroups([[{...rsi(),referenceFor:'rsi-main'}]],'chart slot 0')).toThrow('referenceFor');
 });
 
-test('完整设置与 URL 往返，暂不支持指标明确拒绝，hash 保持独立', () => {
-    const settings=parseDashboardQuery('?indicators=ema,14;rsi,14;macd,12,26,9;bbands,20,2',runtime);
+test('完整设置与 URL 往返包含 ADX，非法周期拒绝，hash 保持独立', () => {
+    const settings=parseDashboardQuery('?indicators=ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2',runtime);
     expect(parseDashboardQuery(serializeDashboardQuery(settings),runtime)).toEqual(settings);
     expect(new URLSearchParams(serializeDashboardQuery(settings)).size).toBe(14);
-    expect(()=>parseDashboardQuery('?indicators=adx,14',runtime)).toThrow('当前不支持');
+    expect(()=>parseDashboardQuery('?indicators=adx,1',runtime)).toThrow('周期');
 });
 
 test('裁剪保留前一个原始输出，柱色与完整序列裁剪后严格相同；缺口不补零', () => {

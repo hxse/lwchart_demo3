@@ -38,9 +38,10 @@
   const timeDisplay = $derived(createTimeDisplay(timezone));
   const indicatorKey = $derived(indicatorString(options?.indicators || []));
   const indicators = $derived(parseIndicators(indicatorKey));
+  const mainPaneRatio = $derived(options?.main_pane_ratio);
   const items = $derived(streams.map((stream, index) => ({
     id: `slot-${index}`, component: CryptoChartPane,
-    props: { slotId: `slot-${index}`, stream, indicators, theme, timeDisplay, sync },
+    props: { slotId: `slot-${index}`, stream, indicators, theme, timeDisplay, sync, mainPaneRatio },
   })));
   function urlFor(value: DashboardSettings) { return `${location.origin}${location.pathname}?${serializeDashboardQuery(value)}${location.hash}`; }
   function validLength(url: string) {

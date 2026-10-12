@@ -98,8 +98,13 @@ LegendManager 读取继承的 --chart-legend-bg／value／label／border／shado
 构造 formatter。上述显示设置属于新入口，旧 ZIP／Notebook 的边距配置继续有效。
 
 SeriesConfig.name 是稳定键，displayName 是可选显示名称。通用 valueFormatter 决定
-单值图例格式，paneWeight 决定首次创建 Pane 的高度权重；数据／主题变化不重新
-设置手动拖动后的权重。参考线按描述变化更新／移除，无重复对象或孤立系列。
+单值图例格式，paneWeight 描述所在 Pane 的权重，同 Pane 取配置最大权重。
+LWChart／ChartController 的 paneWeightMode 默认 initial，仅首次设置实际 Pane 的
+权重；market 显式使用 preset，已应用的权重预设与 SDK 的手动伸展因子分别保存。
+preset 在权重或实际 Pane 身份／数量变化时统一应用全部配置权重，其他协调保持
+手动高度；同数量参数修改或重排不复位。权重在系列协调、位置恢复完成后按实际
+API 所在 Pane 分组，首帧无 DOM 也能应用；副图释放后不缓存失效布局。
+数据／主题变化不重复设置手动拖动后的权重。参考线按描述变化更新／移除，无重复对象或孤立系列。
 Line 内部缺口两侧按连续段绘制；分段沿用原生折线样式，不参与图例、参考线或缩放，
 主系列继续持有数值、轴和标记。缺口恢复、样式变化及删除时同步清理分段。
 图例可读取缺口 customValues.displayValue，鼠标及同步光标都保留状态文本。

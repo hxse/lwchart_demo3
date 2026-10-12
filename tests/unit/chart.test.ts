@@ -107,6 +107,37 @@ test('Pane 首帧没有 DOM 也完成一次权重初始化，后续主题协调�
     expect(f.chart.panes().map(pane => pane.getStretchFactor())).toEqual([6, .5]);
 });
 
+test('Pane 预设只在权重或结构变化时统一应用，手动高度及同数量参数修改保持', () => {
+    const f = fixture(); const registry = new SeriesRegistry(f.chart);
+    const specs = [{type:'rsi',period:14},{type:'macd',fast:12,slow:26,signal:9}] as const;
+    const configs = chartSeries([...specs],'dark',.7);
+    const dom = spyOn(FakePane.prototype,'getHTMLElement').mockReturnValue(null as any);
+    try { registry.apply(configs,'reconcile',null,'preset'); }
+    finally { dom.mockRestore(); }
+    const weights = () => f.chart.panes().map(pane => pane.getStretchFactor());
+    expect(weights()).toEqual([.7,(1-.7)/2,(1-.7)/2]);
+    const main = registry.seriesMap.get('candles');
+    f.chart.panes().forEach((pane,index) => pane.setStretchFactor([.5,.3,.2][index]!));
+    registry.apply(chartSeries([...specs],'light',.7),'reconcile',null,'preset');
+    expect(weights()).toEqual([.5,.3,.2]);
+    registry.apply(chartSeries([{type:'rsi',period:20},specs[1]],'light',.7),'reconcile',null,'preset');
+    expect(weights()).toEqual([.5,.3,.2]);
+    registry.apply(chartSeries([specs[1],specs[0]],'dark',.7),'reconcile',null,'preset');
+    expect(weights()).toEqual([.5,.3,.2]);
+    registry.apply(chartSeries([...specs],'dark',.6),'reconcile',null,'preset');
+    expect(weights()).toEqual([.6,(1-.6)/2,(1-.6)/2]);
+    f.chart.panes().forEach((pane,index) => pane.setStretchFactor([.5,.3,.2][index]!));
+    registry.apply(chartSeries([...specs,{type:'adx',period:14}],'dark',.6),'reconcile',null,'preset');
+    expect(weights()).toEqual([.6,(1-.6)/3,(1-.6)/3,(1-.6)/3]);
+    registry.apply(chartSeries([specs[0]],'dark',.6),'reconcile',null,'preset');
+    expect(weights()).toEqual([.6,1-.6]);
+    registry.apply(chartSeries([],'dark',.6),'reconcile',null,'preset');
+    expect(weights()).toEqual([1]); expect(registry.seriesMap.get('candles')).toBe(main);
+    registry.apply(configs,'reconcile',null,'preset');
+    expect(weights()).toEqual([.7,(1-.7)/2,(1-.7)/2]);
+    expect(() => registry.apply(configs,'reconcile',null,'wrong' as any)).toThrow('Pane 权重模式');
+});
+
 test('旧静态场景同名多 pane 独立创建和清理，切协调模式不残留孤立系列', () => {
     const f = fixture();
     const registry = new SeriesRegistry(f.chart);

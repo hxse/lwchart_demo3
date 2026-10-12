@@ -11,8 +11,8 @@
   import { chartTheme } from './theme';
   import type { TimeDisplay } from './time';
 
-  let { slotId, stream, indicators, theme, timeDisplay, sync }: {
-    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager;
+  let { slotId, stream, indicators, theme, timeDisplay, sync, mainPaneRatio }: {
+    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager; mainPaneRatio?: number;
   } = $props();
   let api = $state<ChartApi>();
   let status = $state<StreamStatus>(untrack(() => stream.status));
@@ -20,7 +20,7 @@
   let hoverTime = $state<number | undefined>();
   let indicatorStates = $state<Map<string, 'warmup' | 'value' | 'undefined'>>(new Map());
   let unregister: (() => void) | undefined;
-  const series = $derived(chartSeries(indicators, theme));
+  const series = $derived(chartSeries(indicators, theme, mainPaneRatio));
   const labels: Record<string,string> = { '1d': '日线', '1w': '周线' };
   const chartOptions = $derived.by(() => {
     const colors = chartTheme(theme);
@@ -88,7 +88,7 @@
       {/each}
     </span>
   </div>
-  <LWChart {series} seriesMode="reconcile" {chartOptions} onRegister={register}
+  <LWChart {series} seriesMode="reconcile" paneWeightMode="preset" {chartOptions} onRegister={register}
     onCrosshairMove={crosshair} enableLegend={true} showLegendInAll={true} />
   {#if status.message || renderError}
     <div class:error={status.phase === 'error' || !!renderError} class="status" role="status">

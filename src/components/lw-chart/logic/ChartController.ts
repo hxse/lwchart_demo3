@@ -8,7 +8,7 @@ import {
     type DeepPartial,
     type TimeFormatterFn,
 } from "lightweight-charts";
-import type { SeriesConfig, SeriesMode, SeriesDataPatch } from "../../../utils/chartTypes";
+import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
 import { SeriesRegistry } from './SeriesRegistry';
 import { applySeriesData } from './SeriesDataUpdater';
@@ -42,8 +42,8 @@ export class ChartController {
         });
     }
 
-    updateSeries(configs: SeriesConfig[], mode: SeriesMode = 'replace') {
-        this.registry?.apply(configs, mode, this.legendManager);
+    updateSeries(configs: SeriesConfig[], mode: SeriesMode = 'replace', paneWeightMode: PaneWeightMode = 'initial') {
+        this.registry?.apply(configs, mode, this.legendManager, paneWeightMode);
     }
 
     replaceSeriesData(patches: SeriesDataPatch[]) {

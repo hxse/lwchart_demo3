@@ -19,7 +19,7 @@ describe('URL 与菜单的统一配置', () => {
         expect(value.tq.symbol).toBe('SHFE.rb2701');
         expect(value.indicators.map(i => 'period' in i ? i.period : undefined)).toEqual([5, 14]);
         expect(parseDashboardQuery(serializeDashboardQuery(value), runtime)).toEqual(value);
-        expect(new URLSearchParams(serializeDashboardQuery(value)).size).toBe(14);
+        expect(new URLSearchParams(serializeDashboardQuery(value)).size).toBe(15);
         expect(runtime.defaults.ccxt.symbol).toBe('BTC/USDT:USDT');
     });
     test('布局、独立周期、无指标；切来源保留内部与公共参数', () => {

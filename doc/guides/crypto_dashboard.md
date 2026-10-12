@@ -49,6 +49,7 @@ http://127.0.0.1:5174/?ccxt.symbol=ETH%2FUSDT%3AUSDT
 http://127.0.0.1:5174/?source=tq&tq.symbol=KQ.m%40SHFE.rb&history_bars=1500
 http://127.0.0.1:5174/?layout=1x2&timeframes=30m,4h&indicators=none
 http://127.0.0.1:5174/?history_bars=500&theme=light&timezone=Asia%2FShanghai
+http://127.0.0.1:5174/?timeframes=30m&indicators=rsi%2C14%3Bmacd%2C12%2C26%2C9&main_pane_ratio=0.7
 ```
 
 layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按数量推断布局；
@@ -57,6 +58,12 @@ layout 为行×列，支持 1x1、1x2、2x1、1x3、3x1、2x2。仅写周期按�
 示例为 ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2，完整参数见
 [指标规范](../current_specs/indicators.md)。
 缺省字段从启动配置补全。完整规则见 [看盘规范](../current_specs/crypto_dashboard.md)。
+
+公共设置的“主图占比”使用大于 0、小于 1 的小数，默认 0.7。例如 RSI 与 MACD
+两个副图时，主图默认七成，两个副图各约一成半；无副图时主图占满。
+可在 `[dashboard]` 写 `main_pane_ratio = 0.7`，设置与 query 也可覆盖。
+该比例是默认布局：拖动分隔线只临时调整当前窗口，不修改设置或地址，行情和
+主题更新保留手动高度。改变占比、增删副图或刷新后恢复默认分配；多窗口拖动互不影响。
 
 ## 自选与书签
 

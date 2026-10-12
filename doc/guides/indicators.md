@@ -31,6 +31,9 @@ ADX 写作 `adx,14`，周期至少为 2；使用独立副图与 25 参考线。�
 均线和布林带叠加主图，其余使用独立副图；MACD 两线一柱共用一个副图。
 拖动分隔线调整高度。配置删除会释放实例与独占副图，重新添加从当前窗口
 初始化；指标标签是文字，不提供临时隐藏按钮。
+market 公共设置的 main_pane_ratio 控制默认主图占比，默认 0.7；剩余高度按
+副图数量均分，MACD 三个角色只算一个副图。手动高度不进配置或 URL，数据与
+主题更新保留；修改占比或增删副图重新应用默认布局。
 
 预热不足时保留副图但不伪造数值。CCI 平盘可能未定义，图表显示缺口，不补零；
 后续有限结果正常恢复。异常计算会保留旧画面并暂停该图，移除问题指标或刷新。
@@ -101,4 +104,6 @@ UMD 的 TypeScript 脚本可引用 `chart-dashboard.umd.d.ts` 后使用
 `ChartDashboardLib.mountDashboard`。公开类型包含 DashboardProps／DashboardOverride、
 ChartConfigJSON／SeriesItemConfig、IndicatorSpec／IndicatorAnnotation／IndicatorOutput、
 ChartApi／ChartConfig／SeriesConfig／SeriesDataPatch／SeriesMode。
+另导出 PaneWeightMode（initial／preset）；legacy 继续使用默认 initial，
+market 使用 preset 应用可变布局预设，不通过指标名称决定高度。
 ChartApi 是共享组件回调的类型，不是 mountDashboard 的返回值；没有新增运行时挂载入口。

@@ -17,6 +17,7 @@ export const LAYOUTS = {
 } as const;
 export const MAX_HISTORY_BARS = 10000;
 export const UPDATE_BARS = 5;
+export const DEFAULT_MAIN_PANE_RATIO = 0.7;
 export type Timeframe = typeof TIMEFRAMES[number];
 export type Layout = keyof typeof LAYOUTS;
 export type Theme = 'dark' | 'light';
@@ -27,7 +28,7 @@ export interface CcxtDefaults { exchange_name: 'binance' | 'kraken'; market: 'fu
 export interface TqDefaults { symbol: string }
 interface DisplayOptions {
     symbol: string; layout: Layout; timeframes: Timeframe[]; indicators: IndicatorSpec[];
-    refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition;
+    refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition; main_pane_ratio: number;
 }
 export interface CcxtOptions extends DisplayOptions, CcxtDefaults { source: 'ccxt' }
 export interface TqOptions extends DisplayOptions { source: 'tq' }
@@ -35,7 +36,7 @@ export type DashboardOptions = CcxtOptions | TqOptions;
 export interface SourceDefaults { ccxt: CcxtDefaults; tq: TqDefaults }
 export interface DashboardSettings extends Omit<DisplayOptions, 'symbol'>, SourceDefaults { source: Source }
 export interface RuntimeOptions { defaults: DashboardSettings }
-export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position'] as const;
+export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position','main_pane_ratio'] as const;
 export const CCXT_KEYS = ['exchange_name','market','is_live'] as const;
 export const DASHBOARD_KEYS = COMMON_KEYS.filter(key => key !== 'symbol');
 export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS] : [...COMMON_KEYS]; }
@@ -56,6 +57,16 @@ export function integer(value: unknown, min: number, max: number, label: string)
 export function parseInteger(value: string, min: number, max: number, label: string) {
     if (!/^[1-9]\d*$/.test(value)) throw new Error(`${label} 必须是正整数`);
     return integer(Number(value), min, max, label);
+}
+export function validateMainPaneRatio(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) {
+        throw new Error('主图占比必须是大于 0 且小于 1 的有限小数');
+    }
+    return value;
+}
+export function parseMainPaneRatio(value: string): number {
+    if (!/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)) throw new Error('主图占比必须使用十进制数字');
+    return validateMainPaneRatio(Number(value));
 }
 export function text(value: unknown, label: string): string {
     if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} 不能为空`);
@@ -101,7 +112,8 @@ export function normalizeOptions(input: unknown): DashboardOptions {
         || value.timeframes.some(t => !TIMEFRAMES.includes(t))) throw new Error('周期列表必须匹配布局，且周期受支持');
     const display: DisplayOptions = { symbol: symbol(value.symbol), layout, timeframes: [...value.timeframes], indicators: parseIndicators(value.indicators),
         refresh_seconds: integer(value.refresh_seconds, 1, 3600, '更新间隔'),
-        history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone), dock_position: dock as DockPosition };
+        history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone), dock_position: dock as DockPosition,
+        main_pane_ratio: validateMainPaneRatio(value.main_pane_ratio === undefined ? DEFAULT_MAIN_PANE_RATIO : value.main_pane_ratio) };
     if (value.source === 'tq') return { ...display, source: 'tq' };
     const identity = normalizeCcxt(Object.fromEntries([...CCXT_KEYS, 'symbol'].map(key => [key, value[key]])));
     return { ...display, ...identity, source: 'ccxt' };

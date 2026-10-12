@@ -11,6 +11,7 @@ export interface SeriesDataPatch {
 }
 
 export type SeriesMode = 'replace' | 'reconcile';
+export type PaneWeightMode = 'initial' | 'preset';
 
 export interface ChartApi {
     setCrosshair: (param: any) => void;

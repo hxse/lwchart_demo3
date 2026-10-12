@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import type { ChartOptions, DeepPartial } from 'lightweight-charts';
-  import type { SeriesConfig, SeriesMode, SeriesDataPatch, ChartApi } from "../../utils/chartTypes";
+  import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch, ChartApi } from "../../utils/chartTypes";
   import { ChartController } from "./logic/ChartController";
 
   // Props
   interface Props {
     series: SeriesConfig[]; // Configuration for all series in this chart
     seriesMode?: SeriesMode;
+    paneWeightMode?: PaneWeightMode;
     template?: string; // Optional identifier for template logic if needed
     fitContent?: boolean; // New prop: Auto-fit content
     fitContentOnDblClick?: boolean; // New prop: Auto-fit on double click
@@ -22,6 +23,7 @@
   let {
     series,
     seriesMode = 'replace',
+    paneWeightMode = 'initial',
     fitContent = false,
     fitContentOnDblClick = false,
     chartOptions = {},
@@ -37,6 +39,7 @@
   const controller = new ChartController();
   let appliedSeries: SeriesConfig[] | undefined;
   let appliedMode: SeriesMode | undefined;
+  let appliedPaneWeightMode: PaneWeightMode | undefined;
 
   export const replaceSeriesData = (patches: SeriesDataPatch[]) => controller.replaceSeriesData(patches);
   export const updateSeriesData = (patches: SeriesDataPatch[]) => controller.updateSeriesData(patches);
@@ -81,9 +84,10 @@
     }
 
     // 注册前先准备系列，使调用方可以立即设置初始数据。
-    controller.updateSeries(untrack(() => series), untrack(() => seriesMode));
+    controller.updateSeries(untrack(() => series), untrack(() => seriesMode), untrack(() => paneWeightMode));
     appliedSeries = untrack(() => series);
     appliedMode = untrack(() => seriesMode);
+    appliedPaneWeightMode = untrack(() => paneWeightMode);
 
     // Register API if requested
     if (onRegister) {
@@ -182,10 +186,11 @@
   $effect(() => {
     const currentSeriesConfig = series;
     const currentMode = seriesMode;
+    const currentPaneWeightMode = paneWeightMode;
 
     untrack(() => {
       if (!chartContainer || !controller.isInitialized()) return;
-      if (currentSeriesConfig === appliedSeries && currentMode === appliedMode) return;
+      if (currentSeriesConfig === appliedSeries && currentMode === appliedMode && currentPaneWeightMode === appliedPaneWeightMode) return;
 
       const rect = chartContainer.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
@@ -194,9 +199,10 @@
         controller.resize(rect.width, rect.height);
       }
 
-      controller.updateSeries(currentSeriesConfig, currentMode);
+      controller.updateSeries(currentSeriesConfig, currentMode, currentPaneWeightMode);
       appliedSeries = currentSeriesConfig;
       appliedMode = currentMode;
+      appliedPaneWeightMode = currentPaneWeightMode;
 
       if (fitContent) {
         controller.fitContent();

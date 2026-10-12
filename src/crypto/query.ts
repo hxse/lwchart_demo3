@@ -1,5 +1,5 @@
 import {
-    normalizeSettings, DASHBOARD_KEYS, CCXT_KEYS, LAYOUTS, layoutSlots, parseInteger,
+    normalizeSettings, DASHBOARD_KEYS, CCXT_KEYS, LAYOUTS, layoutSlots, parseInteger, parseMainPaneRatio,
     indicatorString, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions,
 } from './options';
 
@@ -24,6 +24,7 @@ export function parseDashboardQuery(search: string, runtime: RuntimeOptions): Da
         else if (key === 'timeframes') Object.assign(value, { timeframes: raw.split(',') });
         else if (key === 'refresh_seconds') value.refresh_seconds = parseInteger(raw, 1, 3600, '更新间隔');
         else if (key === 'history_bars') value.history_bars = parseInteger(raw, 1, MAX_HISTORY_BARS, '历史 K 线数量');
+        else if (key === 'main_pane_ratio') value.main_pane_ratio = parseMainPaneRatio(raw);
         else Object.assign(value, { [key]: raw });
     }
     if (params.has('layout') && !params.has('timeframes')) {
@@ -42,6 +43,7 @@ export function serializeDashboardQuery(settings: DashboardSettings): string {
         'tq.symbol': o.tq.symbol,
         layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
         refresh_seconds: String(o.refresh_seconds), history_bars: String(o.history_bars), theme: o.theme, timezone: o.timezone, dock_position: o.dock_position,
+        main_pane_ratio: String(o.main_pane_ratio),
     }).toString();
 }
 export function changeLayout(options: DashboardSettings, layout: Layout, defaults: DashboardSettings): DashboardSettings {

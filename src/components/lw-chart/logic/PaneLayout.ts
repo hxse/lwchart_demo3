@@ -1,5 +1,36 @@
-import type { IChartApi, IPaneApi, Time } from 'lightweight-charts';
-import type { SeriesConfig } from '../../../utils/chartTypes';
+import type { IChartApi, IPaneApi, ISeriesApi, Time } from 'lightweight-charts';
+import type { SeriesConfig, PaneWeightMode } from '../../../utils/chartTypes';
+
+/** 记录已应用的配置预设，与 SDK 中临时拖动后的权重分开。 */
+export class PaneWeights {
+    private initialized = new WeakSet<IPaneApi<Time>>();
+    private preset: Array<{ pane: IPaneApi<Time>; weight: number }> | undefined;
+
+    apply(bindings: Array<{ config: SeriesConfig; api: ISeriesApi<any> }>, mode: PaneWeightMode) {
+        const requested = new Set<IPaneApi<Time>>();
+        const weights = new Map<IPaneApi<Time>,number>();
+        for (const { config,api } of bindings) {
+            const pane = api.getPane();
+            if (config.paneWeight !== undefined) requested.add(pane);
+            weights.set(pane,Math.max(weights.get(pane) ?? -Infinity,config.paneWeight ?? 1));
+        }
+        const next = [...weights].filter(([pane]) => requested.has(pane)).sort(([a],[b]) => a.paneIndex()-b.paneIndex())
+            .map(([pane,weight]) => ({ pane,weight }));
+        if (mode === 'preset') {
+            const unchanged = this.preset?.length === next.length && next.every((item,index) =>
+                item.pane === this.preset![index]!.pane && Object.is(item.weight,this.preset![index]!.weight));
+            if (unchanged) return;
+            for (const { pane,weight } of next) { pane.setStretchFactor(weight); this.initialized.add(pane); }
+            this.preset = next;
+        } else {
+            this.preset = undefined;
+            for (const { pane,weight } of next) if (!this.initialized.has(pane)) {
+                pane.setStretchFactor(weight); this.initialized.add(pane);
+            }
+        }
+    }
+    clear() { this.preset = undefined; }
+}
 
 /** 协调期间保留空 Pane，避免删除／移动一个系列令后续目标编号前移。 */
 export function preservePanePositions(chart: IChartApi, configs: SeriesConfig[]): () => void {

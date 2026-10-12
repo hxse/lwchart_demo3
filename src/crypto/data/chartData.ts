@@ -1,6 +1,6 @@
 import type { UTCTimestamp } from 'lightweight-charts';
 import type { SeriesConfig, SeriesDataPatch } from '../../utils/chartTypes';
-import type { IndicatorSpec, Theme } from '../options';
+import { DEFAULT_MAIN_PANE_RATIO, validateMainPaneRatio, type IndicatorSpec, type Theme } from '../options';
 import { indicatorSeries, indicatorPriceFormat, indicatorStateLabels, includeReferenceRange } from '../../indicators/presentation';
 import { indicatorDefinition } from '../../indicators/definitions';
 import { marketSeriesKey, indicatorKey } from '../../indicators/parameters';
@@ -9,13 +9,18 @@ import type { IndicatorResults } from '../../indicators/types';
 import type { DataChange } from './CandleStore';
 
 const priceFormat = indicatorPriceFormat('price');
-export function chartSeries(indicators: IndicatorSpec[], theme: Theme = 'dark'): SeriesConfig[] {
+export function chartSeries(indicators: IndicatorSpec[], theme: Theme = 'dark', mainPaneRatio = DEFAULT_MAIN_PANE_RATIO): SeriesConfig[] {
+    const ratio = validateMainPaneRatio(mainPaneRatio);
     let nextPane = 1;
-    const series: SeriesConfig[] = [{ name: 'candles', type: 'Candlestick', pane: 0, paneWeight: 5, data: [], showInLegend: true,
+    const series: SeriesConfig[] = [{ name: 'candles', type: 'Candlestick', pane: 0, data: [], showInLegend: true,
         options: { upColor: '#16a085', downColor: '#e7505a', wickUpColor: '#16a085', wickDownColor: '#e7505a', borderVisible: false, priceFormat } },
         ...indicators.flatMap((indicator, index) => indicatorSeries(indicator, index, theme,
             indicatorDefinition(indicator.type).display.placement === 'main' ? 0 : nextPane++))];
-    series.forEach(includeReferenceRange);
+    const subPanes = nextPane - 1;
+    series.forEach(item => {
+        item.paneWeight = subPanes ? (item.pane === 0 ? ratio : (1-ratio)/subPanes) : 1;
+        includeReferenceRange(item);
+    });
     return series;
 }
 export function chartPatches(change: DataChange, indicators: IndicatorSpec[], theme: Theme = 'dark',

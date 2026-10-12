@@ -21,7 +21,7 @@ async function sameCharts(page: Page) {
 test('TQ 默认螺纹主连四周期、最新数量与图例；来源和品种只在应用后修改', async ({ page, request }) => {
     await page.goto('/?source=tq&refresh_seconds=1');
     await expect(page.locator('.crypto-chart[data-phase="ready"]')).toHaveCount(4);
-    expect(new URL(page.url()).searchParams.size).toBe(14);
+    expect(new URL(page.url()).searchParams.size).toBe(15);
     expect(new URL(page.url()).searchParams.get('tq.symbol')).toBe('KQ.m@SHFE.rb');
     await expect(page.locator('.crypto-chart .caption strong').first()).toHaveText('KQ.m@SHFE.rb');
     const before = await (await request.get(fixture)).json();
@@ -54,7 +54,7 @@ test('TQ 默认螺纹主连四周期、最新数量与图例；来源和品种�
     await expect(page.locator('.crypto-chart').first()).toHaveAttribute('data-source', 'tq');
     await page.getByRole('button', { name: '应用', exact: true }).click();
     await expect(page.locator('.crypto-chart[data-source="ccxt"][data-phase="ready"]')).toHaveCount(4);
-    expect(new URL(page.url()).searchParams.size).toBe(14); expect(await sameCharts(page)).toBe(true);
+    expect(new URL(page.url()).searchParams.size).toBe(15); expect(await sameCharts(page)).toBe(true);
 });
 
 test('图例和光标时间按本地／UTC 显示，UTC 时间与视口保持，非法时区不提交', async ({ page, request }) => {

@@ -1,14 +1,14 @@
 import {
     CandlestickSeries, LineSeries, BarSeries, HistogramSeries, AreaSeries, BaselineSeries,
-    createSeriesMarkers, type IChartApi, type ISeriesApi, type IPriceLine, type IPaneApi, type Time,
+    createSeriesMarkers, type IChartApi, type ISeriesApi, type IPriceLine,
 } from 'lightweight-charts';
-import type { SeriesConfig, SeriesMode } from '../../../utils/chartTypes';
+import type { SeriesConfig, SeriesMode, PaneWeightMode } from '../../../utils/chartTypes';
 import { SlTpLineSeries } from '../plugins/SlTpLineSeries';
 import { PositionArrowSeries } from '../plugins/PositionArrowSeries';
 import type { LegendManager } from './LegendManager';
 import { clearTimeline, commitTimeline, nextTimeline } from './SeriesTimeline';
 import { clearLineSegments, syncLineSegments } from './LineSegments';
-import { preservePanePositions } from './PaneLayout';
+import { preservePanePositions, PaneWeights } from './PaneLayout';
 
 interface RegisteredSeries { api: ISeriesApi<any>; type: SeriesConfig['type']; lines: IPriceLine[]; referenceSignature?: string }
 
@@ -17,11 +17,12 @@ export class SeriesRegistry {
     readonly seriesMap = new Map<string, ISeriesApi<any>>();
     private records = new Map<string, RegisteredSeries>();
     private owned = new Set<ISeriesApi<any>>();
-    private weightedPanes = new WeakSet<IPaneApi<Time>>();
+    private weights = new PaneWeights();
 
     constructor(private chart: IChartApi) {}
 
-    apply(configs: SeriesConfig[], mode: SeriesMode, legend: LegendManager | null) {
+    apply(configs: SeriesConfig[], mode: SeriesMode, legend: LegendManager | null, paneWeightMode: PaneWeightMode = 'initial') {
+        if (!['initial','preset'].includes(paneWeightMode)) throw new Error('Pane 权重模式必须是 initial 或 preset');
         if (configs.some(config => !Number.isInteger(config.pane) || config.pane < 0)) throw new Error('Pane 编号必须是非负整数');
         if (mode === 'reconcile') {
             const names = configs.map(c => c.name);
@@ -30,8 +31,10 @@ export class SeriesRegistry {
             }
         }
         const restorePanes = mode === 'reconcile' ? preservePanePositions(this.chart, configs) : () => {};
-        try { this.reconcile(configs, mode, legend); }
+        let bindings: Array<{ config: SeriesConfig; api: ISeriesApi<any> }>;
+        try { bindings = this.reconcile(configs, mode, legend); }
         finally { restorePanes(); }
+        this.weights.apply(bindings, paneWeightMode);
     }
 
     private reconcile(configs: SeriesConfig[], mode: SeriesMode, legend: LegendManager | null) {
@@ -48,7 +51,7 @@ export class SeriesRegistry {
         } else this.clear();
 
         legend?.clearSeries();
-        configs.forEach((config, index) => {
+        return configs.map((config, index) => {
             const name = config.name || `series_${index}`;
             // 静态场景允许同名系列，各配置独立创建；实时协调才按名称复用。
             let record = mode === 'reconcile' ? this.records.get(name) : undefined;
@@ -80,14 +83,6 @@ export class SeriesRegistry {
                 record.lines = (config.priceLines ?? []).map(line => record!.api.createPriceLine(line));
                 record.referenceSignature = signature;
             }
-            if (config.paneWeight !== undefined) {
-                const pane = record.api.getPane();
-                // Pane 在首帧 DOM 创建前已经存在，权重初始化不依赖绘制时机。
-                if (!this.weightedPanes.has(pane)) {
-                    pane.setStretchFactor(Math.max(...configs.filter(c => c.pane === config.pane).map(c => c.paneWeight ?? 1)));
-                    this.weightedPanes.add(pane);
-                }
-            }
             if (config.options?.scaleMargins) {
                 try {
                     record.api.priceScale().applyOptions({ scaleMargins: config.options.scaleMargins });
@@ -99,6 +94,7 @@ export class SeriesRegistry {
                 showInLegend: true,
                 formatter: config.valueFormatter ?? config.options?.priceFormat?.formatter ?? (value => record!.api.priceFormatter().format(value)),
             });
+            return { config,api: record.api };
         });
     }
 
@@ -124,6 +120,7 @@ export class SeriesRegistry {
     }
 
     clear() {
+        this.weights.clear();
         for (const api of this.owned) this.release(api);
         this.owned.clear();
         this.records.clear();

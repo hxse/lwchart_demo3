@@ -6,7 +6,7 @@ export async function validateDeclarations(root: string, directory: string, targ
     const umd = join(directory, 'declaration-umd.ts');
     await Bun.write(esm, `
 import Dashboard, { mountDashboard } from ${JSON.stringify(join(target, 'chart-dashboard.es.js'))};
-import type { DashboardProps, ChartConfigJSON, SeriesItemConfig, IndicatorAnnotation, SeriesConfig, SeriesDataPatch, ChartApi } from ${JSON.stringify(join(target, 'chart-dashboard.es.js'))};
+import type { DashboardProps, ChartConfigJSON, SeriesItemConfig, IndicatorAnnotation, SeriesConfig, SeriesDataPatch, ChartApi, PaneWeightMode } from ${JSON.stringify(join(target, 'chart-dashboard.es.js'))};
 import type { Component } from 'svelte';
 import type { UTCTimestamp } from 'lightweight-charts';
 const props: DashboardProps = { zipData: new Blob(), config: { show: ['0,0,0,1'] } };
@@ -19,9 +19,12 @@ const config: ChartConfigJSON = { template: 'single', showBottomRow: false, view
 const line: SeriesConfig = { type: 'Line', data: [], pane: 1, name: 'line', displayName: 'RSI14', valueFormatter: String, paneWeight: 1 };
 const patch: SeriesDataPatch = { name: 'line', data: [{ time: 1718000000 as UTCTimestamp, value: 0, color: '#888888' }, { time: 1718000060 as UTCTimestamp, customValues: { displayValue: '未定义' } }] };
 declare const api: ChartApi;
+const weightMode: PaneWeightMode = 'preset';
 api.updateSeriesData([patch]); api.replaceSeriesData([patch]);
 // @ts-expect-error 非法角色必须被产物中的类型拒绝
 annotation.output = 'unknown';
+// @ts-expect-error 仅允许两种明确的权重模式
+const invalidMode: PaneWeightMode = 'unknown';
 // @ts-expect-error displayName 是文本
 line.displayName = false;
 // @ts-expect-error 引用组身份是文本
@@ -32,7 +35,7 @@ annotation.spec = { type: 'ema' };
 patch.data = [{ time: 1718000000 as UTCTimestamp, value: 'invalid' }];
 // @ts-expect-error 挂载入口采用真实 props 类型
 mountDashboard(document.createElement('div'), { unknown: true });
-void [component, config];
+void [component, config, weightMode, invalidMode];
 `);
     const reference = join(target, 'chart-dashboard.umd.d.ts').replaceAll('&', '&amp;').replaceAll('"', '&quot;');
     await Bun.write(umd, `/// <reference path="${reference}" />

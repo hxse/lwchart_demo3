@@ -82,6 +82,9 @@ config.toml 与其备份忽略跟踪，完整公共模板为
 用户已有 config.toml 不被运行或测试命令自动覆盖。
 通用默认值位于 dashboard，两个来源的默认身份位于 ccxt／tq；旧来源字段和
 incremental_bars／max_catchup_pages 必须迁移，启动不保留旧配置兼容。
+公共 main_pane_ratio 缺省为 0.7，TOML 必须使用严格在零和一之间的有限数值；
+local／remote 覆盖共用加载与校验。浏览器设置和 query 只改变页面默认布局，
+不回写文件或保存手动拖动高度；写法见 [看盘说明](../guides/crypto_dashboard.md)。
 
 ## 离线验证
 

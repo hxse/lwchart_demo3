@@ -3,7 +3,7 @@
   import { indicatorDefinition } from '../indicators/definitions';
   import { onMount, untrack } from 'svelte';
   import { changeLayout, serializeDashboardQuery } from './query';
-  import { normalizeSettings, indicatorString, TIMEFRAMES, LAYOUTS, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions, type DockPosition } from './options';
+  import { normalizeSettings, validateMainPaneRatio, indicatorString, TIMEFRAMES, LAYOUTS, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions, type DockPosition } from './options';
   import { anchorPopup } from './popup';
   let { current, runtime, anchor, position, version, onApply, onCancel }: {
     current: DashboardSettings; runtime: RuntimeOptions; anchor?: HTMLElement; position: DockPosition; version: number;
@@ -28,7 +28,7 @@
   });
   function apply(event: SubmitEvent) {
     event.preventDefault();
-    try { onApply(normalizeSettings({ ...draft, indicators })); }
+    try { onApply(normalizeSettings({ ...draft, indicators, main_pane_ratio: validateMainPaneRatio(draft.main_pane_ratio) })); }
     catch (e) { error = (e as Error).message; }
   }
 </script>
@@ -64,6 +64,8 @@
       </select></label>
       <label>主题<select name="theme" bind:value={draft.theme}><option value="dark">深色</option><option value="light">浅色</option></select></label>
     </div>
+    <label>主图占比<input name="main_pane_ratio" type="number" min="0" max="1" step="any" bind:value={draft.main_pane_ratio} /></label>
+    <div class="hint">大于 0、小于 1；例如 0.7 表示主图七成，剩余由副图均分。拖动仅临时调整。</div>
     <label>按钮栏位置<select name="dock_position" bind:value={draft.dock_position}>
       <option value="top">上方</option><option value="bottom">下方</option><option value="left">左侧</option><option value="right">右侧</option>
     </select></label>

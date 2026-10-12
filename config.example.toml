@@ -23,6 +23,8 @@ port = 5174
 source = "ccxt"
 # 按钮栏实际占位；right／left 为竖栏，top／bottom 为横栏。
 dock_position = "right"
+# 主图默认占比，严格在 0 和 1 之间；其余绘图高度由副图均分，拖动仅临时调整。
+main_pane_ratio = 0.7
 # local 跟随浏览器时区；也可用 UTC 或 Asia/Shanghai 等 IANA 时区。
 timezone = "local"
 # 主题：dark 深色、light 浅色；URL 与设置可以覆盖。

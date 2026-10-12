@@ -112,7 +112,7 @@ test('注记错误在正确位置失败，不猜列名或静默处理', () => {
 test('完整设置与 URL 往返包含 ADX，非法周期拒绝，hash 保持独立', () => {
     const settings=parseDashboardQuery('?indicators=ema,14;rsi,14;macd,12,26,9;adx,14;bbands,20,2',runtime);
     expect(parseDashboardQuery(serializeDashboardQuery(settings),runtime)).toEqual(settings);
-    expect(new URLSearchParams(serializeDashboardQuery(settings)).size).toBe(14);
+    expect(new URLSearchParams(serializeDashboardQuery(settings)).size).toBe(15);
     expect(()=>parseDashboardQuery('?indicators=adx,1',runtime)).toThrow('周期');
 });
 

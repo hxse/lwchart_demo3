@@ -73,6 +73,53 @@ SDK 滚动请求在下一帧应用；同帧连续批次继承待绘制偏移，S
 
 ## 图表外观更新
 
+### 分组价格线
+
+ChartApi 与 LWChart 导出 `setPriceLineGroup(group: PriceLineGroup)` 和
+`clearPriceLineGroup(series: string, id: string)`。共享图表内部通过 SeriesRegistry／
+SeriesPriceLines 统一管理配置参考线和动态分组；业务只传价格及样式，不接触 SDK
+对象、创建／删除或缩放处理。动态线不进入时间数据、图例或历史计算。
+
+```ts
+chartApi.setPriceLineGroup({
+  series: 'candles', id: 'order-preview', autoscale: true, labelPosition: 'left',
+  lines: [
+    { id: 'entry', price: 10000, color: '#60a5fa', title: '多入' },
+    { id: 'stop', price: 9800, color: '#f87171', title: '多损' },
+    { id: 'take-profit', price: 10200, color: '#34d399', title: '多盈' },
+  ],
+});
+chartApi.clearPriceLineGroup('candles', 'order-preview');
+```
+
+每次 set 整体替换指定系列的指定组；同组同线 ID 复用 IPriceLine，只对变化调用
+applyOptions。空 lines 清除该组，不影响其他组或 SeriesConfig.priceLines。
+组及线 ID 必须非空，组内不能重复；价格必须为有限 number，颜色／标题为字符串。
+lineStyle 默认为虚线 2，可取 0..4；lineWidth 默认 1，可取 1..4；axisLabelVisible
+默认 true，必须为布尔值。整组先校验，失败不产生局部绘图修改；未知系列明确报错。
+
+labelPosition 为 axis／left，默认 axis 保留 SDK 原生标题及价格轴标签；非法值含 null
+整组拒绝。left 将标题与本系列 priceFormatter 格式化的价格放在绘图区左侧，关闭该组
+原生标题和轴标签，不移动系列或开启左轴。axisLabelVisible=false 在两种位置均隐藏标签。
+左标签字体不大于 11px，为顶部图例及底部图表标识留白；邻近标签只在显示上错开，
+并用短引线指回真实价位，价格线不移动。
+每个系列至多一个 PriceLineLabels primitive，统一绘制全部左标签，视图与线对象复用。
+使用 [官方 series primitive](https://tradingview.github.io/lightweight-charts/docs/plugins/series-primitives)
+按图表重绘取坐标及主题背景，无额外系列、DOM、事件订阅或 timer；最后一枚左标签
+移除、切回 axis 或系列销毁时释放 primitive，静态参考线及其他组不受影响。
+
+autoscale 默认 false；true 时将该组价格并入系列已有自动范围计算，保留其 margins。
+变化及清除重新计算并集，最后一组移除后恢复原范围语义。不 fitContent／reset，
+不修改时间缩放或解锁手动纵轴。SDK 忽略 undefined，默认范围通过透传计算恢复。
+配置协调保留动态组；系列删除、类型替换、静态重建及图表销毁释放全部所属线。
+配置参考线原有行为保持，动态组不隐式恢复到重建后的系列。
+
+离线测试覆盖分组隔离、原位更新、重复更新无 SDK 写入、非法输入原子拒绝、
+清理及声明消费；真实浏览器检查自动／手动价格轴、时间视口与实际画布价格线，
+并在 1／2 倍像素密度验证左侧位置、相近价格避让、更新及切回原生后的清理。
+
+### 主题与其它选项
+
 LWChart 导出方法与 onRegister API 提供 `applyOptions(options: DeepPartial<ChartOptions>)`，
 直接转发既有 ChartController／Lightweight Charts 的选项更新，不重建图表或系列。
 初始化 chartOptions props 保持原职责；动态切换颜色显式调用 applyOptions。

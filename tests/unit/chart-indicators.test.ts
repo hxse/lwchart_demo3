@@ -10,7 +10,7 @@ import { selectWatch } from '../../src/crypto/watchlist';
 import { loadCryptoConfig } from '../../scripts/crypto/config';
 import { runtime } from '../fixtures/data';
 
-test('窗口覆盖的继承、独立、none、编码和编号顺序往返，基础 query 仍为十五项', () => {
+test('窗口覆盖的继承、独立、none、编码和编号顺序往返，基础 query 为十八项', () => {
     expect(parseDashboardQuery('',runtime).chart_indicators).toEqual({});
     expect(normalizeRuntime({defaults:{...runtime.defaults,chart_indicators:undefined}}).defaults.chart_indicators).toEqual({});
     const settings = parseDashboardQuery('?timeframes=30m,4h,1d,1w&indicators=ema,14;ema,50&chart.4.indicators=none&chart.1.indicators=ema,14;rsi,14&chart.2.indicators=macd,12,26,9',runtime);
@@ -18,7 +18,7 @@ test('窗口覆盖的继承、独立、none、编码和编号顺序往返，基�
     expect(chartIndicators(activeOptions(settings),2)).toEqual(settings.indicators);
     expect(chartIndicators(activeOptions(settings),3)).toEqual([]);
     const query = serializeDashboardQuery(settings); const params = new URLSearchParams(query);
-    expect(params.size).toBe(18);
+    expect(params.size).toBe(21);
     expect([...params.keys()].slice(-3)).toEqual(['chart.1.indicators','chart.2.indicators','chart.4.indicators']);
     expect(query).toContain('chart.1.indicators=ema%2C14%3Brsi%2C14');
     expect(parseDashboardQuery(query,runtime)).toEqual(settings);

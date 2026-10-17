@@ -63,7 +63,7 @@ test('并集同值或重排不重算，新增只播种新增配置，共有项�
 });
 
 test('四窗口各十二项的四十八项并集严格覆盖、追加、裁剪对齐，用户上限仍是十二', async () => {
-    expect(MAX_COMPUTED_INDICATORS).toBe(48);
+    expect(MAX_COMPUTED_INDICATORS).toBe(49);
     const chart_indicators=Object.fromEntries(['sma','ema','dema','tema'].map((type,index) =>
         [String(index+1),Array.from({length:12},(_,i) => `${type},${i+1}`)]));
     const options=shared({history_bars:40,chart_indicators});
@@ -83,8 +83,8 @@ test('四窗口各十二项的四十八项并集严格覆盖、追加、裁剪�
                 });
             }
         }
-        const tooMany=Array.from({length:49},(_,i) => parseIndicator(`ema,${i+1}`));
-        expect(() => new CandleStore(5).setIndicators(tooMany)).toThrow('至多 48');
+        const tooMany=Array.from({length:50},(_,i) => parseIndicator(`ema,${i+1}`));
+        expect(() => new CandleStore(5).setIndicators(tooMany)).toThrow('至多 49');
         expect(() => parseIndicatorList(tooMany.slice(0,13))).toThrow('至多 12');
     } finally { hub.dispose(); }
 });

@@ -36,7 +36,7 @@ chart-dashboard.umd.d.ts 及 types/，复制包含全部声明；失败时不复
 声明范围及消费示例见 [技术指标使用](../guides/indicators.md)。
 
 market dev 以 `src/crypto` 为 Vite 根，端口来自 TOML，默认 5174。
-该入口同时支持 CCXT／TQ 只读看盘，命令名为 market。
+该入口支持 CCXT／TQ 看盘及 CCXT 手动市价下单，命令名为 market；交易边界见 [manual_orders.md](manual_orders.md)。
 market build 共用构建脚本生成 dist-crypto 与 dist-market 独立服务包，不读运行凭据、不登录、不请求行情。
 market serve 只运行已有 dist-crypto，缺少 index.html 明确失败，不隐式构建。
 开发中间件与 Bun 生产服务共用同一配置、鉴权与 API 实现；生产静态根仅 dist-crypto。
@@ -93,6 +93,7 @@ chart_indicators 文件字段；服务公开默认值提供空映射，各窗口
 
 `just test` 顺序执行 Bun 逻辑／服务回归和 Playwright 浏览器测试。
 所有数据为本地 fixture；不登录真实后端，不请求外网，不隐式安装浏览器。
+交易执行同样只访问本地 mock，覆盖真实 JSON 路由、同源、回执及不自动重试的语义。
 指标使用 trading-signals 的原生类完整重放，与应用增量结果严格对齐；
 indicator-golden.json 保留固定期望，来源与读取口径见 [indicators.md](indicators.md)。
 旧 EMA 专用参考 fixture 与 Python 生成器已退出，不提供再生入口。

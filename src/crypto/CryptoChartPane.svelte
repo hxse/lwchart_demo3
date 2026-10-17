@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import LWChart from '../components/lw-chart/LWChart.svelte';
-  import type { ChartApi } from '../utils/chartTypes';
+  import type { ChartApi, PriceLineGroup } from '../utils/chartTypes';
   import { ChartSyncManager } from '../components/lw-chart/logic/ChartSyncManager';
   import { chartSeries, chartPatches } from './data/chartData';
   import type { MarketStream, StreamStatus } from './data/MarketStream';
@@ -11,8 +11,8 @@
   import { chartTheme } from './theme';
   import type { TimeDisplay } from './time';
 
-  let { slotId, stream, indicators: configuredIndicators, theme, timeDisplay, sync, mainPaneRatio }: {
-    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager; mainPaneRatio?: number;
+  let { slotId, stream, indicators: configuredIndicators, theme, timeDisplay, sync, mainPaneRatio, priceLines = null }: {
+    slotId: string; stream: MarketStream; indicators: IndicatorSpec[]; theme: Theme; timeDisplay: TimeDisplay; sync: ChartSyncManager; mainPaneRatio?: number; priceLines?: PriceLineGroup | null;
   } = $props();
   let api = $state<ChartApi>();
   let status = $state<StreamStatus>(untrack(() => stream.status));
@@ -20,6 +20,16 @@
   let hoverTime = $state<number | undefined>();
   let indicatorStates = $state<Map<string, 'warmup' | 'value' | 'undefined'>>(new Map());
   let unregister: (() => void) | undefined;
+  let renderedGroup: PriceLineGroup | null = null;
+  $effect(() => {
+    const chart = api, next = priceLines;
+    if (!chart) return;
+    if (renderedGroup && (!next || next.id !== renderedGroup.id || next.series !== renderedGroup.series)) {
+      chart.clearPriceLineGroup(renderedGroup.series, renderedGroup.id);
+    }
+    if (next) chart.setPriceLineGroup(next);
+    renderedGroup = next;
+  });
   const configuration = $derived(indicatorString(configuredIndicators));
   const indicators = $derived(parseIndicators(configuration));
   const series = $derived(chartSeries(indicators, theme, mainPaneRatio));

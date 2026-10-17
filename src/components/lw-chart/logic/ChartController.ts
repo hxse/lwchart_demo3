@@ -8,7 +8,7 @@ import {
     type DeepPartial,
     type TimeFormatterFn,
 } from "lightweight-charts";
-import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch } from "../../../utils/chartTypes";
+import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch, PriceLineGroup } from "../../../utils/chartTypes";
 import { LegendManager } from "./LegendManager";
 import { SeriesRegistry } from './SeriesRegistry';
 import { applySeriesData } from './SeriesDataUpdater';
@@ -55,6 +55,12 @@ export class ChartController {
         if (!this.chart) throw new Error('图表尚未初始化');
         applySeriesData(this.chart, this.seriesMap, patches, false);
     }
+
+    setPriceLineGroup(group: PriceLineGroup) {
+        if (!this.registry) throw new Error('图表尚未初始化');
+        this.registry.setPriceLineGroup(group);
+    }
+    clearPriceLineGroup(series: string, id: string) { this.registry?.clearPriceLineGroup(series, id); }
 
     isInitialized() { return this.chart !== null; }
 
@@ -203,6 +209,7 @@ export class ChartController {
             this.legendManager = null;
         }
         if (this.chart) {
+            this.registry?.clear();
             this.chart.remove();
             this.chart = null;
         }

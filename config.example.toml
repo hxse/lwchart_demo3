@@ -23,6 +23,10 @@ port = 5174
 source = "ccxt"
 # 按钮栏实际占位；right／left 为竖栏，top／bottom 为横栏。
 dock_position = "right"
+# 下单窗口显示设置；交易参数仅在当前页面内存中保留。
+order_panel_layout = "floating"
+order_panel_inline_width = 230
+order_panel_floating_width = 230
 # 主图默认占比，严格在 0 和 1 之间；其余绘图高度由副图均分，拖动仅临时调整。
 main_pane_ratio = 0.7
 # local 跟随浏览器时区；也可用 UTC 或 Asia/Shanghai 等 IANA 时区。

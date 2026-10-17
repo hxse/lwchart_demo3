@@ -21,6 +21,13 @@ const patch: SeriesDataPatch = { name: 'line', data: [{ time: 1718000000 as UTCT
 declare const api: ChartApi;
 const weightMode: PaneWeightMode = 'preset';
 api.updateSeriesData([patch]); api.replaceSeriesData([patch]);
+api.setPriceLineGroup({ series: 'line', id: 'example', autoscale: true, labelPosition: 'left',
+  lines: [{ id: 'entry', price: 100, color: '#60a5fa', title: '示例' }] });
+api.clearPriceLineGroup('line', 'example');
+// @ts-expect-error 标签只支持原生价格轴或绘图区左侧
+api.setPriceLineGroup({ series: 'line', id: 'example', labelPosition: 'right', lines: [] });
+// @ts-expect-error 价格线价格必须为数值
+api.setPriceLineGroup({ series: 'line', id: 'example', lines: [{ id: 'entry', price: '100', color: '#fff', title: '示例' }] });
 // @ts-expect-error 非法角色必须被产物中的类型拒绝
 annotation.output = 'unknown';
 // @ts-expect-error 仅允许两种明确的权重模式

@@ -1,11 +1,15 @@
 import type { DockPosition } from './options';
 
-interface AnchorOptions { anchor?: HTMLElement; side: DockPosition; controls?: boolean }
+interface AnchorOptions { anchor?: HTMLElement; side: DockPosition; controls?: boolean; enabled?: boolean }
 
 /** 浮层朝按钮栏内侧展开；悬浮控制保持贴近主按钮，并限制在窗口内。 */
 export function anchorPopup(node: HTMLElement, initial: AnchorOptions) {
     let options = initial;
     function place() {
+        if (options.enabled === false) {
+            for (const property of ['left', 'top', 'max-width', 'max-height']) node.style.removeProperty(property);
+            return;
+        }
         if (!options.anchor) return;
         const anchor = options.anchor.getBoundingClientRect();
         const gap = options.controls ? 4 : 8;

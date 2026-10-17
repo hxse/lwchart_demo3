@@ -27,6 +27,7 @@ export class MarketStream {
     constructor(readonly identity: MarketIdentity, private source: MarketSource, readonly historyBars: number) {
         this.store = new CandleStore(historyBars);
     }
+    get refreshIntervalSeconds() { return this.refreshSeconds; }
     subscribe(listener: Listener) {
         this.listeners.add(listener); listener(this.store.snapshot());
         return () => this.listeners.delete(listener);
@@ -68,6 +69,12 @@ export class MarketStream {
             if (!this.disposed && !signal.aborted) this.fail(error);
         }).finally(() => { this.inFlight = null; this.controller = null; });
         return this.inFlight;
+    }
+    async refresh(): Promise<void> {
+        if (this.disposed) return;
+        if (this.inFlight) await this.inFlight;
+        if (this.calculationStopped) { this.calculationStopped = false; this.failedIndicator = undefined; this.reload = true; }
+        await this.poll();
     }
     private async replaceWindow(signal: AbortSignal) {
         const response = validateBatch(await this.source.latest(this.identity, this.historyBars, signal), this.historyBars);

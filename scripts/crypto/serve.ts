@@ -8,8 +8,9 @@ export async function serve(configPath: string, directory: string) {
     const api = createApi(config);
     const files = staticHandler(directory);
     const server = Bun.serve({ hostname: config.server.host, port: config.server.port,
-        async fetch(request) {
+        async fetch(request, connection) {
             const url = new URL(request.url);
+            if (request.method === 'POST' && ['/api/ccxt/manual-order', '/api/ccxt/manual-order/check'].includes(url.pathname)) connection.timeout(request, 65);
             if (url.pathname === '/healthz' && request.method === 'GET') return Response.json({ status: 'ready' });
             return await api(request) || await files(request);
         },

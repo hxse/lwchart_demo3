@@ -54,7 +54,7 @@ test('TQ 复用鉴权，实际解析响应并只返回归一数据，不携带�
 
 test('TQ 非法参数和写路由在取数前失败，受控后端错误不透传原文', async () => {
     let calls = 0;
-    const api = createApi(config, { read: async () => { calls++; return tqResult([candle(0)]); } });
+    const api = createApi(config, { read: async () => { calls++; return tqResult([candle(0)]); }, write: async () => { throw new Error('不应写入'); } });
     for (const raw of [`${query}&symbol=SHFE.rb2701`, `${query}&since=1718000000000`, `${query}&is_live=true`,
         `${query}&limit=5`, `${query}&adj_type=F`, `${query}&password=PRIVATE_TQ_MARKER`,
         new URLSearchParams({ ...Object.fromEntries(query), duration_seconds: '7' }).toString(),

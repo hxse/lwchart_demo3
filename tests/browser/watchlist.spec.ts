@@ -246,6 +246,22 @@ test('独立编辑新增、上下排序、真实拖拽、删除；保存只改 h
     expect(new URL(page.url()).searchParams.get('ccxt.symbol')).toBe('ETH/USDT:USDT');
 });
 
+test('清空全部只修改编辑草稿，可取消；保存空列表保留平铺设置、当前图表及 query', async ({ page, request }) => {
+    await page.goto('/?timeframes=30m&refresh_seconds=3600#flat=true;' + mixed.slice(1)); await ready(page); await capture(page);
+    const original = page.url(), before = await metrics(request);
+    await editList(page); await expect(page.locator('[data-watch-row]')).toHaveCount(3);
+    await page.getByRole('button', { name: '清空全部' }).click();
+    await expect(page.locator('[data-watch-row]')).toHaveCount(0); expect(page.url()).toBe(original);
+    await expect(page.getByRole('button', { name: '清空全部' })).toBeDisabled();
+    await page.getByRole('dialog', { name: '编辑自选' }).getByRole('button', { name: '取消', exact: true }).click();
+    await editList(page); await expect(page.locator('[data-watch-row]')).toHaveCount(3);
+    await page.getByRole('button', { name: '清空全部' }).click();
+    await page.getByRole('button', { name: '保存自选', exact: true }).click();
+    expect(new URL(page.url()).hash).toBe('#flat=true'); expect(new URL(page.url()).search).toBe(new URL(original).search);
+    expect(await sameCanvases(page)).toBe(true); expect((await metrics(request)).reads).toEqual(before.reads);
+    await page.goBack(); await expect(page.locator('.flat-rail .flat-entry')).toHaveCount(3);
+});
+
 test('编辑取消、无变化保存、hash 导航保留设置草稿；外部 hash 丢弃旧自选草稿', async ({ page, request }) => {
     await page.goto('/?timeframes=30m&refresh_seconds=3600' + mixed); await ready(page); await capture(page);
     const initial = page.url(); const before = await metrics(request);

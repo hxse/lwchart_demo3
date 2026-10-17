@@ -33,6 +33,15 @@
     draft = changeLayout(draft,value,runtime.defaults);
     charts = resizeChartIndicatorDrafts(charts,draft.timeframes.length,indicators);
   }
+  function reset() {
+    draft = structuredClone($state.snapshot(runtime.defaults));
+    indicators = indicatorString(draft.indicators); charts = chartIndicatorDrafts(draft); error = '';
+  }
+  function outside(event: MouseEvent) {
+    const path = event.composedPath();
+    if (dialog && path.includes(dialog) || anchor && path.includes(anchor)) return;
+    onCancel();
+  }
   function apply(event: SubmitEvent) {
     event.preventDefault();
     try {
@@ -43,7 +52,7 @@
   }
 </script>
 
-<svelte:window onkeydown={event => { if (event.key === 'Escape') { event.preventDefault(); onCancel(); } }} />
+<svelte:window onclick={outside} onkeydown={event => { if (event.key === 'Escape') { event.preventDefault(); onCancel(); } }} />
 <div class="menu" bind:this={dialog} use:anchorPopup={{ anchor, side: position }} role="dialog" aria-modal="true" aria-label="看盘设置" tabindex="-1">
   <div class="heading"><strong>看盘设置</strong><button class="close" aria-label="关闭设置" onclick={onCancel}>×</button></div>
   <form onsubmit={apply} novalidate>
@@ -79,6 +88,13 @@
     <label>按钮栏位置<select name="dock_position" bind:value={draft.dock_position}>
       <option value="top">上方</option><option value="bottom">下方</option><option value="left">左侧</option><option value="right">右侧</option>
     </select></label>
+    <label>下单面板布局<select name="order_panel_layout" bind:value={draft.order_panel_layout}>
+      <option value="floating">悬浮</option><option value="inline">平铺</option>
+    </select></label>
+    <div class="row">
+      <label>平铺下单面板宽度（px）<input name="order_panel_inline_width" type="number" min="1" step="1" bind:value={draft.order_panel_inline_width} /></label>
+      <label>悬浮下单面板宽度（px）<input name="order_panel_floating_width" type="number" min="1" step="1" bind:value={draft.order_panel_floating_width} /></label>
+    </div>
     <label>显示时区<input name="timezone" list="timezones" bind:value={draft.timezone} spellcheck="false" /></label>
     <datalist id="timezones"><option value="local">本地</option><option value="UTC"></option><option value="Asia/Shanghai"></option><option value="America/New_York"></option><option value="Europe/London"></option></datalist>
     <div class="hint">local 跟随本地（{localZone}）；也可填 IANA 时区。只改变显示。</div>
@@ -91,7 +107,7 @@
     <WindowSettings bind:timeframes={draft.timeframes} bind:drafts={charts} common={indicators} />
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     <div class="hint">点击应用后更新图表与地址；关闭或取消丢弃修改。</div>
-    <div class="footer"><button type="button" onclick={onCancel}>取消</button><button class="apply" type="submit">应用</button></div>
+    <div class="footer"><button type="button" onclick={reset}>恢复默认值</button><button type="button" onclick={onCancel}>取消</button><button class="apply" type="submit">应用</button></div>
   </form>
 </div>
 

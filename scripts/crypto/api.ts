@@ -3,6 +3,8 @@ import { timeframeSeconds } from '../../src/crypto/data/client';
 import { ccxtBatch, tqBatch } from './ohlcv';
 import type { CryptoConfig } from './config';
 import { BackendClient, GatewayError } from './backend';
+import { handleOrderApi, orderPaths } from './order-api';
+import { TradingError } from '../../src/crypto/trading/types';
 
 function validateQuery(params: URLSearchParams, tq: boolean) {
     const keys = tq ? ['symbol','duration_seconds','data_length','enable_cache']
@@ -24,7 +26,7 @@ function validateQuery(params: URLSearchParams, tq: boolean) {
     if (params.has('enable_cache') && params.get('enable_cache') !== 'true') throw new Error('本入口启用后端缓存');
     return limit;
 }
-export function createApi(config: CryptoConfig, backend: Pick<BackendClient, 'read'> = new BackendClient(config.backend)) {
+export function createApi(config: CryptoConfig, backend: Pick<BackendClient, 'read' | 'write'> = new BackendClient(config.backend)) {
     return async (request: Request): Promise<Response | null> => {
         const url = new URL(request.url);
         if (!url.pathname.startsWith('/api/')) return null;
@@ -36,6 +38,16 @@ export function createApi(config: CryptoConfig, backend: Pick<BackendClient, 're
             return response;
         };
         try {
+            if (orderPaths.includes(url.pathname)) {
+                const measured = async <T>(run: () => Promise<T>) => {
+                    const time = performance.now();
+                    try { return await run(); } finally { upstream += performance.now() - time; }
+                };
+                return json(await handleOrderApi(request, {
+                    read: (...args) => measured(() => backend.read(...args)),
+                    write: (...args) => measured(() => backend.write(...args)),
+                }, config.backend.request_timeout_seconds));
+            }
             if (request.method !== 'GET') throw new GatewayError(405, 'METHOD_NOT_ALLOWED', '本看盘入口只读取行情');
             if (url.pathname === '/api/crypto/runtime') {
                 if (url.search) throw new GatewayError(400, 'INVALID_QUERY', '运行配置接口不接受查询参数');
@@ -53,7 +65,7 @@ export function createApi(config: CryptoConfig, backend: Pick<BackendClient, 're
             try { return json(tq ? tqBatch(body, limit) : ccxtBatch(body, limit)); }
             catch { throw new GatewayError(502, 'BACKEND_INVALID_RESPONSE', '后端行情响应格式无效'); }
         } catch (error) {
-            const e = error instanceof GatewayError ? error : new GatewayError(502, 'BACKEND_ERROR', '后端读取失败');
+            const e = error instanceof GatewayError || error instanceof TradingError ? error : new GatewayError(502, 'BACKEND_ERROR', '后端读取失败');
             return json({ error: { code: e.code, message: e.message } }, e.status);
         }
     };

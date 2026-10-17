@@ -29,6 +29,8 @@ export function parseDashboardQuery(search: string, runtime: RuntimeOptions): Da
         else if (key === 'refresh_seconds') value.refresh_seconds = parseInteger(raw, 1, 3600, '更新间隔');
         else if (key === 'history_bars') value.history_bars = parseInteger(raw, 1, MAX_HISTORY_BARS, '历史 K 线数量');
         else if (key === 'main_pane_ratio') value.main_pane_ratio = parseMainPaneRatio(raw);
+        else if (key === 'order_panel_inline_width') value.order_panel_inline_width = parseInteger(raw, 1, Number.MAX_SAFE_INTEGER, '平铺下单面板宽度');
+        else if (key === 'order_panel_floating_width') value.order_panel_floating_width = parseInteger(raw, 1, Number.MAX_SAFE_INTEGER, '悬浮下单面板宽度');
         else Object.assign(value, { [key]: raw });
     }
     if (params.has('layout') && !params.has('timeframes')) {
@@ -48,6 +50,8 @@ export function serializeDashboardQuery(settings: DashboardSettings): string {
         layout: o.layout, timeframes: o.timeframes.join(','), indicators: indicatorString(o.indicators),
         refresh_seconds: String(o.refresh_seconds), history_bars: String(o.history_bars), theme: o.theme, timezone: o.timezone, dock_position: o.dock_position,
         main_pane_ratio: String(o.main_pane_ratio),
+        order_panel_layout: o.order_panel_layout, order_panel_inline_width: String(o.order_panel_inline_width),
+        order_panel_floating_width: String(o.order_panel_floating_width),
         ...Object.fromEntries(Object.entries(o.chart_indicators).sort(([a],[b]) => Number(a)-Number(b))
             .map(([key,list]) => [`chart.${key}.indicators`,indicatorString(list)])),
     }).toString();

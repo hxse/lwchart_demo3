@@ -5,7 +5,8 @@
 `src/crypto/index.html` 由 `just market` 运行，支持 CCXT 加密货币与 TQ 期货。
 两来源复用既有行情窗口、EMA、LWChart、ChartController、ChartSyncManager 和 GridTemplate。
 内部目录、dist-crypto 产物和 /api/crypto/runtime 路径保留；旧 ZIP／Notebook 入口独立。
-本入口不提供交易、订单、账户或主连映射查询。
+按钮栏另提供 CCXT 手动市价下单，边界与协议见 [手动下单](manual_orders.md)。
+TQ 下单为“待实现”；不提供主连映射查询或自动交易管理。
 
 开发使用宿主 Bun，生产使用独立 Bun 容器；场景覆盖与部署见 [deployment.md](deployment.md)。
 启动配置来自私有 config.toml；公共模板见
@@ -26,14 +27,18 @@
 
 设置面板为贴近按钮的浮层，默认收起。CCXT／TQ Tab 显示各自品种及内部参数，来源、公共和窗口设置各用主题色细边框包围。
 Tab 只改变草稿的 source，来回切换不丢弃双方编辑。应用整体提交设置和完整 query；
-取消／关闭／Esc 丢弃草稿，编辑期间已生效行情继续轮询。有变化只 pushState 一次，
+取消／关闭／Esc／点击面板及设置按钮以外区域丢弃草稿，编辑期间已生效行情继续轮询。
+内部操作按原始事件路径识别，切 Tab 等替换内容不误触外部关闭；平铺下单面板保持显示。
+“恢复默认值”用本次服务 runtime.defaults 重填全部设置草稿，包含两来源、公共与窗口
+指标及两种下单宽度，清除编辑错误；应用后才生效，取消可放弃，不修改 TOML 或自选 hash。
+有变化只 pushState 一次，
 无变化不新增历史。前进／后退重新解析设置并重置打开中的设置草稿。
 首次与导航补全有效 query，保留 hash；非法 query 不自动修复或取行情，可由设置恢复。
 
 ## 占位按钮栏
 
 按钮栏为实际占位 div，42px 厚，默认 right。公共 dock_position 决定 top／bottom／left／right；
-左右竖排，上下横排。设置、自选及全部平铺按钮均为 32×30px，设置／自选固定在栏首，
+左右竖排，上下横排。设置、下单、列表入口依次固定在栏首，与全部平铺按钮均为 32×30px，
 平铺内容在剩余栏空间内按方向滚动。图表只占剩余区域，按钮不覆盖图表价格轴。
 缺省 TOML 字段仍使用 right，私有配置无需为本字段强制迁移。
 
@@ -61,10 +66,15 @@ Tab 只改变草稿的 source，来回切换不丢弃双方编辑。应用整体
 | timezone | local、UTC 或 Intl 接受的 IANA 时区 |
 | dock_position | top／bottom／left／right，默认 right；公共页面参数 |
 | main_pane_ratio | 有限小数，0 < r < 1，默认 0.7；主图默认占比，剩余由实际副图均分 |
+| order_panel_layout | floating／inline，默认 floating；下单面板悬浮或实际占位平铺 |
+| order_panel_inline_width | 平铺下单面板宽度，正的安全整数像素，默认 230 |
+| order_panel_floating_width | 悬浮下单面板宽度，正的安全整数像素，默认 230 |
 | chart.N.indicators | 当前布局内一基窗口位置的独立覆盖；缺参数继承公共 indicators，none 表示无指标，每个列表至多十二项 |
 
-完整 query 始终保存 15 个基础字段，按编号追加零至四个显式窗口覆盖，不丢弃非活动来源。未知／重复／空字段及非法类型明确失败，
+完整 query 始终保存 18 个基础字段，按编号追加零至四个显式窗口覆盖，不丢弃非活动来源。未知／重复／空字段及非法类型明确失败，
 不回显未知值。旧裸写 symbol、exchange_name、market、is_live 已退出，旧书签须更新。
+旧 order_panel_width 退出，URL／TOML／runtime 不保留别名；迁移时将旧宽度分别填入
+两项新宽度。两项独立保存，切换布局只取对应值，不覆盖另一项；显示受可用空间限制。
 
 周期为 1m、3m、5m、15m、30m、1h、2h、4h、6h、8h、12h、1d、3d、1w。
 仅写 layout 取默认周期前 N 项，不足报错；仅写 timeframes 且数量变化时，1／2／3／4
@@ -120,6 +130,7 @@ query 或 hash；刷新恢复默认布局。多个窗口共用占比，临时拖
 
 编辑使用独立宽弹窗，支持增、改、删、拖拽和上下按钮排序。保存只发布 hash，不重新
 序列化 query、不更新设置、不刷新或重配行情。删除当前条目不切品种；保存保留平铺模式。
+“清空全部”仅清空编辑草稿及错误、结束拖拽，空列表时禁用；保存才更新 hash，取消仍恢复原列表。
 空列表且 flat=false 时移除 hash，flat=true 时保留模式参数。
 取消／关闭／Esc 丢弃草稿。保存变化只新增一条历史，无变化不新增。
 仅 hash 导航不重置设置草稿；hash 改变关闭旧自选草稿，前后退同步两部分。
@@ -149,7 +160,8 @@ Binance／Kraken 名称取第一个 / 前部分，例如 BTC；TQ 取最后一�
 
 ## 本地 API 与鉴权
 
-浏览器只访问同源 GET：
+看盘数据使用以下同源 GET；手动下单的两个读取与两个 JSON POST 见
+[手动下单接口](manual_orders.md)：
 
 ```text
 /api/crypto/runtime
@@ -166,18 +178,21 @@ variant=default／enable_cache=true。TQ 接受 symbol、duration_seconds、data
 及可选 enable_cache=true；本入口固定无复权。数量均为 1..10000。
 TQ 周期按秒传递，30m／4h／1d／1w 为 1800／14400／86400／604800，其余按单位转换。
 原本地 since-limit 返回 404；since、TQ limit、CCXT data_length、重复参数或写方法
-在调用后端前拒绝。只转发以上同名后端 GET，不提供通配或写代理。
+在调用后端前拒绝。这些行情入口只转发以上同名后端 GET，不提供通配或任意写代理。
 
 两来源共用 Password Grant 和服务端内存 Bearer。并发共用登录，按 expires_in 过期；
 401 只失效同代 token，原 GET 重新登录重试一次，迟到旧 401 不注销新 token。
 用户名和密码非空且原样使用，不使用 refresh token，不在浏览器存储凭据／Cookie。
 TQ 后台账户由后端管理，本项目 [tq] 只配置默认品种。
+交易复用同一鉴权客户端，但任何写请求均不自动重发，包括 401；失效 token 只供
+用户下次明确操作重新登录。Vite 保留 JSON 正文和实际 Host／Origin，与生产共用准入。
 
 本地错误为 `{error:{code,message}}`：400 INVALID_QUERY、405 METHOD_NOT_ALLOWED、
 404 NOT_FOUND、502 BACKEND_AUTH_FAILED／BACKEND_UNAVAILABLE／BACKEND_INVALID_RESPONSE、
 504 BACKEND_TIMEOUT、499 REQUEST_CANCELLED。已知后端领域错误保留状态及稳定 code，
 包括 TQ 的受控提示；未知错误正文不原样透传。
-Server-Timing 以毫秒提供 upstream（鉴权、后端等待和解析）及 local（校验／序列化），
+Server-Timing 以毫秒提供 upstream（鉴权、后端等待和解析）及 local（校验／序列化）；
+多上游交易请求的 upstream 是各请求耗时累计，可能因并发大于总墙钟时间，local 最低为零。
 不暴露凭据；开发／生产共用实现。私有配置、备份与 Git／JJ 元数据不可通过静态服务读取。
 
 ## 数据与最新窗口
@@ -217,12 +232,18 @@ TQ 只创建一次六列数组。CandleStore 在持有行情的所有权边界�
 
 同身份／周期／历史数量的窗口共享流。MarketHub 汇总各窗口生效指标，按规范化键
 去重排序，针对每个唯一流 configure 一次，公共默认未被继承时不计算。
-每个用户列表至多十二项，内部流并集上限为最大窗口数乘十二，当前四十八；参数
+每个用户列表至多十二项，内部流并集上限为最大窗口数乘十二加一个面板 ATR，当前四十九；参数
 和重复校验共用。窗口绘图、标签和图例仅消费自己的子集，不显示共享并集的其它项。
 仍有窗口使用的实例保留，最后使用者移除才释放；新增只播种新增配置，其余起点
 和累计状态保持。同集合重排、同值继承／独立切换不重算或重新请求历史。
 计算异常继续暂停整个共享流，所有共享窗口受影响，其它流保持独立；恢复必须从
 全部使用者移除失败项，或按既有刷新／重建流程处理，不增加按窗口恢复模型。
+
+MarketHub 的 setOrderDemand 接受一份非绘图 ATR 需求，包含完整行情身份、历史容量、
+ATR 根数和独占时刷新间隔。同身份／周期／容量与图表共享流及原生指标；图表存在时
+沿用图表节拍，图表导航离开后保留该需求并改用其保存的节拍。置为 null 只释放
+该需求，最后使用者消失才停止流；configure(null) 只释放图表需求，dispose 释放全部。
+这个内部消费入口不向图表增加系列，也不修改公共／独立指标配置。
 
 ## 指标计算与独立对照
 

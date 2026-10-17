@@ -48,7 +48,10 @@
           </li>
         {/each}
       </ol>
-      <button type="button" onclick={() => { rows = [...rows, { id: nextId++, provider: 'binance' as WatchProvider, symbol: '' }]; }}>新增品种</button>
+      <div class="row-actions">
+        <button type="button" onclick={() => { rows = [...rows, { id: nextId++, provider: 'binance' as WatchProvider, symbol: '' }]; }}>新增品种</button>
+        <button type="button" disabled={!rows.length} onclick={() => { rows = []; dragging = undefined; error = ''; }}>清空全部</button>
+      </div>
       {#if length !== undefined}<p class="hint" class:too-long={length > MAX_URL_LENGTH}>完整 URL：{length} / {MAX_URL_LENGTH} 字符</p>{/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       <div class="footer"><button type="button" onclick={onCancel}>取消</button><button class="save" type="submit">保存自选</button></div>
@@ -60,6 +63,7 @@
   .backdrop { position:fixed; inset:0; z-index:200; display:grid; place-items:center; background:var(--chart-overlay); }
   .editor { width:560px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow:auto; padding:18px; box-sizing:border-box; border:1px solid var(--ui-border); border-radius:12px; background:var(--surface-background); box-shadow:0 14px 50px var(--ui-shadow); }
   .heading,.footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .row-actions { display:flex; gap:8px; }
   .hint { color:var(--muted-text); font-size:11px; line-height:1.6; }
   ol { list-style:none; padding:0; margin:14px 0; display:flex; flex-direction:column; gap:8px; }
   li { display:flex; align-items:center; gap:5px; }

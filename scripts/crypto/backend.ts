@@ -4,6 +4,11 @@ import { parseTqJson } from './ohlcv';
 export class GatewayError extends Error {
     constructor(readonly status: number, readonly code: string, message: string) { super(message); }
 }
+export class BackendWriteError extends GatewayError {
+    constructor(error: GatewayError, readonly writeState: 'not_sent' | 'rejected' | 'unknown') {
+        super(error.status, error.code, error.message);
+    }
+}
 interface Token { value: string; expiresAt: number }
 interface BackendReply { response: Response; signal: AbortSignal }
 type Fetcher = typeof fetch;
@@ -18,6 +23,13 @@ const messages: Record<string, string> = {
     TQ_INVALID_TIME_AXIS: '后端 TQ 行情时间无效', TQ_INVALID_OHLCV_VALUES: '后端 TQ 行情价格无效',
     TQ_TRADING_STATUS_UNAVAILABLE: '后端无法确认 TQ 休市状态', TQ_INVALID_SYMBOL: '后端拒绝 TQ 品种',
     TQ_PERMISSION_DENIED: '后端账号没有 TQ 行情权限', TQ_CACHE_READ_FAILED: '后端 TQ 缓存读取失败',
+    INSUFFICIENT_FUNDS: '账户资金不足，交易所已拒绝订单', ORDER_REJECTED: '交易所已拒绝订单',
+    PROVIDER_OPERATION_REJECTED: '交易所拒绝此操作，请检查账户或仓位状态', ORDER_NOT_FOUND: '此次查询未找到订单，不能据此判断从未成交',
+    INVALID_ORDER_PRICE: '订单价格无效', INVALID_PRICE_PRECISION: '订单价格不符合交易所步长',
+    PRICE_OUT_OF_RANGE: '订单价格超出交易所范围', PRICE_RULES_UNAVAILABLE: '后端无法取得价格校验资料，订单未提交',
+    OPERATION_STATUS_UNKNOWN: '订单结果未知，请核对交易所订单，勿重复提交',
+    FEE_CREDENTIALS_NOT_CONFIGURED: 'Kraken 后端未配置当前实盘账户的费用查询凭据',
+    PUBLIC_TIME_NOT_READY: '后端可信时钟尚未就绪', PUBLIC_TIME_EXPIRED: '后端可信时钟已过期',
 };
 
 /** 开发中间件与生产服务共用该鉴权客户端，旧 token 失败不能注销新 token。 */
@@ -71,26 +83,65 @@ export class BackendClient {
         }
         return this.loginPromise;
     }
+    private waitForToken(signal?: AbortSignal): Promise<Token> {
+        if (signal?.aborted) return Promise.reject(this.connectionError(signal));
+        const pending = this.token();
+        if (!signal) return pending;
+        // 单个读取取消不取消共享登录，但也不继续等待或发送后续请求。
+        return new Promise((resolve, reject) => {
+            const aborted = () => reject(this.connectionError(signal));
+            signal.addEventListener('abort', aborted, { once: true });
+            void pending.then(resolve, reject).finally(() => signal.removeEventListener('abort', aborted));
+        });
+    }
+    private responseError(status: number, body: any) {
+        const rawCode = typeof body?.detail === 'string' ? body.detail : body?.detail?.code;
+        const code = typeof rawCode === 'string' && Object.hasOwn(messages, rawCode) ? rawCode : 'BACKEND_ERROR';
+        return new GatewayError(status, code, messages[code] || `后端请求失败（${status}）`);
+    }
     async read(path: string, params: URLSearchParams, signal?: AbortSignal): Promise<unknown> {
-        const token = await this.token();
+        const token = await this.waitForToken(signal);
         const url = `${path}?${params}`;
         const get = (value: Token) => this.request(url, { headers: { Authorization: `Bearer ${value.value}` } }, signal);
         let reply = await get(token);
         if (reply.response.status === 401) {
             await reply.response.body?.cancel();
             if (this.current === token) this.current = null;
-            reply = await get(await this.token());
+            reply = await get(await this.waitForToken(signal));
         }
         if (reply.response.status === 401) {
             await reply.response.body?.cancel();
             throw new GatewayError(502, 'BACKEND_AUTH_FAILED', '后端鉴权失败，请检查运行配置');
         }
         const body = await this.json(reply, false, path === '/tq/fetch_ohlcv');
-        if (!reply.response.ok) {
-            const rawCode = typeof body?.detail === 'string' ? body.detail : body?.detail?.code;
-            const code = typeof rawCode === 'string' && Object.hasOwn(messages, rawCode) ? rawCode : 'BACKEND_ERROR';
-            throw new GatewayError(reply.response.status, code, messages[code] || `后端请求失败（${reply.response.status}）`);
-        }
+        if (!reply.response.ok) throw this.responseError(reply.response.status, body);
         return body;
+    }
+    async write(path: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
+        let token: Token;
+        try { token = await this.waitForToken(signal); }
+        catch (error) { throw new BackendWriteError(error as GatewayError, 'not_sent'); }
+        if (signal?.aborted) throw new BackendWriteError(this.connectionError(signal), 'not_sent');
+        try {
+            const reply = await this.request(path, { method: 'POST', headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body) }, signal);
+            if (reply.response.status === 401) {
+                await reply.response.body?.cancel();
+                if (this.current === token) this.current = null;
+                throw new BackendWriteError(new GatewayError(401, 'BACKEND_AUTH_FAILED', '后端鉴权失效，本次写请求未重试'), 'rejected');
+            }
+            const data = await this.json(reply);
+            if (!reply.response.ok) {
+                const error = this.responseError(reply.response.status, data);
+                const rejected = [400, 403, 409, 413, 415, 422].includes(error.status)
+                    || ['PRICE_RULES_UNAVAILABLE', 'SERVICE_NOT_ENABLED', 'SERVICE_NOT_READY'].includes(error.code);
+                throw new BackendWriteError(error, rejected ? 'rejected' : 'unknown');
+            }
+            return data;
+        } catch (error) {
+            if (error instanceof BackendWriteError) throw error;
+            const failure = error instanceof GatewayError ? error : new GatewayError(502, 'OPERATION_STATUS_UNKNOWN', messages.OPERATION_STATUS_UNKNOWN!);
+            throw new BackendWriteError(failure, 'unknown');
+        }
     }
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import type { ChartOptions, DeepPartial } from 'lightweight-charts';
-  import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch, ChartApi } from "../../utils/chartTypes";
+  import type { SeriesConfig, SeriesMode, PaneWeightMode, SeriesDataPatch, ChartApi, PriceLineGroup } from "../../utils/chartTypes";
   import { ChartController } from "./logic/ChartController";
 
   // Props
@@ -45,6 +45,8 @@
   export const updateSeriesData = (patches: SeriesDataPatch[]) => controller.updateSeriesData(patches);
   export const applyOptions = (options: DeepPartial<ChartOptions>) => controller.applyOptions(options);
   export const getCrosshairTime = () => controller.getCrosshairTime();
+  export const setPriceLineGroup = (group: PriceLineGroup) => controller.setPriceLineGroup(group);
+  export const clearPriceLineGroup = (series: string, id: string) => controller.clearPriceLineGroup(series, id);
 
   // Exported methods for external sync
   export const setCrosshair = (param: any) => {
@@ -101,6 +103,8 @@
         applyOptions,
         replaceSeriesData,
         updateSeriesData,
+        setPriceLineGroup,
+        clearPriceLineGroup,
       });
     }
 

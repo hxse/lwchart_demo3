@@ -20,7 +20,7 @@ test('主图占比缺省为 0.7，十进制和指数往返，来源／布局／�
         const settings = parseDashboardQuery(`?main_pane_ratio=${raw}`,runtime);
         expect(settings.main_pane_ratio).toBe(Number(raw));
         const query = serializeDashboardQuery(settings);
-        expect(new URLSearchParams(query).size).toBe(15);
+        expect(new URLSearchParams(query).size).toBe(18);
         expect(new URLSearchParams(query).get('main_pane_ratio')).toBe(String(Number(raw)));
         expect(parseDashboardQuery(query,runtime)).toEqual(settings);
         expect(activeOptions({...settings,source:'tq'}).main_pane_ratio).toBe(settings.main_pane_ratio);

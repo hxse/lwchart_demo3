@@ -128,7 +128,7 @@ test('HTTP 白名单与 runtime 投影，非法 query 或写方法不触发后�
     expect(maximumResponse.status).toBe(200);
     expect((await maximumResponse.json()).rows).toHaveLength(1);
     expect(calls).toBe(3);
-    const broken = createApi(config, { read: async () => ({ rows: [[1]], last_bar_completion_confirmed: false }) });
+    const broken = createApi(config, { read: async () => ({ rows: [[1]], last_bar_completion_confirmed: false }), write: async () => { throw new Error('不应写入'); } });
     expect((await broken(new Request(`http://local/api/ccxt/fetch_ohlcv/latest-limit?${query}`)))!.status).toBe(502);
     expect(new GatewayError(502, 'BACKEND_ERROR', '受控错误')).toBeInstanceOf(Error);
 });

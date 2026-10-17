@@ -3,12 +3,12 @@
   import { currentWatchIndex, adjacentWatch, shortWatchLabel, type WatchEntry } from './watchlist';
   import type { DashboardSettings, DockPosition } from './options';
   import { anchorPopup } from './popup';
-  let { entries, flat, position, current, error, onSelect, onEdit, onFlatChange }: {
+  let { entries, flat, position, current, error, onSelect, onEdit, onFlatChange, opened = $bindable(false), onOpen }: {
     entries: WatchEntry[]; flat: boolean; position: DockPosition; current?: DashboardSettings; error: string;
     onSelect: (entry: WatchEntry) => boolean; onEdit: () => void; onFlatChange: (value: boolean) => boolean;
+    opened?: boolean; onOpen?: () => void;
   } = $props();
   const HOVER_MARGIN = 12;
-  let opened = $state(false);
   let locked = $state(false);
   let pointerVisible = $state(false);
   let focusVisible = $state(false);
@@ -71,7 +71,7 @@
     bind:this={toggle}
     onpointerenter={event => { if (!flat && event.pointerType !== 'touch') pointerVisible = true; }}
     onfocus={event => { if (!flat && event.currentTarget.matches(':focus-visible')) focusVisible = true; }}
-    title={entries.length || error || flat ? '自选列表' : '新建自选'} onclick={() => { if (!entries.length && !error && !flat) onEdit(); else opened = !opened; }}>☰</button>
+    title={entries.length || error || flat ? '自选列表' : '新建自选'} onclick={() => { if (!entries.length && !error && !flat) onEdit(); else { if (!opened) onOpen?.(); opened = !opened; } }}>☰</button>
   {#if !flat}
   <div class="shortcuts" class:visible={controlsVisible} bind:this={controls} use:anchorPopup={{ anchor: toggle, side: position, controls: true }}>
     <button aria-label="上一个自选" disabled={!entries.length || !current} onclick={() => adjacent(-1)}>↑</button>

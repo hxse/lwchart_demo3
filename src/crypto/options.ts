@@ -17,10 +17,13 @@ export const LAYOUTS = {
     '2x2': GridTemplateType.GRID_2x2,
 } as const;
 export const MAX_CHARTS = Math.max(...Object.values(LAYOUTS).map(layout => gridTemplates[layout].slots));
-export const MAX_COMPUTED_INDICATORS = MAX_CHARTS * MAX_INDICATORS_PER_LIST;
+export const MAX_COMPUTED_INDICATORS = MAX_CHARTS * MAX_INDICATORS_PER_LIST + 1;
 export const MAX_HISTORY_BARS = 10000;
 export const UPDATE_BARS = 5;
 export const DEFAULT_MAIN_PANE_RATIO = 0.7;
+export const ORDER_PANEL_LAYOUTS = ['floating', 'inline'] as const;
+export type OrderPanelLayout = typeof ORDER_PANEL_LAYOUTS[number];
+export const DEFAULT_ORDER_PANEL_WIDTH = 230;
 export type Timeframe = typeof TIMEFRAMES[number];
 export type Layout = keyof typeof LAYOUTS;
 export type Theme = 'dark' | 'light';
@@ -33,6 +36,7 @@ interface DisplayOptions {
     symbol: string; layout: Layout; timeframes: Timeframe[]; indicators: IndicatorSpec[];
     refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition; main_pane_ratio: number;
     chart_indicators: ChartIndicatorOverrides;
+    order_panel_layout: OrderPanelLayout; order_panel_inline_width: number; order_panel_floating_width: number;
 }
 export interface CcxtOptions extends DisplayOptions, CcxtDefaults { source: 'ccxt' }
 export interface TqOptions extends DisplayOptions { source: 'tq' }
@@ -40,7 +44,7 @@ export type DashboardOptions = CcxtOptions | TqOptions;
 export interface SourceDefaults { ccxt: CcxtDefaults; tq: TqDefaults }
 export interface DashboardSettings extends Omit<DisplayOptions, 'symbol'>, SourceDefaults { source: Source }
 export interface RuntimeOptions { defaults: DashboardSettings }
-export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position','main_pane_ratio'] as const;
+export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position','main_pane_ratio','order_panel_layout','order_panel_inline_width','order_panel_floating_width'] as const;
 export const CCXT_KEYS = ['exchange_name','market','is_live'] as const;
 export const DASHBOARD_KEYS = COMMON_KEYS.filter(key => key !== 'symbol');
 export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS, 'chart_indicators'] : [...COMMON_KEYS, 'chart_indicators']; }
@@ -105,6 +109,8 @@ export function normalizeOptions(input: unknown): DashboardOptions {
     if (value.theme !== 'dark' && value.theme !== 'light') throw new Error('主题必须是 dark 或 light');
     const dock = value.dock_position ?? 'right';
     if (!DOCK_POSITIONS.includes(dock as DockPosition)) throw new Error('按钮栏位置必须是 top、bottom、left 或 right');
+    const orderLayout = value.order_panel_layout === undefined ? 'floating' : value.order_panel_layout;
+    if (!ORDER_PANEL_LAYOUTS.includes(orderLayout as OrderPanelLayout)) throw new Error('下单面板布局必须是 floating 或 inline');
     if (typeof value.layout !== 'string' || !Object.hasOwn(LAYOUTS, value.layout)) throw new Error('未知图表布局');
     const layout = value.layout as Layout;
     if (!Array.isArray(value.timeframes) || value.timeframes.length !== layoutSlots(layout)
@@ -113,6 +119,9 @@ export function normalizeOptions(input: unknown): DashboardOptions {
         refresh_seconds: integer(value.refresh_seconds, 1, 3600, '更新间隔'),
         history_bars: integer(value.history_bars, 1, MAX_HISTORY_BARS, '历史 K 线数量'), theme: value.theme, timezone: validateTimezone(value.timezone), dock_position: dock as DockPosition,
         main_pane_ratio: validateMainPaneRatio(value.main_pane_ratio === undefined ? DEFAULT_MAIN_PANE_RATIO : value.main_pane_ratio),
+        order_panel_layout: orderLayout as OrderPanelLayout,
+        order_panel_inline_width: integer(value.order_panel_inline_width === undefined ? DEFAULT_ORDER_PANEL_WIDTH : value.order_panel_inline_width, 1, Number.MAX_SAFE_INTEGER, '平铺下单面板宽度'),
+        order_panel_floating_width: integer(value.order_panel_floating_width === undefined ? DEFAULT_ORDER_PANEL_WIDTH : value.order_panel_floating_width, 1, Number.MAX_SAFE_INTEGER, '悬浮下单面板宽度'),
         chart_indicators: parseChartIndicators(value.chart_indicators,layoutSlots(layout)) };
     if (value.source === 'tq') return { ...display, source: 'tq' };
     const identity = normalizeCcxt(Object.fromEntries([...CCXT_KEYS, 'symbol'].map(key => [key, value[key]])));

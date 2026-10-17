@@ -7,6 +7,7 @@ import { legacyIndicatorZip } from './legacy-indicators';
 import { staticHandler } from '../../scripts/crypto/static';
 import { validateDeclarations } from './declaration-consumer';
 import { legacyDisplayZip } from './legacy-display';
+import { OrderFixture } from './order-backend';
 
 // 此服务仅由离线测试显式启动，不进入生产 API 或构建。
 const root = resolve(import.meta.dirname, '../..');
@@ -74,6 +75,7 @@ let revision = 0;
 let correction = 0;
 let errors: string[] = [];
 let delay = 0;
+const orders = new OrderFixture();
 const intervals: Record<string, number> = { '1m': 60000, '3m': 180000, '5m': 300000, '15m': 900000, '30m': 1800000, '1h': 3600000, '2h': 7200000, '4h': 14400000, '6h': 21600000, '8h': 28800000, '12h': 43200000, '1d': 86400000, '3d': 259200000, '1w': 604800000 };
 function rows(timeframe: string, symbol: string): OhlcvRow[] {
     const step = intervals[timeframe]!;
@@ -112,10 +114,11 @@ async function main() {
     const styles = (await readdir(join(root, 'dist-lib'))).filter(n => n.endsWith('.css'));
     mock = Bun.serve({ hostname: '127.0.0.1', port: 43175, async fetch(request) {
         const url = new URL(request.url);
+        if (url.pathname === '/__orders') return orders.control(request);
         if (url.pathname === '/' || url.pathname.startsWith('/assets/')) return oldApp(request);
-        if (url.pathname === '/viewport' || url.pathname === '/chart-gaps') {
+        if (['/viewport', '/chart-gaps', '/price-lines'].includes(url.pathname)) {
             const html = await Bun.file(join(root, 'tests/fixtures/viewport.html')).text();
-            const module = url.pathname === '/viewport' ? 'viewport.ts' : 'chart-gaps.ts';
+            const module = `${url.pathname.slice(1)}.ts`;
             return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures', module))), {
                 headers: { 'Content-Type': 'text/html; charset=utf-8' },
             });
@@ -130,7 +133,7 @@ async function main() {
             if (request.method === 'POST') {
                 const state = await request.json();
                 // 每个用例拒绝旧令牌，让服务端缓存通过正常 401 流程刷新，避免测试顺序影响登录计数。
-                if (state.reset) { tokenEpoch++; metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; correction = 0; errors = []; delay = 0; }
+                if (state.reset) { tokenEpoch++; metrics = { logins: 0, reads: [] }; advance = 0; revision = 0; correction = 0; errors = []; delay = 0; orders.reset(); }
                 if (state.advance !== undefined) advance = state.advance;
                 if (state.revision !== undefined) revision = state.revision;
                 if (state.correction !== undefined) correction = state.correction;
@@ -161,6 +164,10 @@ async function main() {
             if (request.headers.get('Authorization') !== `Bearer ${token()}`) return new Response(null, { status: 401 });
             if (url.pathname === '/file/list') return Response.json({ files: [{ filename: 'legacy.zip', path: 'fixture/legacy.zip' }] });
             if (url.pathname === '/file/download') return new Response(new Uint8Array(zip).buffer, { headers: { 'Content-Type': 'application/zip' } });
+        }
+        if (url.pathname.startsWith('/ccxt/') && url.pathname !== '/ccxt/fetch_ohlcv/latest-limit') {
+            if (request.headers.get('Authorization') !== `Bearer ${token()}`) return new Response(null, { status: 401 });
+            return orders.handle(request);
         }
         if (!['/ccxt/fetch_ohlcv/latest-limit', '/tq/fetch_ohlcv'].includes(url.pathname) || request.method !== 'GET') return new Response(null, { status: 404 });
         if (request.headers.get('Authorization') !== `Bearer ${token()}`) return new Response(null, { status: 401 });

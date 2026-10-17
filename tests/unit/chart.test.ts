@@ -169,6 +169,18 @@ test('参考线可更新和删除，不重建系列；显示名称与 key 分开
     expect(fake.lines).toEqual([]); expect(f.created).toHaveLength(1);
 });
 
+test('共享图表注册表提供分组价格线入口，系列移除及静态重建清理临时组', () => {
+    const f = fixture(), registry = new SeriesRegistry(f.chart);
+    registry.apply([config('candles')], 'reconcile', null);
+    const group = { series: 'candles', id: 'preview', lines: [{ id: 'entry', price: 100, color: '#fff', title: '示例' }] };
+    expect(() => registry.setPriceLineGroup({ ...group, series: 'missing' })).toThrow('未知的价格线所属系列');
+    registry.setPriceLineGroup(group); expect(f.created[0]!.lines).toHaveLength(1);
+    registry.apply([config('candles')], 'reconcile', null); expect(f.created[0]!.lines).toHaveLength(1);
+    registry.apply([config('candles')], 'replace', null); expect(f.created[0]!.lines).toHaveLength(0);
+    expect(f.created[1]!.lines).toHaveLength(0);
+    registry.setPriceLineGroup(group); registry.clear(); expect(f.created[1]!.lines).toHaveLength(0);
+});
+
 test('Histogram 与 time-only 缺口整批预校验，末根缺口移除旧值且保留历史更新能力', () => {
     const f=fixture(); const candle=new FakeSeries('Candlestick'); candle.setData([point(0),point(1)]); f.primary=candle;
     const histogram=new FakeSeries('Histogram'); histogram.setData([{time:point(1).time,value:1,color:'#123456'}]);

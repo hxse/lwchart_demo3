@@ -3,7 +3,16 @@
  * 用于 LWChart 组件和 GridItemBuilder
  */
 
-import type { CandlestickData, LineData, HistogramData, WhitespaceData, UTCTimestamp, ChartOptions, DeepPartial } from 'lightweight-charts';
+import type { CandlestickData, LineData, HistogramData, WhitespaceData, UTCTimestamp, ChartOptions, DeepPartial, LineStyle, LineWidth } from 'lightweight-charts';
+
+export interface ChartPriceLine {
+    id: string; price: number; color: string; title: string;
+    lineStyle?: LineStyle; lineWidth?: LineWidth; axisLabelVisible?: boolean;
+}
+export interface PriceLineGroup {
+    series: string; id: string; lines: ChartPriceLine[]; autoscale?: boolean;
+    labelPosition?: 'axis' | 'left';
+}
 
 export interface SeriesDataPatch {
     name: string;
@@ -23,6 +32,8 @@ export interface ChartApi {
     applyOptions: (options: DeepPartial<ChartOptions>) => void;
     replaceSeriesData: (patches: SeriesDataPatch[]) => void;
     updateSeriesData: (patches: SeriesDataPatch[]) => void;
+    setPriceLineGroup: (group: PriceLineGroup) => void;
+    clearPriceLineGroup: (series: string, id: string) => void;
 }
 
 export interface SeriesConfig {

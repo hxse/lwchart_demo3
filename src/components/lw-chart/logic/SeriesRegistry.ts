@@ -1,8 +1,9 @@
 import {
     CandlestickSeries, LineSeries, BarSeries, HistogramSeries, AreaSeries, BaselineSeries,
-    createSeriesMarkers, type IChartApi, type ISeriesApi, type IPriceLine,
+    createSeriesMarkers, type IChartApi, type ISeriesApi,
 } from 'lightweight-charts';
-import type { SeriesConfig, SeriesMode, PaneWeightMode } from '../../../utils/chartTypes';
+import type { SeriesConfig, SeriesMode, PaneWeightMode, PriceLineGroup } from '../../../utils/chartTypes';
+import { SeriesPriceLines } from './SeriesPriceLines';
 import { SlTpLineSeries } from '../plugins/SlTpLineSeries';
 import { PositionArrowSeries } from '../plugins/PositionArrowSeries';
 import type { LegendManager } from './LegendManager';
@@ -10,16 +11,25 @@ import { clearTimeline, commitTimeline, nextTimeline } from './SeriesTimeline';
 import { clearLineSegments, syncLineSegments } from './LineSegments';
 import { preservePanePositions, PaneWeights } from './PaneLayout';
 
-interface RegisteredSeries { api: ISeriesApi<any>; type: SeriesConfig['type']; lines: IPriceLine[]; referenceSignature?: string }
+interface RegisteredSeries { api: ISeriesApi<any>; type: SeriesConfig['type'] }
 
 /** 同一控制器管理静态重建与命名系列协调，两种场景共用系列创建逻辑。 */
 export class SeriesRegistry {
     readonly seriesMap = new Map<string, ISeriesApi<any>>();
     private records = new Map<string, RegisteredSeries>();
     private owned = new Set<ISeriesApi<any>>();
+    private priceLines = new Map<ISeriesApi<any>, SeriesPriceLines>();
     private weights = new PaneWeights();
 
     constructor(private chart: IChartApi) {}
+
+    setPriceLineGroup(group: PriceLineGroup) { this.linesFor(group.series).set(group); }
+    clearPriceLineGroup(series: string, id: string) { this.linesFor(series).clear(id); }
+    private linesFor(name: string) {
+        const api = this.seriesMap.get(name);
+        if (!api) throw new Error(`未知的价格线所属系列：${name}`);
+        return this.priceLines.get(api)!;
+    }
 
     apply(configs: SeriesConfig[], mode: SeriesMode, legend: LegendManager | null, paneWeightMode: PaneWeightMode = 'initial') {
         if (!['initial','preset'].includes(paneWeightMode)) throw new Error('Pane 权重模式必须是 initial 或 preset');
@@ -61,13 +71,14 @@ export class SeriesRegistry {
             }
             const fresh = !record;
             if (!record) {
-                record = { api: this.create(config), type: config.type, lines: [] };
+                record = { api: this.create(config), type: config.type };
                 this.owned.add(record.api);
+                this.priceLines.set(record.api, new SeriesPriceLines(record.api, config.options?.autoscaleInfoProvider));
                 this.records.set(name, record);
                 this.seriesMap.set(name, record.api);
             } else {
                 if (record.api.getPane().paneIndex() !== config.pane) record.api.moveToPane(config.pane);
-                if (config.options) record.api.applyOptions(config.options);
+                if (config.options) this.priceLines.get(record.api)!.applyOptions(config.options);
             }
 
             if (fresh) {
@@ -77,12 +88,7 @@ export class SeriesRegistry {
                 record.api.moveToPane(config.pane);
             }
             syncLineSegments(this.chart, record.api, config.options);
-            const signature = JSON.stringify(config.priceLines ?? []);
-            if (record.referenceSignature !== signature) {
-                for (const line of record.lines) record.api.removePriceLine(line);
-                record.lines = (config.priceLines ?? []).map(line => record!.api.createPriceLine(line));
-                record.referenceSignature = signature;
-            }
+            this.priceLines.get(record.api)!.setReferences(config.priceLines ?? []);
             if (config.options?.scaleMargins) {
                 try {
                     record.api.priceScale().applyOptions({ scaleMargins: config.options.scaleMargins });
@@ -127,6 +133,7 @@ export class SeriesRegistry {
         this.seriesMap.clear();
     }
     private release(api: ISeriesApi<any>) {
+        this.priceLines.get(api)?.dispose(); this.priceLines.delete(api);
         clearLineSegments(api);
         clearTimeline(api);
         this.chart.removeSeries(api);

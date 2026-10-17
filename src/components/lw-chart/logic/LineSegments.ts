@@ -7,21 +7,29 @@ const segments = new WeakMap<ISeriesApi<any>, Segments>();
 /** 原生折线会跨 whitespace 连线。保留主系列的数据／轴／标记，只让连续段负责画线。 */
 export function syncLineSegments(chart: IChartApi, api: ISeriesApi<any>, options?: { lineVisible?: boolean }) {
     if (api.seriesType() !== 'Line') return;
-    const groups: SeriesPoint[][] = [];
-    let current: SeriesPoint[] | undefined;
+    let hasValues = false, gap = false, split = false;
     for (const point of seriesTimeline(api).values()) {
-        if (!('value' in point)) { current = undefined; continue; }
-        if (!current) { current = []; groups.push(current); }
-        current.push(point);
+        if (!('value' in point)) { if (hasValues) gap = true; }
+        else {
+            if (gap) { split = true; break; }
+            hasValues = true;
+        }
     }
     let state = segments.get(api);
-    if (groups.length < 2) {
+    if (!split) {
         if (state) {
             if (options?.lineVisible !== undefined) state.visible = options.lineVisible;
             clearLineSegments(api);
             api.applyOptions({ lineVisible: state.visible });
         }
         return;
+    }
+    const groups: SeriesPoint[][] = [];
+    let current: SeriesPoint[] | undefined;
+    for (const point of seriesTimeline(api).values()) {
+        if (!('value' in point)) { current = undefined; continue; }
+        if (!current) { current = []; groups.push(current); }
+        current.push(point);
     }
     if (!state) {
         state = { chart, visible: api.options().lineVisible, series: [] };

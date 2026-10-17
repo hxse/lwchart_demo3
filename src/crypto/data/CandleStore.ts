@@ -32,9 +32,10 @@ export class CandleStore {
         const key = indicatorListString(specs);
         if (key === this.configuration) return false;
         const next = new Map<string, IndicatorStream>();
+        let inputs: IndicatorInput[] | undefined;
         for (const spec of specs) {
             const id = indicatorKey(spec);
-            next.set(id, !this.broken && this.engines.has(id) ? this.engines.get(id)! : new IndicatorStream(spec, this.rows.map(input)));
+            next.set(id, !this.broken && this.engines.has(id) ? this.engines.get(id)! : new IndicatorStream(spec, inputs ??= this.rows.map(input)));
         }
         this.engines = next; this.configuration = key; this.broken = false;
         this.commitResults();
@@ -43,7 +44,8 @@ export class CandleStore {
     initialize(rows: OhlcvRow[]): DataChange {
         const next = rows.map(copy);
         const engines = new Map<string, IndicatorStream>();
-        for (const [key, engine] of this.engines) engines.set(key, new IndicatorStream(engine.spec, next.map(input)));
+        const inputs = this.engines.size ? next.map(input) : [];
+        for (const [key, engine] of this.engines) engines.set(key, new IndicatorStream(engine.spec, inputs));
         this.rows = next.slice(-this.capacity);
         if (this.rows.length) for (const engine of engines.values()) engine.trim(this.rows[0]![0]);
         this.engines = engines; this.broken = false;
@@ -52,16 +54,34 @@ export class CandleStore {
         return this.snapshot();
     }
     private commitResults() { this.indicators = new Map([...this.engines].map(([key, engine]) => [key, engine.snapshot()])); }
+    private knownRow(time: number) {
+        const recent = this.recent.get(time);
+        if (recent) return recent;
+        let low = 0, high = this.rows.length - 1;
+        while (low <= high) {
+            const middle = (low + high) >>> 1;
+            const row = this.rows[middle]!;
+            if (row[0] === time) return row;
+            if (row[0] < time) low = middle + 1;
+            else high = middle - 1;
+        }
+        return undefined;
+    }
+    private remember(rows: OhlcvRow[]) {
+        const recent = new Map(this.recent);
+        for (const row of rows.slice(-UPDATE_BARS)) recent.set(row[0], copy(row));
+        this.recent = new Map([...recent.values()].sort((a, b) => a[0] - b[0])
+            .slice(-UPDATE_BARS).map(row => [row[0], row]));
+    }
     merge(rows: OhlcvRow[]): DataChange | ReloadRequired {
         const tail = this.tail;
         if (tail === undefined || !rows.some(row => row[0] === tail)) return { kind: 'reload', reason: 'missing-tail', oldTail: tail };
         if (this.broken) throw new Error('指标状态已失效，需要重新初始化');
-        const known = new Map([...this.rows, ...this.recent.values()].map(row => [row[0], row]));
-        const first = Math.min(...known.keys());
+        const first = Math.min(this.rows[0]![0], ...this.recent.keys());
         // 完整历史校验先于任何原生状态更新，旧末根允许变化。
         for (const row of rows) {
             if (row[0] >= tail || row[0] < first) continue;
-            const old = known.get(row[0]);
+            const old = this.knownRow(row[0]);
             if (!old) return { kind: 'reload', reason: 'history-insertion', oldTail: tail, time: row[0] };
             if (!equal(old, row)) return { kind: 'reload', reason: 'history-mismatch', oldTail: tail, time: row[0],
                 differences: columns.flatMap((field, index) => Object.is(old[index], row[index]) ? []
@@ -71,6 +91,10 @@ export class CandleStore {
         const replacement = rows.find(row => row[0] === tail)!;
         const changes = [...(!equal(oldTail, replacement) ? [replacement] : []), ...rows.filter(row => row[0] > tail)].map(copy);
         const delta = new Map<string, IndicatorResults>();
+        if (!changes.length) {
+            this.remember(rows);
+            return { kind: 'update', rows: [], indicators: delta };
+        }
         try {
             for (const row of changes) for (const [key, engine] of this.engines) {
                 const points = row[0] === tail ? engine.replace(input(row)) : engine.add(input(row));
@@ -80,11 +104,15 @@ export class CandleStore {
                 delta.set(key, { spec: engine.spec, outputs });
             }
         } catch (error) { this.broken = true; throw error; }
-        const next = [...this.rows.slice(0, -1), copy(replacement), ...changes.filter(row => row[0] > tail)];
+        const next = this.rows.slice();
+        for (const row of changes) {
+            if (row[0] === tail) next[next.length - 1] = row;
+            else next.push(row);
+        }
         const trimmed = next.length > this.capacity;
-        this.rows = next.slice(-this.capacity);
-        this.recent = new Map([...new Map([...this.recent.values(), ...rows.map(copy)].map(row => [row[0], row])).values()]
-            .sort((a, b) => a[0] - b[0]).slice(-UPDATE_BARS).map(row => [row[0], row]));
+        if (trimmed) next.splice(0, next.length - this.capacity);
+        this.rows = next;
+        this.remember(rows);
         if (trimmed) for (const engine of this.engines.values()) engine.trim(this.rows[0]![0]);
         this.commitResults();
         return trimmed ? this.snapshot() : { kind: 'update', rows: changes, indicators: delta };

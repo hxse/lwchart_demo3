@@ -1,7 +1,7 @@
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import type { SeriesDataPatch } from '../../../utils/chartTypes';
 import { latestCandleIsUnclipped } from './CandleVisibility';
-import { seriesTimeline, nextTimeline, commitTimeline, isGap } from './SeriesTimeline';
+import { seriesTimeline, timelineTail, nextTimeline, commitTimeline, updateTimeline, isGap } from './SeriesTimeline';
 import { syncLineSegments } from './LineSegments';
 
 // SDK 的公开滚动接口到下一帧才应用；同帧下一批须使用已请求的偏移。
@@ -23,14 +23,13 @@ export function applySeriesData(
         const kind = series.seriesType();
         if (!['Candlestick', 'Line', 'Histogram'].includes(kind)) throw new Error('数据补丁仅支持蜡烛、折线与柱系列');
         // 单值系列可能有预热或缺口，实际值不必从全图索引 0 开始。
-        const existing = [...seriesTimeline(series).values()];
-        const last = existing.at(-1);
-        const times = new Set(existing.map(point => Number(point.time)));
+        const existing = seriesTimeline(series);
+        const last = timelineTail(series);
         let previous = -Infinity;
         for (const point of patch.data) {
             const time = point.time as number;
             if (!Number.isFinite(time) || time <= previous) throw new Error('图表补丁时间必须严格递增');
-            if (!replace && last && time < Number(last.time) && !times.has(time)) throw new Error('图表历史修正只能使用已有时间');
+            if (!replace && last && time < Number(last.time) && !existing.has(String(time))) throw new Error('图表历史修正只能使用已有时间');
             previous = time;
             if (kind === 'Candlestick') {
                 if (!('open' in point) || ![point.open, point.high, point.low, point.close].every(Number.isFinite)
@@ -46,9 +45,10 @@ export function applySeriesData(
     const scale = chart.timeScale();
     const actualRange = scale.getVisibleLogicalRange();
     const primary = seriesMap.values().next().value as ISeriesApi<any> | undefined;
-    const oldLength = primary?.data().length || 0;
-    const first = primary?.dataByIndex(0)?.time;
     const candle = primary?.seriesType() === 'Candlestick';
+    const length = () => primary ? (candle ? seriesTimeline(primary).size : primary.data().length) : 0;
+    const oldLength = length();
+    const first = primary?.dataByIndex(0)?.time;
     if (!actualRange || !oldLength) pendingOffsets.delete(chart);
     const actualOffset = scale.scrollPosition();
     const spacing = scale.options().barSpacing;
@@ -67,25 +67,28 @@ export function applySeriesData(
     }
     for (const patch of patches) {
         const series = seriesMap.get(patch.name)!;
-        const previous = [...seriesTimeline(series).values()];
-        let tail = Number(previous.at(-1)?.time ?? -Infinity);
-        const old = new Map(previous.map(point => [Number(point.time), point]));
-        const next = nextTimeline(series, patch.data, replace);
+        if (!replace && !patch.data.length) continue;
+        let tail = Number(timelineTail(series)?.time ?? -Infinity);
+        const old = seriesTimeline(series);
         // SDK historicalUpdate 无法正确在缺口位置插入值，重复缺口也可能删除后一根值。
         const historicalGap = patch.data.some(point => Number(point.time) < tail
-            && (isGap(point) || (old.has(Number(point.time)) && isGap(old.get(Number(point.time))!))));
-        if (replace || historicalGap) series.setData([...next.values()] as any);
+            && (isGap(point) || (old.has(String(point.time)) && isGap(old.get(String(point.time))!))));
+        if (replace || historicalGap) {
+            const next = nextTimeline(series, patch.data, replace);
+            series.setData([...next.values()] as any);
+            commitTimeline(series, next);
+        }
         else {
             for (const point of patch.data) {
                 series.update(point, Number(point.time) < tail);
                 tail = Math.max(tail, Number(point.time));
             }
+            updateTimeline(series, patch.data);
         }
-        commitTimeline(series, next);
         syncLineSegments(chart, series);
     }
     if (range && primary) {
-        const nextLength = primary.data().length;
+        const nextLength = length();
         const move = (position: number) => {
             scale.scrollToPosition(position, false);
             pendingOffsets.set(chart, { series: primary, requested: position, observed: scale.scrollPosition(), width: scale.width(), spacing });

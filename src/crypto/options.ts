@@ -1,5 +1,5 @@
 import { GridTemplateType, gridTemplates } from '../components/grid-template/gridTemplates';
-import { validateTimezone } from './time';
+import { validateTimezone } from './timezone';
 import { MAX_INDICATORS_PER_LIST } from '../indicators/parameters';
 import type { IndicatorSpec } from '../indicators/types';
 import { parseIndicators, parseChartIndicators, type ChartIndicatorOverrides } from './chartIndicators';

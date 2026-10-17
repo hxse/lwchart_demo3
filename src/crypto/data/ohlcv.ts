@@ -1,10 +1,11 @@
 export type OhlcvRow = [number, number, number, number, number, number];
 export interface CandleBatch { rows: OhlcvRow[] }
 
+/** 只校验并借用输入；持有历史的 CandleStore 在所有权边界复制，不在校验层复制。 */
 export function validateRows(input: unknown, limit: number): OhlcvRow[] {
     if (!Array.isArray(input) || input.length > limit) throw new Error('行情数量无效');
     let previous = -Infinity;
-    return input.map((raw): OhlcvRow => {
+    for (const raw of input) {
         if (!Array.isArray(raw) || raw.length !== 6 || !raw.every(v => typeof v === 'number' && Number.isFinite(v))) {
             throw new Error('行情必须是六列有限数值');
         }
@@ -14,8 +15,8 @@ export function validateRows(input: unknown, limit: number): OhlcvRow[] {
         }
         if (volume < 0 || high < Math.max(open, close, low) || low > Math.min(open, close)) throw new Error('行情价格或成交量无效');
         previous = time;
-        return [time, open, high, low, close, volume];
-    });
+    }
+    return input as OhlcvRow[];
 }
 export function validateBatch(input: unknown, limit: number): CandleBatch {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('行情响应格式错误');

@@ -1,13 +1,7 @@
 import { TickMarkType, type TickMarkFormatter, type Time, type TimeFormatterFn } from 'lightweight-charts';
+import { validateTimezone } from './timezone';
 
 export interface TimeDisplay { format: TimeFormatterFn; ticks: TickMarkFormatter; zone: string }
-export function validateTimezone(value: unknown): string {
-    if (typeof value !== 'string' || !value) throw new Error('显示时区不能为空');
-    if (value === 'local') return value;
-    try { new Intl.DateTimeFormat('en', { timeZone: value }); }
-    catch { throw new Error('显示时区必须是 local、UTC 或有效的 IANA 时区'); }
-    return value;
-}
 function dayString(time: Exclude<Time, number>): string {
     if (typeof time === 'string') return time;
     return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;

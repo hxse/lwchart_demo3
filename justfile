@@ -34,3 +34,7 @@ deploy *args:
 # 只使用缓存生产镜像和本地 fixture 的容器验证
 test-container:
     @APP_CONFIG_PROFILE=dev bun tests/container/run.ts
+
+# 显式离线内存对照；消费已构建产物，不进入默认回归
+benchmark-memory *args:
+    @bun tests/memory/run.ts "$@"

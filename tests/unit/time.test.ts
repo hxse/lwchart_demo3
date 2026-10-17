@@ -1,6 +1,7 @@
 import { expect, test, spyOn } from 'bun:test';
 import { TickMarkType, type UTCTimestamp } from 'lightweight-charts';
-import { createTimeDisplay, validateTimezone } from '../../src/crypto/time';
+import { createTimeDisplay } from '../../src/crypto/time';
+import { validateTimezone } from '../../src/crypto/timezone';
 
 const timestamp = (year: number, month: number, day: number, hour: number, minute = 0) => Date.UTC(year, month - 1, day, hour, minute) / 1000 as UTCTimestamp;
 

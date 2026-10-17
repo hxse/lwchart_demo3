@@ -47,6 +47,8 @@ local／remote 差异模板见 [本地模板](../../config.local.example.toml)�
 
 just market --build 共用构建脚本生成 dist-crypto，以及 dist-market/server.js 与 public 静态目录。
 服务单独打包为 Bun 产物，生产不加载 Vite；最终镜像仅含 Bun、server.js 和 public。
+生产构建拒绝服务端引入 lightweight-charts、fancy-canvas、Svelte 或 trading-signals；
+这些实现只属于浏览器链路。容器沿用 Bun 默认 GC，不注入强制回收或 --smol。
 配置、源码、node_modules、Just、编译器、Git／JJ 不进入最终镜像。静态根仅 public，
 server.js 与运行配置在静态根外。/healthz 仅返回自身 ready，不检查真实账号权限。
 

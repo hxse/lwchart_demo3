@@ -16,7 +16,7 @@ export class IndicatorStream {
     private native: NativeIndicator;
     private last: IndicatorInput | undefined;
     private count = 0;
-    private initializing = true;
+    private published = new Set<IndicatorOutput>();
     private points = new Map<IndicatorOutput, IndicatorPoint[]>();
     private previous = new Map<IndicatorOutput, IndicatorPoint>();
     constructor(spec: IndicatorSpec, inputs: readonly IndicatorInput[] = []) {
@@ -24,10 +24,12 @@ export class IndicatorStream {
         this.native = createNativeIndicator(this.spec);
         for (const output of indicatorDefinition(this.spec.type).outputs) this.points.set(output.key, []);
         for (const input of inputs) this.add(input);
-        this.initializing = false;
     }
     get inputCount() { return this.count; }
-    snapshot(): IndicatorResults { return { spec: this.spec, outputs: new Map(this.points), previous: new Map(this.previous) }; }
+    snapshot(): IndicatorResults {
+        for (const role of this.points.keys()) this.published.add(role);
+        return { spec: this.spec, outputs: new Map(this.points), previous: new Map(this.previous) };
+    }
     add(input: IndicatorInput) {
         if (this.last && input.time <= this.last.time) throw new Error('指标追加时间必须晚于末根');
         return this.update(input, false);
@@ -65,10 +67,11 @@ export class IndicatorStream {
             throw new IndicatorCalculationError(key, input.time, 'result', '原生更新或读取失败');
         }
         for (const [role, points] of delta) {
-            const old = this.points.get(role)!;
-            // 构造期间尚未发布快照，直接收集，避免完整窗口初始化变成平方复杂度。
-            if (this.initializing) old.push(...points);
-            else this.points.set(role, (replace ? old.slice(0, -1) : old).concat(points));
+            let values = this.points.get(role)!;
+            // 发布后的数组只复制一次；同一批中尚未发布的追加／覆盖复用该副本。
+            if (this.published.delete(role)) { values = values.slice(); this.points.set(role, values); }
+            if (replace) values[values.length - 1] = points[0]!;
+            else values.push(...points);
         }
         this.last = { ...input };
         if (!replace) this.count++;
@@ -78,7 +81,10 @@ export class IndicatorStream {
         for (const [role, points] of this.points) {
             const first = points.findIndex(point => point.time >= firstTime);
             if (first > 0) this.previous.set(role, points[first - 1]!);
-            this.points.set(role, points.filter(point => point.time >= firstTime));
+            if (first !== 0) {
+                this.points.set(role, first < 0 ? [] : points.slice(first));
+                this.published.delete(role);
+            }
         }
     }
 }

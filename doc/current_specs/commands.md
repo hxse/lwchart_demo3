@@ -19,6 +19,7 @@ just test
 just deploy --target=local --build --start
 just deploy --target=remote --upload --build --start
 just test-container
+just benchmark-memory --baseline=/tmp/lwchart-memory-baseline --runs=3
 ```
 
 每个场景支持 --help；动作互斥，未知参数、空配置路径及旧场景的 dev／serve／stop 退出 2。
@@ -106,3 +107,22 @@ ADX 安装回归使用新的临时目录和已有缓存，离线冻结安装生�
 浏览器优先用 PLAYWRIGHT_CHROMIUM_EXECUTABLE 或已安装缓存，否则使用 Playwright
 默认安装。NixOS 复用已存在的动态库，不修改系统环境。
 典型验证顺序为 `just check`、`just test`、`just market --build`。
+
+## 离线内存对照
+
+`just benchmark-memory --baseline=/path --runs=3` 为显式诊断，不进入默认测试。
+在修改前通过 `just market --build` 准备基线，再将 src、dist-market、package.json、
+config.example.toml 保存到独立目录，并提供可解析的同版本 node_modules；当前工作区
+也须先通过正式构建准备对应产物。诊断消费已有业务产物，仅临时构建浏览器 fixture。
+不自动创建／切换 JJ change，不安装依赖、下载浏览器或访问真实行情服务。
+
+baseline 必须是独立的已准备目录；runs 为 1..10 的整数，默认 3。缺文件、未知／
+重复参数及非法次数在启动服务前报错。使用同一 Bun 和已有 Chromium，轮换比较
+基线服务、优化后默认服务与 --smol，并交错比较两版本的正式浏览器计算／绘图链。
+两来源模拟后端只监听临时回环端口，配置使用离线凭据，退出清理所属进程和文件。
+
+标准输出逐行 JSON：服务记录启动、四路加速请求、两秒空闲后的 RSS／匿名内存／
+峰值及延迟；浏览器记录四窗口 1000／10000 根的重复、末根、追加裁剪耗时和堆大小，
+以及包含已回收对象的 CDP 累计采样分配估计。三轮以上比较中位数，终态必须严格相同。
+浏览器阶段间的显式 GC 仅用于测量，生产没有对应调用。加速负载不等同五秒真实
+节拍，累计分配量不等同常驻内存或峰值，也不等同 Cockpit 的容器统计；不默认写报告。

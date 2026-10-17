@@ -7,7 +7,13 @@ export async function buildMarket(root: string) {
     const directory = resolve(root, 'dist-market');
     await mkdir(directory, { recursive: true });
     const result = await Bun.build({ entrypoints: [resolve(root, 'scripts/crypto/production.ts')], target: 'bun', outdir: directory,
-        naming: 'server.js', minify: true });
+        naming: 'server.js', minify: true,
+        plugins: [{ name: 'server-dependencies', setup(builder) {
+            builder.onResolve({ filter: /^(lightweight-charts|fancy-canvas|svelte|trading-signals)(\/|$)/ }, ({ path }) => {
+                throw new Error(`生产服务不得加载浏览器实现：${path}`);
+            });
+        } }],
+    });
     if (!result.success) throw new Error('生产服务打包失败，请检查构建诊断');
     await rm(resolve(directory, 'public'), { recursive: true, force: true });
     await cp(resolve(root, 'dist-crypto'), resolve(directory, 'public'), { recursive: true, force: true });

@@ -7,6 +7,7 @@ import { findClosestTime } from '../../src/components/lw-chart/logic/TimeScaleHe
 import type { LegendManager } from '../../src/components/lw-chart/logic/LegendManager';
 import type { SeriesConfig, SeriesDataPatch } from '../../src/utils/chartTypes';
 import { chartSeries } from '../../src/crypto/data/chartData';
+import { timelinePoint } from '../../src/components/lw-chart/logic/SeriesTimeline';
 
 class FakePane {
     preserved = false;
@@ -215,6 +216,7 @@ test('补丁整批先校验，尾根覆盖与追加不重建；空更新无操�
     expect(() => applySeriesData(f.chart, map, bad, false)).toThrow('折线');
     expect(candle.updates).toBe(0);
     expect(f.range).toEqual(originalRange);
+    expect(timelinePoint(candle as unknown as ISeriesApi<any>, point(1).time)?.close).toBe(100);
     for (const patches of [
         [{ name: 'missing', data: [] }], [{ name: 'candles', data: [point(-1)] }],
         [{ name: 'candles', data: [point(1), point(1)] }], [{ name: 'candles', data: [{ time: point(1).time, value: 1 }] }],

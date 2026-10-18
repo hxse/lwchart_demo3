@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { ISeriesApi, ITimeScaleApi, Time } from 'lightweight-charts';
 import { candleRightEdge, latestCandleIsUnclipped } from '../../src/components/lw-chart/logic/CandleVisibility';
+import { commitTimeline, nextTimeline } from '../../src/components/lw-chart/logic/SeriesTimeline';
 
 test('蜡烛边缘适配 SDK 的宽度、奇偶对齐和实际 bitmap 比例', () => {
     for (const [spacing, ratio, right] of [
@@ -15,14 +16,17 @@ function fixture(ratio: number, spacing: number) {
     let empty = false;
     const canvas = { width: 600 * ratio, clientWidth: 600, clientHeight: 300 };
     const series = {
-        data: () => empty ? [] : [{ time: 100 }],
+        data: () => empty ? [] : [{ time: 100, open: 1, high: 1, low: 1, close: 1 }],
+        seriesType: () => 'Candlestick',
         getPane: () => ({ getHTMLElement: () => ({ querySelectorAll: () => available ? [canvas] : [] }) }),
     } as unknown as ISeriesApi<any>;
     const scale = {
         timeToCoordinate: () => center, width: () => 600, options: () => ({ barSpacing: spacing }),
     } as unknown as ITimeScaleApi<Time>;
     return { visible: () => latestCandleIsUnclipped(scale, series), set center(value: number) { center = value; },
-        set available(value: boolean) { available = value; }, set empty(value: boolean) { empty = value; } };
+        set available(value: boolean) { available = value; }, set empty(value: boolean) {
+            empty = value; commitTimeline(series, nextTimeline(series, series.data(), true));
+        } };
 }
 
 test('完整贴边跟随，一个 bitmap 像素裁切或约 1/3 裁切均保持历史', () => {

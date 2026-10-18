@@ -4,6 +4,7 @@
  */
 
 import type { ITimeScaleApi, ISeriesApi } from "lightweight-charts";
+import { seriesValues } from './SeriesTimeline';
 
 /**
  * 在系列数据中查找最接近目标时间的时间点（使用二分查找，O(log n)）
@@ -23,8 +24,7 @@ export function findClosestTime(
     if (!firstSeries) return null;
 
     try {
-        // @ts-ignore - 访问内部 API 获取数据
-        const data = firstSeries.data?.() || [];
+        const data = seriesValues(firstSeries);
         if (data.length === 0) return null;
 
         // 二分查找最接近且不超过目标时间的点

@@ -1,7 +1,7 @@
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import type { SeriesDataPatch } from '../../../utils/chartTypes';
 import { latestCandleIsUnclipped } from './CandleVisibility';
-import { seriesTimeline, timelineTail, nextTimeline, commitTimeline, updateTimeline, isGap } from './SeriesTimeline';
+import { seriesTimeline, seriesValues, timelineTail, nextTimeline, commitTimeline, updateTimeline, isGap } from './SeriesTimeline';
 import { syncLineSegments } from './LineSegments';
 
 // SDK 的公开滚动接口到下一帧才应用；同帧下一批须使用已请求的偏移。
@@ -46,7 +46,7 @@ export function applySeriesData(
     const actualRange = scale.getVisibleLogicalRange();
     const primary = seriesMap.values().next().value as ISeriesApi<any> | undefined;
     const candle = primary?.seriesType() === 'Candlestick';
-    const length = () => primary ? (candle ? seriesTimeline(primary).size : primary.data().length) : 0;
+    const length = () => primary ? (candle ? seriesTimeline(primary).size : seriesValues(primary).length) : 0;
     const oldLength = length();
     const first = primary?.dataByIndex(0)?.time;
     if (!actualRange || !oldLength) pendingOffsets.delete(chart);
@@ -102,7 +102,7 @@ export function applySeriesData(
             if (candle) move(offset);
             else restore(nextLength - 1 + range.to - (oldLength - 1));
         } else if (replace && anchor !== undefined) {
-            const data = primary.data();
+            const data = seriesValues(primary);
             const nextIndex = data.findIndex(p => p.time === anchor);
             if (nextIndex >= 0) {
                 const shift = nextIndex - anchorIndex;

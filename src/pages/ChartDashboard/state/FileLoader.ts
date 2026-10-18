@@ -3,7 +3,7 @@
  * 负责处理 ZIP 文件的加载和解析，包括 Notebook 模式和 Browser 模式
  */
 
-import type { DashboardOverride, ChartConfigJSON } from "../chartDashboard.types";
+import type { ChartConfigJSON } from "../chartDashboard.types";
 import type { ParsedFileContent } from "../../../utils/zipParser";
 import { ChartDataProcessor } from "../logic/ChartDataProcessor";
 import { parseUrlOverrides, applyOverridesToConfig } from './OverrideManager';
@@ -60,11 +60,10 @@ export function convertToBlob(zipData: string | ArrayBuffer | Blob): Blob {
     if (typeof zipData === 'string') {
         // Base64 字符串
         const byteCharacters = atob(zipData);
-        const byteNumbers = new Array(byteCharacters.length);
+        const byteArray = new Uint8Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+            byteArray[i] = byteCharacters.charCodeAt(i);
         }
-        const byteArray = new Uint8Array(byteNumbers);
         return new Blob([byteArray], { type: 'application/zip' });
     } else if (zipData instanceof ArrayBuffer) {
         // ArrayBuffer

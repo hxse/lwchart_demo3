@@ -35,24 +35,44 @@ export async function measureBrowser(root: string, signal: AbortSignal) {
         const cdp = await page.context().newCDPSession(page);
         const stages = [];
         const bytes = (node: { selfSize: number; children: any[] }): number => node.selfSize + node.children.reduce((sum, child) => sum + bytes(child), 0);
+        async function measure<T extends { elapsed_ms: number; checksum: unknown }>(size: number, kind: string, initial: number, run: () => Promise<T>) {
+            signal.throwIfAborted();
+            await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768,
+                includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+            const result = await run();
+            const sampled = await cdp.send('HeapProfiler.stopSampling');
+            const after = await cdp.send('Runtime.getHeapUsage');
+            await cdp.send('HeapProfiler.collectGarbage');
+            const retained = await cdp.send('Runtime.getHeapUsage');
+            return { size, kind, ...result, initial_heap_bytes: initial, sampled_allocation_bytes: bytes(sampled.profile.head),
+                after_heap_bytes: after.usedSize, retained_heap_bytes: retained.usedSize, retained_backing_bytes: retained.backingStorageSize };
+        }
         for (const size of [1000, 10000]) {
             await page.evaluate(size => window.memoryBench.initialize(size), size);
             await cdp.send('HeapProfiler.collectGarbage');
             const initial = await cdp.send('Runtime.getHeapUsage');
             for (const kind of ['repeat', 'tail', 'append'] as const) {
-                signal.throwIfAborted();
-                await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768,
-                    includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
-                const result = await page.evaluate(({ kind, rounds }) => window.memoryBench.update(kind, rounds), { kind, rounds: kind === 'append' ? 20 : 100 });
-                const sampled = await cdp.send('HeapProfiler.stopSampling');
-                const after = await cdp.send('Runtime.getHeapUsage');
-                await cdp.send('HeapProfiler.collectGarbage');
-                const retained = await cdp.send('Runtime.getHeapUsage');
-                stages.push({ size, kind, ...result, initial_heap_bytes: initial.usedSize, sampled_allocation_bytes: bytes(sampled.profile.head),
-                    after_heap_bytes: after.usedSize, retained_heap_bytes: retained.usedSize });
+                stages.push(await measure(size, kind, initial.usedSize, () => page.evaluate(({ kind, rounds }) => window.memoryBench.update(kind, rounds),
+                    { kind, rounds: kind === 'append' ? 20 : 100 })));
             }
         }
         await page.evaluate(() => window.memoryBench.dispose());
+        for (const size of [1000, 10000]) {
+            await page.evaluate(size => window.memoryBench.hot.initialize(size), size);
+            for (const kind of ['visibility', 'crosshair', 'legend'] as const) {
+                await page.evaluate(() => window.memoryBench.hot.prepare());
+                await cdp.send('HeapProfiler.collectGarbage');
+                const initial = await cdp.send('Runtime.getHeapUsage');
+                stages.push(await measure(size, kind, initial.usedSize, () => page.evaluate(kind => window.memoryBench.hot.run(kind, kind === 'visibility' ? 100 : 200), kind)));
+            }
+        }
+        await page.evaluate(() => window.memoryBench.hot.initializeGaps(1000));
+        await cdp.send('HeapProfiler.collectGarbage');
+        stages.push(await measure(1000, 'cci-gaps', (await cdp.send('Runtime.getHeapUsage')).usedSize, () => page.evaluate(() => window.memoryBench.hot.updateGaps(20))));
+        await page.evaluate(() => window.memoryBench.hot.initializeBytes(1048576));
+        await cdp.send('HeapProfiler.collectGarbage');
+        stages.push(await measure(1048576, 'base64', (await cdp.send('Runtime.getHeapUsage')).usedSize, () => page.evaluate(() => window.memoryBench.hot.convert(4))));
+        await page.evaluate(() => window.memoryBench.hot.dispose());
         if (errors.length) throw new Error(errors.join('\n'));
         return stages;
     } finally {

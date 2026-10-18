@@ -116,7 +116,7 @@ async function main() {
         const url = new URL(request.url);
         if (url.pathname === '/__orders') return orders.control(request);
         if (url.pathname === '/' || url.pathname.startsWith('/assets/')) return oldApp(request);
-        if (['/viewport', '/chart-gaps', '/price-lines'].includes(url.pathname)) {
+        if (['/viewport', '/chart-gaps', '/price-lines', '/chart-performance'].includes(url.pathname)) {
             const html = await Bun.file(join(root, 'tests/fixtures/viewport.html')).text();
             const module = `${url.pathname.slice(1)}.ts`;
             return new Response(html.replace('__VIEWPORT_MODULE__', encodeURI(join(root, 'tests/fixtures', module))), {

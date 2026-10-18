@@ -1,4 +1,5 @@
 import type { ISeriesApi, ITimeScaleApi, Time } from 'lightweight-charts';
+import { seriesValues } from './SeriesTimeline';
 
 /**
  * 内置蜡烛的 bitmap 右边缘（不含边缘外的像素）。
@@ -19,7 +20,7 @@ export function candleRightEdge(center: number, spacing: number, ratio: number):
 }
 
 export function latestCandleIsUnclipped(scale: ITimeScaleApi<Time>, series: ISeriesApi<any>, pendingShift = 0): boolean {
-    const tail = series.data().at(-1);
+    const tail = seriesValues(series).at(-1);
     if (!tail) return true;
     const center = scale.timeToCoordinate(tail.time);
     const pane = series.getPane().getHTMLElement();

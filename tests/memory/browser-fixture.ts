@@ -5,6 +5,7 @@ import { parseIndicatorList } from '../../src/indicators/parameters';
 import { SeriesRegistry } from '../../src/components/lw-chart/logic/SeriesRegistry';
 import { applySeriesData } from '../../src/components/lw-chart/logic/SeriesDataUpdater';
 import type { OhlcvRow } from '../../src/crypto/data/ohlcv';
+import { hotMemoryBench } from './hotpath-fixture';
 
 const specs = parseIndicatorList('ema,14;ema,50;ema,100;rsi,14;macd,12,26,9');
 const candle = (index: number, revision = 0): OhlcvRow => {
@@ -66,5 +67,5 @@ async function update(kind: 'repeat' | 'tail' | 'append', rounds: number) {
     await painted();
     return { elapsed_ms: performance.now() - start, checksum: checksum() };
 }
-export const memoryBench = { initialize, update, dispose };
+export const memoryBench = { initialize, update, dispose, hot: hotMemoryBench };
 Object.assign(window, { memoryBench });

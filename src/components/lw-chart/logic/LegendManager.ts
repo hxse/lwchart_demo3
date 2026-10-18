@@ -1,21 +1,25 @@
-import type { ISeriesApi, MouseEventParams, IChartApi, TimeFormatterFn } from "lightweight-charts";
+import type { ISeriesApi, MouseEventParams, IChartApi, TimeFormatterFn } from 'lightweight-charts';
 import { timelinePoint } from './SeriesTimeline';
 
 const volumeFormatter = new Intl.NumberFormat('en', { maximumSignificantDigits: 8 });
-
+const ohlcLabels = ['O', 'H', 'L', 'C'], volumeLabels = [...ohlcLabels, 'V'];
 export interface LegendItemConfig {
     name: string;
     color: string;
     showInLegend: boolean;
     formatter?: (value: number) => string;
 }
-const escaped = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+interface LegendRow { element: HTMLDivElement; labels: HTMLSpanElement[]; values: HTMLSpanElement[] }
 
+/** 图例节点只属于当前注册系列，格式变化只更新实际发生变化的文字。 */
 export class LegendManager {
     private legendElement: HTMLElement | null = null;
     private seriesMap = new Map<ISeriesApi<any>, LegendItemConfig>();
-    private showInAll = false; // 是否在所有同步图表中显示
-    private chart: IChartApi | null = null; // 图表实例引用，用于同步时获取数据
+    private rows = new Map<ISeriesApi<any>, LegendRow>();
+    private timeElement: HTMLDivElement | undefined;
+    private timeMarkup = '';
+    private showInAll = false;
+    private chart: IChartApi | null = null;
     private timeFormatter: TimeFormatterFn | undefined;
     private lastParam: MouseEventParams | undefined;
 
@@ -23,174 +27,103 @@ export class LegendManager {
         this.timeFormatter = formatter;
         if (this.lastParam) this.update(this.lastParam);
     }
-
-    /**
-     * 创建 Legend DOM 元素
-     * @param container 图表容器，用于挂载 Legend
-     */
     public create(container: HTMLElement): void {
         if (this.legendElement) return;
-
-        this.legendElement = document.createElement("div");
-        this.legendElement.className = "chart-legend";
-
-        // 样式设置
+        this.legendElement = document.createElement('div');
+        this.legendElement.className = 'chart-legend';
         Object.assign(this.legendElement.style, {
-            position: "absolute",
-            left: "6px",
-            top: "6px",
-            zIndex: "10",
-            fontSize: "11px",
-            fontFamily: "'Inter', 'Segoe UI', 'Consolas', monospace",
-            lineHeight: "14px",
-            color: "var(--chart-legend-value, #444)",
-            background: "var(--chart-legend-bg, rgba(255, 255, 255, 0.3))",
-            padding: "4px 6px",
-            borderRadius: "3px",
-            border: "1px solid var(--chart-legend-border, rgba(0,0,0,0.08))",
-            pointerEvents: "none",
-            display: "none", // 初始隐藏
-            flexDirection: "column",
-            gap: "1px",
-            boxShadow: "0 1px 3px var(--chart-legend-shadow, rgba(0,0,0,0.05))",
-            backdropFilter: "blur(8px)"
+            position: 'absolute', left: '6px', top: '6px', zIndex: '10', fontSize: '11px',
+            fontFamily: "'Inter', 'Segoe UI', 'Consolas', monospace", lineHeight: '14px',
+            color: 'var(--chart-legend-value, #444)', background: 'var(--chart-legend-bg, rgba(255, 255, 255, 0.3))',
+            padding: '4px 6px', borderRadius: '3px', border: '1px solid var(--chart-legend-border, rgba(0,0,0,0.08))',
+            pointerEvents: 'none', display: 'none', flexDirection: 'column', gap: '1px',
+            boxShadow: '0 1px 3px var(--chart-legend-shadow, rgba(0,0,0,0.05))', backdropFilter: 'blur(8px)',
         });
-
-        container.style.position = "relative";
-        container.appendChild(this.legendElement);
+        container.style.position = 'relative'; container.appendChild(this.legendElement);
     }
-
-    /**
-     * 注册要显示的系列
-     * @param series 价格系列 API
-     * @param config 系列配置 (名称, 颜色, 显隐控制)
-     */
-    public registerSeries(series: ISeriesApi<any>, config: LegendItemConfig): void {
-        this.seriesMap.set(series, config);
-    }
-
+    public registerSeries(series: ISeriesApi<any>, config: LegendItemConfig): void { this.seriesMap.set(series, config); }
     public clearSeries(): void {
-        this.seriesMap.clear();
-        if (this.legendElement) this.legendElement.style.display = 'none';
+        this.seriesMap.clear(); this.rows.clear(); this.timeElement = undefined; this.timeMarkup = '';
+        this.legendElement?.replaceChildren(); this.display(false);
     }
-
-    /**
-     * 设置是否在所有同步图表中显示
-     * @param val
-     */
-    public setShowInAll(val: boolean): void {
-        this.showInAll = val;
+    public setShowInAll(value: boolean): void { this.showInAll = value; }
+    public setChart(chart: IChartApi): void { this.chart = chart; }
+    private display(visible: boolean) {
+        const next = visible ? 'flex' : 'none';
+        if (this.legendElement && this.legendElement.style.display !== next) this.legendElement.style.display = next;
     }
-
-    /**
-     * 设置图表实例引用（用于同步时获取数据）
-     */
-    public setChart(chart: IChartApi): void {
-        this.chart = chart;
+    private place(element: HTMLElement, index: number) {
+        const sibling = this.legendElement!.children.item(index);
+        if (sibling !== element) this.legendElement!.insertBefore(element, sibling);
     }
-
-    /**
-     * 更新 Legend 显示内容
-
-     * @param param 十字线移动事件参数
-     */
+    private write(element: HTMLElement, value: string) {
+        if (element.textContent !== value) element.textContent = value;
+    }
+    private row(series: ISeriesApi<any>, labels: string[], values: string[], index: number) {
+        let row = this.rows.get(series);
+        if (!row) {
+            const element = document.createElement('div'); element.className = 'legend-item';
+            element.style.cssText = 'display:flex;align-items:center;gap:4px';
+            row = { element, labels: [], values: [] }; this.rows.set(series, row);
+        }
+        if (row.values.length !== values.length) {
+            row.element.replaceChildren(); row.labels = []; row.values = [];
+            for (let i = 0; i < values.length; i++) {
+                const label = document.createElement('span'), value = document.createElement('span');
+                label.style.cssText = 'color:var(--chart-legend-label, #888);margin-right:2px';
+                value.style.cssText = 'color:var(--chart-legend-value, #222);font-weight:500;margin-right:6px';
+                if (i === 4) value.className = 'legend-volume';
+                row.element.append(label, value); row.labels.push(label); row.values.push(value);
+            }
+        }
+        values.forEach((value, i) => { this.write(row!.labels[i]!, labels[i]!); this.write(row!.values[i]!, value); });
+        this.place(row.element, index);
+    }
+    private data(series: ISeriesApi<any>, param: MouseEventParams) {
+        const known = timelinePoint(series, param.time!) ?? param.seriesData?.get(series);
+        if (known || !this.chart) return known;
+        try {
+            const scale = this.chart.timeScale(), coordinate = scale.timeToCoordinate(param.time!);
+            if (coordinate === null) return undefined;
+            const index = scale.coordinateToLogical(coordinate);
+            return index === null ? undefined : series.dataByIndex(Math.round(index));
+        } catch { return undefined; }
+    }
     public update(param: MouseEventParams): void {
         this.lastParam = param;
         if (!this.legendElement) return;
-
-        // 如果不是用户发起的交互（例如程序调用的同步），且未开启 showInAll，隐藏 Legend
-        if (!this.showInAll && !param.sourceEvent) {
-            this.legendElement.style.display = "none";
-            return;
+        if (!param.time || !this.showInAll && (!param.sourceEvent || !param.point || param.point.x < 0 || param.point.y < 0)) {
+            this.display(false); return;
         }
-
-        // 如果没有时间戳（鼠标离开），隐藏 Legend
-        if (!param.time) {
-            this.legendElement.style.display = "none";
-            return;
-        }
-
-        // 如果不是 showInAll 模式，还需要检查点是否在图表内
-        if (!this.showInAll && (!param.point || param.point.x < 0 || param.point.y < 0)) {
-            this.legendElement.style.display = "none";
-            return;
-        }
-
-        const time = param.time;
-        let html = this.timeFormatter ? `<div class="legend-time">T ${this.timeFormatter(time)}</div>` : '';
-        let hasContent = false;
-
+        const markup = this.timeFormatter ? `T ${this.timeFormatter(param.time)}` : null;
+        let index = markup === null ? 0 : 1, hasContent = false;
         this.seriesMap.forEach((config, series) => {
-            if (!config.showInLegend) return;
-
-            // 优先使用 param 中的数据，如果没有则尝试从图表获取
-            let data = timelinePoint(series, time) ?? param.seriesData?.get(series);
-
-            // 如果 seriesData 中没有数据（同步情况），尝试通过时间获取
-            // 注意：时间已在 setCrosshair 中匹配，这里直接使用
-            if (!data && this.chart && param.time) {
-                try {
-                    const timeScale = this.chart.timeScale();
-                    const coordinate = timeScale.timeToCoordinate(param.time as any);
-                    if (coordinate !== null) {
-                        const logicalIndex = timeScale.coordinateToLogical(coordinate);
-                        if (logicalIndex !== null) {
-                            data = series.dataByIndex(Math.round(logicalIndex)) as any;
-                        }
-                    }
-                } catch (e) {
-                    // 忽略获取数据失败的情况
-                }
-            }
-
-            if (!data) return;
-
+            const data = config.showInLegend ? this.data(series, param) : undefined;
+            if (!data) { this.rows.get(series)?.element.remove(); return; }
             hasContent = true;
-
-            // 处理不同类型的数据显示
-            let valueStr = "";
-            const labelStyle = 'color: var(--chart-legend-label, #888); margin-right: 2px;';
-            const valStyle = () => `color: var(--chart-legend-value, #222); font-weight: 500; margin-right: 6px;`;
-
-            if ("open" in data && "high" in data && "low" in data && "close" in data) {
-                // OHLC 数据 (Candle/Bar) - 采用更精简的标签
-                valueStr = `<span style="${labelStyle}">O</span><span style="${valStyle()}">${data.open.toFixed(2)}</span>` +
-                    `<span style="${labelStyle}">H</span><span style="${valStyle()}">${data.high.toFixed(2)}</span>` +
-                    `<span style="${labelStyle}">L</span><span style="${valStyle()}">${data.low.toFixed(2)}</span>` +
-                    `<span style="${labelStyle}">C</span><span style="${valStyle()}">${data.close.toFixed(2)}</span>`;
+            if ('open' in data && 'high' in data && 'low' in data && 'close' in data) {
+                const values = [data.open.toFixed(2), data.high.toFixed(2), data.low.toFixed(2), data.close.toFixed(2)];
                 const volume = data.customValues?.volume;
-                if (typeof volume === 'number' && Number.isFinite(volume)) {
-                    valueStr += `<span style="${labelStyle}">V</span><span class="legend-volume" style="${valStyle()}">${volumeFormatter.format(volume)}</span>`;
-                }
-            } else if ("value" in data) {
-                // 单值数据 (Line/Area/Histogram)
-                valueStr = `<span style="${labelStyle}">${escaped(config.name)}</span><span style="${valStyle()}">${escaped(config.formatter ? config.formatter(data.value) : data.value.toFixed(2))}</span>`;
+                const hasVolume = typeof volume === 'number' && Number.isFinite(volume);
+                if (hasVolume) values.push(volumeFormatter.format(volume));
+                this.row(series, hasVolume ? volumeLabels : ohlcLabels, values, index++);
+            } else if ('value' in data) {
+                this.row(series, [config.name], [config.formatter ? config.formatter(data.value) : data.value.toFixed(2)], index++);
             } else if (typeof data.customValues?.displayValue === 'string') {
-                valueStr = `<span style="${labelStyle}">${escaped(config.name)}</span><span style="${valStyle()}">${escaped(data.customValues.displayValue)}</span>`;
-            }
-
-            if (valueStr) {
-                html += `<div class="legend-item" style="display:flex; align-items:center; gap:4px;">${valueStr}</div>`;
-            }
+                this.row(series, [config.name], [data.customValues.displayValue], index++);
+            } else this.rows.get(series)?.element.remove();
         });
-
-        if (hasContent) {
-            this.legendElement.innerHTML = html;
-            this.legendElement.style.display = "flex";
-        } else {
-            this.legendElement.style.display = "none";
-        }
+        if (hasContent && markup !== null) {
+            if (!this.timeElement) { this.timeElement = document.createElement('div'); this.timeElement.className = 'legend-time'; }
+            // 时间格式器继续采用既有字符串渲染；数值、系列名和缺口文本均使用 textContent。
+            if (this.timeMarkup !== markup) { this.timeElement.innerHTML = markup; this.timeMarkup = markup; }
+            this.place(this.timeElement, 0);
+        } else this.timeElement?.remove();
+        this.display(hasContent);
     }
-
-    /**
-     * 销毁 Legend
-     */
     public destroy(): void {
-        if (this.legendElement && this.legendElement.parentNode) {
-            this.legendElement.parentNode.removeChild(this.legendElement);
-        }
-        this.legendElement = null;
-        this.seriesMap.clear();
-        this.lastParam = undefined;
+        this.legendElement?.remove(); this.legendElement = null;
+        this.seriesMap.clear(); this.rows.clear(); this.timeElement = undefined; this.timeMarkup = '';
+        this.lastParam = undefined; this.chart = null;
     }
 }

@@ -16,6 +16,8 @@ function watchLookups(page: Page) {
 }
 async function open(page: Page) {
     await page.getByRole('button', { name: '展开下单面板' }).click(); await expect(buy(page)).toBeEnabled();
+    await panel(page).getByRole('checkbox', { name: '空仓时清理只减仓条件单' }).uncheck();
+    await panel(page).getByRole('checkbox', { name: '下单前自动查询' }).uncheck();
 }
 test.beforeEach(async ({ page, request }) => {
     await request.post(fixture, { data: { reset: true } });
@@ -27,7 +29,7 @@ test.beforeEach(async ({ page, request }) => {
 });
 test.afterEach(async ({ page }) => { expect(errors.get(page)).toEqual([]); });
 
-test('面板按钮单飞查询，确认框不读取或展示持仓，查询中仍可确认，报价和刷新不自动重查', async ({ page, request }) => {
+test('关闭两项偏好后仅手动单飞查询，确认框不展示持仓，纯查询不阻止确认且行情不自动重查', async ({ page, request }) => {
     const lookups = watchLookups(page);
     await page.goto('/?timeframes=30m&refresh_seconds=3600'); await open(page);
     await expect(query(page)).toBeEnabled(); await expect(positionStatus(page)).toHaveCount(0);

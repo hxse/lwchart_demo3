@@ -5,7 +5,7 @@ import { TradingError, type Confirmation, type LegName, type Observation, type S
 export interface OrderFacts {
     id: string; clientId: string | null; symbol: string; side: Side | null; status: string | null;
     amount: string | null; filled: string | null; average: string | null; trigger: string | null;
-    reduceOnly: boolean | null; fee: unknown;
+    reduceOnly: boolean | null; type: string | null; fee: unknown;
 }
 const invalid = () => new TradingError('BACKEND_INVALID_RESPONSE', '订单或成交字段无效，不能确认交易结果', 502);
 export function numeric(value: unknown, positive = false): string | null {
@@ -23,7 +23,8 @@ export function orderFacts(input: unknown): OrderFacts {
     if (amount && filled && Decimal.parse(filled).cmp(Decimal.parse(amount)) > 0) throw invalid();
     return { id: text(value.id), symbol: text(value.symbol), clientId: value.clientOrderId == null ? null : text(value.clientOrderId),
         side: (value.side ?? null) as Side | null, status: value.status as string | null, amount, filled,
-        average: numeric(value.average, true), trigger: numeric(value.triggerPrice, true), reduceOnly: (value.reduceOnly ?? null) as boolean | null, fee: value.fee };
+        average: numeric(value.average, true), trigger: numeric(value.triggerPrice, true), reduceOnly: (value.reduceOnly ?? null) as boolean | null,
+        type: value.type == null ? null : text(value.type).toLowerCase(), fee: value.fee };
 }
 export function mergeFacts(old: OrderFacts | null, next: OrderFacts): OrderFacts {
     if (!old || old.id !== next.id) return next;

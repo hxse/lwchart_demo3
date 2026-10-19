@@ -87,6 +87,13 @@ export function parseCheckRequest(input: unknown): CheckRequest {
         return { ...identity, request_id: uuid(value.request_id), orders: { entry: id(orders.entry), stop_loss: id(orders.stop_loss), take_profit: id(orders.take_profit) } };
     });
 }
+export function parseCleanupRequest(input: unknown): TradeIdentity {
+    return parseInput(() => {
+        const identity = normalizeCcxt(fields(input, identityKeys, '清理请求'));
+        if (/[?*]/.test(identity.symbol)) throw new Error('清理请求必须指定完整品种，不能使用通配符');
+        return identity;
+    });
+}
 export function parseTradeQuery(params: URLSearchParams): TradeIdentity {
     const values = Object.fromEntries(params);
     onlyKeys(values, identityKeys, '交易资料参数');

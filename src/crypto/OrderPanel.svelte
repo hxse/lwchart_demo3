@@ -27,6 +27,8 @@
   let snapshot = $state.raw<PanelState | null>(null);
   const view = $derived(snapshot && matchesChart(orderReaderSettings(memory, initial), snapshot.identity) ? snapshot : null);
   let progress = $state.raw<ExecutionState>(untrack(() => execution.state));
+  const cleaning = $derived(progress.inspection.pending && progress.inspection.cleanup);
+  const busy = $derived(progress.pending || progress.checking || cleaning);
   let panel = $state<HTMLElement>();
   let controller: OrderPanelState | undefined;
   let exampleSide = $state<Side | null>(null);
@@ -44,11 +46,11 @@
         controller = reader;
         unsubscribe = reader.subscribe(value => { snapshot = value; }); reader.start();
       }
-      return () => { unsubscribe?.(); reader?.dispose(); controller = undefined; snapshot = null; };
+      return () => { unsubscribe?.(); reader?.dispose(); execution.cancelInspection(); controller = undefined; snapshot = null; };
     });
   });
   $effect(() => { if (dirty || overlayOpen) confirmation = null; });
-  const canExample = $derived(!dirty && !progress.pending && !progress.checking && !!view && matchesChart(chartCurrent, view.identity));
+  const canExample = $derived(!dirty && !busy && !!view && matchesChart(chartCurrent, view.identity));
   $effect(() => {
     const preview = exampleSide && canExample ? view?.directions[exampleSide].preview : null;
     onExample(preview && view && exampleSide ? { identity: { ...view.identity }, side: exampleSide,
@@ -95,14 +97,16 @@
   }
   function refresh() { if (!dirty && view) void controller?.refresh(); }
   function check() { if (!dirty) void execution.check(); }
+  function inspect() { if (!dirty && view) void execution.inspect(view.identity, memory.cleanupOnQuery); }
   function requestSubmit(side: Side) {
-    if (dirty || progress.pending || progress.checking || !view?.directions[side].preview) return;
+    if (dirty || busy || !view?.directions[side].preview) return;
     clearExample(); confirmation = side;
+    if (memory.inspectBeforeSubmit) inspect();
   }
   function submit() {
     const side = confirmation;
     if (!side) return;
-    if (dirty || progress.pending || progress.checking || !view || !controller) return;
+    if (dirty || busy || !view || !controller) return;
     confirmation = null;
     try { const input = controller.prepare(side); memory.error = ''; void execution.submit(input); }
     catch (value) { memory.error = (value as Error).message; }
@@ -164,7 +168,8 @@
         {#if view && !matchesChart(chartCurrent, view.identity)}<p class="hint">下单品种或交易身份与当前图表不同，不能画线示例。</p>{/if}
         <p class="reference">当前预览：{view?.identity.symbol ?? applied.symbol} · {view?.parameters.timeframe ?? applied.timeframe} ·
           ATR <span data-testid="order-atr">{view?.atr?.value ?? '等待计算'}</span></p>
-        {#if view}<OrderPositions identity={view.identity} disabled={dirty || progress.pending || progress.checking} />{/if}
+        {#if view}<OrderPositions identity={view.identity} state={progress.inspection} disabled={dirty || busy}
+          bind:cleanupOnQuery={memory.cleanupOnQuery} bind:inspectBeforeSubmit={memory.inspectBeforeSubmit} onQuery={inspect} />{/if}
         {#if view?.data}<p class="hint">账户 taker：{percent(view.data.trading_fee.taker)} · {view.data.trading_fee.source === 'binance_commission_rate' ? 'Binance 账户费率' : 'Kraken 账户费率'} · {new Date(view.data.trading_fee.updated_at).toLocaleTimeString()}</p>{/if}
         <div class="tabs" role="tablist" aria-label="参考方向">
           {#each sides as side}
@@ -196,7 +201,7 @@
               <OrderExampleControls {side} active={exampleSide === side} disabled={!canExample || !preview}
                 bind:visibility={memory.exampleVisibility} onToggle={() => toggleExample(side)} />
             {/if}
-            <button class="submit" disabled={!preview || dirty || progress.pending || progress.checking} onclick={() => requestSubmit(side)}>{side === 'buy' ? '做多 · 市价下单' : '做空 · 市价下单'}</button>
+            <button class="submit" disabled={!preview || dirty || busy} onclick={() => requestSubmit(side)}>{side === 'buy' ? '做多 · 市价下单' : '做空 · 市价下单'}</button>
           </div>
         {/each}
         {#each warnings as warning}<p class="warning">{warning.message}</p>{/each}
@@ -205,12 +210,13 @@
       <details class="group" bind:open={memory.expanded.log} data-testid="order-log">
         <summary>日志<span class="section-state">{progress.pending ? '执行中' : progress.checking ? '查询中' : progress.error ? '有错误' : progress.result ? '有结果' : ''}</span></summary>
         {#if !progress.pending && !progress.error && !progress.result}<p class="hint">暂无下单记录。</p>{/if}
-        <OrderResult state={progress} checkDisabled={dirty} onCheck={check} />
+        <OrderResult state={progress} checkDisabled={dirty || cleaning} onCheck={check} />
       </details>
     </div>
   {/if}
   {#if confirmation && view}
-    <OrderConfirmation state={view} side={confirmation} disabled={dirty || progress.pending || progress.checking}
+    <OrderConfirmation state={view} side={confirmation} disabled={dirty || busy}
+      inspection={memory.inspectBeforeSubmit ? progress.inspection : undefined}
       onConfirm={submit} onCancel={() => { confirmation = null; }} />
   {/if}
 </div>

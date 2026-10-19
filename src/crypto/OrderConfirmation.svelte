@@ -3,9 +3,12 @@
   import type { PanelState } from './trading/panel-state';
   import type { Side } from './trading/types';
   import { planNotionalValue } from './trading/risk-model';
+  import type { InspectionState } from './trading/inspection';
+  import OrderPositionSummary from './OrderPositionSummary.svelte';
 
-  let { state: view, side, disabled, onConfirm, onCancel }: {
+  let { state: view, side, disabled, inspection, onConfirm, onCancel }: {
     state: PanelState; side: Side; disabled: boolean; onConfirm: () => void; onCancel: () => void;
+    inspection?: InspectionState;
   } = $props();
   let dialog: HTMLDialogElement;
   const direction = $derived(side === 'buy' ? '做多' : '做空');
@@ -27,6 +30,7 @@
     </dl>
   {:else}<p class="error" role="alert">{view.directions[side].error}</p>{/if}
   <p class="hint">参考值持续更新，按确认时的最新有效参考提交。</p>
+  {#if inspection}<OrderPositionSummary state={inspection} />{/if}
   <div class="actions">
     <button onclick={onCancel}>取消下单</button>
     <button class="confirm" disabled={disabled || !preview} onclick={onConfirm}>确认{direction}</button>

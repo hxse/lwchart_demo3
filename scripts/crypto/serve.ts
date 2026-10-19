@@ -1,6 +1,7 @@
 import { createApi } from './api';
 import { staticHandler } from './static';
 import { loadCryptoConfig } from './config';
+import { orderWritePaths } from './order-api';
 
 export async function serve(configPath: string, directory: string) {
     const config = await loadCryptoConfig(configPath);
@@ -10,7 +11,7 @@ export async function serve(configPath: string, directory: string) {
     const server = Bun.serve({ hostname: config.server.host, port: config.server.port,
         async fetch(request, connection) {
             const url = new URL(request.url);
-            if (request.method === 'POST' && ['/api/ccxt/manual-order', '/api/ccxt/manual-order/check'].includes(url.pathname)) connection.timeout(request, 65);
+            if (request.method === 'POST' && orderWritePaths.includes(url.pathname)) connection.timeout(request, 65);
             if (url.pathname === '/healthz' && request.method === 'GET') return Response.json({ status: 'ready' });
             return await api(request) || await files(request);
         },

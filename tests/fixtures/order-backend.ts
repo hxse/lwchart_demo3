@@ -6,13 +6,16 @@ import { orderFee, orderMarket } from './orders';
 export interface OrderFixtureOptions {
     scenario: string; ticker_delay: number; entry_delay: number; protection_delay: number; taker: string; price: number;
     position_delay: number; positions: Array<Record<string, unknown>> | null;
+    open_orders: Array<Record<string, unknown>>; cancel_delay: number; cancel_sparse: boolean;
 }
+const initialOptions = (): OrderFixtureOptions => ({ scenario: 'ok', ticker_delay: 0, entry_delay: 0, protection_delay: 0,
+    taker: '0.0004', price: 60000, position_delay: 0, positions: null, open_orders: [], cancel_delay: 0, cancel_sparse: false });
 export class OrderFixture {
-    options: OrderFixtureOptions = { scenario: 'ok', ticker_delay: 0, entry_delay: 0, protection_delay: 0, taker: '0.0004', price: 60000, position_delay: 0, positions: null };
+    options: OrderFixtureOptions = initialOptions();
     reads: Array<{ method: string; symbol: string; live: string | null }> = [];
     writes: Array<{ method: string; body: Record<string, unknown> }> = [];
     private orders = new Map<string, Record<string, unknown>>();
-    reset() { this.options = { scenario: 'ok', ticker_delay: 0, entry_delay: 0, protection_delay: 0, taker: '0.0004', price: 60000, position_delay: 0, positions: null }; this.reads = []; this.writes = []; this.orders.clear(); }
+    reset() { this.options = initialOptions(); this.reads = []; this.writes = []; this.orders.clear(); }
     private fail(status: number, code: string, write = false) {
         const error = new GatewayError(status, code, `离线 ${code}`);
         throw write ? new BackendWriteError(error, status === 502 ? 'unknown' : 'rejected') : error;
@@ -66,7 +69,7 @@ export class OrderFixture {
             if (!order) this.fail(404, 'ORDER_NOT_FOUND');
             return { order };
         }
-        if (method === 'fetch_open_orders' || method === 'fetch_closed_orders') return { orders: [...this.orders.values()].filter(order => order.symbol === identity.symbol && (method === 'fetch_open_orders' ? order.status === 'open' : order.status !== 'open')) };
+        if (method === 'fetch_open_orders' || method === 'fetch_closed_orders') return { orders: [...this.orders.values(), ...this.options.open_orders].filter(order => order.symbol === identity.symbol && (method === 'fetch_open_orders' ? order.status === 'open' || order.status == null : order.status !== 'open')) };
         if (method === 'fetch_my_trades') return { trades: [...this.orders.values()].filter(order => order.type === 'market' && Number(order.filled) > 0 && order.symbol === identity.symbol)
             .map(order => ({ id: `trade-${order.id}`, order: order.id, symbol: order.symbol, side: order.side, amount: order.filled,
                 price: this.options.price, cost: Number(order.filled) * this.options.price, fee: { cost: Number(order.filled) * this.options.price * Number(this.options.taker), currency: identity.exchange_name === 'kraken' ? 'USD' : 'USDT' } })) };
@@ -76,6 +79,15 @@ export class OrderFixture {
         signal?.throwIfAborted();
         const method = path.split('/').at(-1)!, scenario = this.options.scenario;
         this.writes.push({ method, body: { ...body } });
+        if (method === 'cancel_order') {
+            if (this.options.cancel_delay) await Bun.sleep(this.options.cancel_delay);
+            signal?.throwIfAborted();
+            const order = this.orders.get(String(body.id)) ?? this.options.open_orders.find(order => order.id === body.id && order.symbol === body.symbol);
+            if (!order) this.fail(404, 'ORDER_NOT_FOUND', true);
+            if (scenario === 'cancel-rejected') this.fail(422, 'PROVIDER_OPERATION_REJECTED', true);
+            order!.status = 'canceled';
+            return { order: this.options.cancel_sparse ? { id: order!.id, symbol: order!.symbol, status: null, type: null, side: null } : order };
+        }
         const id = `offline-${this.writes.length}`;
         const entry = method === 'create_market_order', stop = method === 'create_stop_market_order';
         if (entry && this.options.entry_delay) await Bun.sleep(this.options.entry_delay);

@@ -41,7 +41,7 @@ test('六个数值参数共用紧凑箭头，按 1 精确微调，只改草稿�
     }
     await expect(buy(page)).toBeDisabled(); await expect(confirm(page)).toBeEnabled();
     await expect(page.getByRole('button', { name: '强制刷新', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: '查询持仓', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '查询并清理', exact: true })).toBeDisabled();
     await field(page, 'risk_amount').fill('0.1234567890123456789');
     await arrow(page, 'risk_amount', '增加').click(); await expect(field(page, 'risk_amount')).toHaveValue('1.1234567890123456789');
     await field(page, 'risk_amount').press('ArrowDown'); await expect(field(page, 'risk_amount')).toHaveValue('0.1234567890123456789');

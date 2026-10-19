@@ -12,6 +12,8 @@ export interface OrderMemory {
     error: string;
     referenceSide: Side;
     exampleVisibility: ExampleVisibility;
+    cleanupOnQuery: boolean;
+    inspectBeforeSubmit: boolean;
     expanded: { parameters: boolean; reference: boolean; log: boolean };
 }
 function context(settings: DashboardSettings): OrderContext {
@@ -23,7 +25,7 @@ function context(settings: DashboardSettings): OrderContext {
 export function createOrderMemory(settings: DashboardSettings): OrderMemory {
     const draft = initialOrderDraft(settings);
     return { context: context(settings), draft, applied: { ...draft }, dirty: false, error: '', referenceSide: 'buy',
-        exampleVisibility: { entry: true, stop: true, 'take-profit': true },
+        exampleVisibility: { entry: true, stop: true, 'take-profit': true }, cleanupOnQuery: true, inspectBeforeSubmit: true,
         expanded: { parameters: true, reference: true, log: true } };
 }
 export function sameChartIdentity(left: DashboardSettings | undefined, right: DashboardSettings) {

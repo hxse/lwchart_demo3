@@ -1,5 +1,6 @@
 import { identityQuery } from './validation';
 import type { CheckRequest, CheckResult, ExecutionResult, PositionSnapshot, Quote, TradeData, TradeIdentity, TradeRequest } from './types';
+import type { CleanupResult } from './inspection';
 
 export class OrderHttpError extends Error {
     constructor(message: string, readonly status: number, readonly code: string) { super(message); }
@@ -33,6 +34,10 @@ export class OrderClient implements OrderReader {
     execute(input: TradeRequest) {
         return this.request<ExecutionResult>('/api/ccxt/manual-order', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(input), signal: AbortSignal.timeout(65000) });
+    }
+    cleanup(identity: TradeIdentity) {
+        return this.request<CleanupResult>('/api/ccxt/manual-order/cleanup', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(identity), signal: AbortSignal.timeout(65000) });
     }
     check(input: CheckRequest) {
         return this.request<CheckResult>('/api/ccxt/manual-order/check', { method: 'POST', headers: { 'Content-Type': 'application/json' },

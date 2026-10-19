@@ -170,7 +170,7 @@ test('编辑参数必须确认或取消，统一锁住下单、强制刷新及�
     const cancel = page.getByRole('button', { name: '取消', exact: true });
     const refresh = page.getByRole('button', { name: '强制刷新', exact: true });
     const check = page.getByRole('button', { name: '查询结果', exact: true });
-    const positions = page.getByRole('button', { name: '查询持仓', exact: true });
+    const positions = page.getByRole('button', { name: '查询并清理', exact: true });
     const amount = page.locator('[name="order.risk_amount"]');
     const fields = () => page.locator('.order-panel form [name]').evaluateAll(elements =>
         Object.fromEntries(elements.map(element => [(element as HTMLInputElement).name, (element as HTMLInputElement).value])));

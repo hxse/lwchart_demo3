@@ -2,6 +2,7 @@ import { integer, MAX_HISTORY_BARS, type DashboardOptions } from '../options';
 import type { MarketIdentity, MarketSource } from './client';
 import { MarketStream } from './MarketStream';
 import { chartIndicators } from '../chartIndicators';
+import { tqChartSymbol } from '../chartTqSeries';
 import { indicatorKey, parseIndicator } from '../../indicators/parameters';
 import type { IndicatorSpec } from '../../indicators/types';
 
@@ -43,9 +44,9 @@ export class MarketHub {
     }
     private reconcile() {
         const options = this.options;
-        const identities: MarketIdentity[] = options ? options.timeframes.map(timeframe => options.source === 'ccxt'
+        const identities: MarketIdentity[] = options ? options.timeframes.map((timeframe, index) => options.source === 'ccxt'
             ? { source: 'ccxt', exchange_name: options.exchange_name, market: options.market, is_live: options.is_live, symbol: options.symbol, timeframe }
-            : { source: 'tq', symbol: options.symbol, timeframe }) : [];
+            : { source: 'tq', symbol: tqChartSymbol(options.symbol, options.chart_tq_series[String(index + 1)]), timeframe }) : [];
         const groups = new Map<string, DemandGroup>();
         identities.forEach((identity,index) => {
             const id = streamKey(identity, options!.history_bars);

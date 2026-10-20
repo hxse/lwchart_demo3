@@ -3,6 +3,7 @@
   import { changeLayout, serializeDashboardQuery } from './query';
   import { normalizeSettings, validateMainPaneRatio, indicatorString, parseIndicators, LAYOUTS, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions, type DockPosition } from './options';
   import { chartIndicatorDrafts, resizeChartIndicatorDrafts, parseChartIndicatorDrafts } from './chartIndicators';
+  import { isTqContinuousSymbol, type TqSeries } from './chartTqSeries';
   import IndicatorEditor from './IndicatorEditor.svelte';
   import WindowSettings from './WindowSettings.svelte';
   import { anchorPopup } from './popup';
@@ -36,6 +37,11 @@
   function reset() {
     draft = structuredClone($state.snapshot(runtime.defaults));
     indicators = indicatorString(draft.indicators); charts = chartIndicatorDrafts(draft); error = '';
+  }
+  function tqSeries(index: number, value: string) {
+    const key = String(index + 1);
+    if (value === 'inherit') delete draft.chart_tq_series[key];
+    else draft.chart_tq_series[key] = value as TqSeries;
   }
   function outside(event: MouseEvent) {
     const path = event.composedPath();
@@ -71,6 +77,15 @@
       </div>
     {:else}
       <label>品种<input name="tq.symbol" bind:value={draft.tq.symbol} placeholder="KQ.m@SHFE.rb" /></label>
+      <div class="tq-series" role="group" aria-label="各窗口 TQ 品种形式">
+        {#each draft.timeframes as period, index}
+          <label>窗口 {index + 1} · {period}<select name={`chart.${index + 1}.tq_series`}
+            value={draft.chart_tq_series[String(index + 1)] ?? 'inherit'} onchange={event => tqSeries(index, event.currentTarget.value)}>
+            <option value="inherit">跟随品种</option><option value="main">主连</option><option value="index">加权</option>
+          </select></label>
+        {/each}
+      </div>
+      <div class="hint">{isTqContinuousSymbol(draft.tq.symbol) ? '按窗口选择主连或加权，跟随品种则使用原始输入。' : '当前为具体合约，此设置不生效；已选形式仍保留。'}</div>
     {/if}
     </div>
     </section>
@@ -127,6 +142,8 @@
   .tabs [aria-selected="true"] { color:var(--text-color); border-color:var(--ui-border); border-bottom-color:var(--surface-background); background:var(--surface-background); }
   .source-fields,.common-fields { display:flex; flex-direction:column; gap:13px; padding:12px; }
   .source-fields select { padding:8px 4px; font-size:11px; }
+  .tq-series { display:flex; flex-direction:column; gap:7px; }
+  .tq-series label { display:grid; grid-template-columns:minmax(0,1fr) 120px; align-items:center; gap:8px; }
   .common-fields { margin:0; }
   legend { padding:0 5px; font-size:11px; color:var(--secondary-text); }
   .hint { margin-top:-8px; font-size:10px; color:var(--muted-text); }

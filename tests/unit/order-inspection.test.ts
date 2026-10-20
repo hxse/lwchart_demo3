@@ -2,6 +2,7 @@ import { expect, test, spyOn } from 'bun:test';
 import { OrderExecution } from '../../src/crypto/trading/execution-state';
 import { OrderHttpError } from '../../src/crypto/trading/client';
 import type { CleanupResult } from '../../src/crypto/trading/inspection';
+import { emptyInspection } from '../../src/crypto/trading/inspection';
 import type { CheckResult, ExecutionResult, PositionSnapshot, TradeIdentity } from '../../src/crypto/trading/types';
 import { createOrderMemory, changeOrderIdentity, resetOrderDraft } from '../../src/crypto/trading/memory';
 import { runtime, deferred } from '../fixtures/data';
@@ -43,7 +44,7 @@ test('清理与本页入场／结果查询互斥且单飞，关闭不能取消�
     await execution.submit(orderRequest()); expect(client.submitted).toBe(1);
 });
 
-test('纯持仓读取不阻止开仓，关闭和切身份隔离晚到响应，不增加清理请求', async () => {
+test('纯持仓读取不阻止开仓，切身份取消并隔离晚到响应，不增加清理请求', async () => {
     const reads: Array<{ identity: TradeIdentity; signal: AbortSignal; done: ReturnType<typeof deferred<PositionSnapshot>> }> = [];
     const client = tradeClient(); let cleans = 0;
     const execution = new OrderExecution(client, {
@@ -53,13 +54,48 @@ test('纯持仓读取不阻止开仓，关闭和切身份隔离晚到响应，�
     const first = execution.inspect(orderIdentity, false);
     await execution.inspect(orderIdentity, false); expect(reads).toHaveLength(1);
     await execution.submit(orderRequest()); expect(client.submitted).toBe(1);
-    execution.cancelInspection(); expect(reads[0]!.signal.aborted).toBe(true);
-    const other = { ...orderIdentity, symbol: 'ETH/USDT:USDT' }, second = execution.inspect(other, false);
+    const other = { ...orderIdentity, symbol: 'ETH/USDT:USDT' };
+    execution.syncInspectionIdentity(other); expect(reads[0]!.signal.aborted).toBe(true);
+    const second = execution.inspect(other, false);
     reads[0]!.done.resolve(snapshot()); await first;
     expect(execution.state.inspection.pending).toBe(true); expect(execution.state.inspection.identity).toEqual(other);
     reads[1]!.done.resolve(snapshot(other)); await second;
     expect(execution.state.inspection.snapshot).toEqual(snapshot(other)); expect(cleans).toBe(0);
     execution.cancelInspection(); expect(execution.state.inspection.identity).toBeNull();
+});
+
+test('切完整身份清空持仓和清理显示，切回不恢复；同身份同步及交易日志保持', async () => {
+    for (const next of [{ ...orderIdentity, symbol: 'ETH/USDT:USDT' }, { ...orderIdentity, exchange_name: 'kraken' as const },
+        { ...orderIdentity, is_live: true }, { ...orderIdentity, market: 'spot' as const }, null]) {
+        const client = tradeClient(), execution = new OrderExecution(client, { positions: async () => snapshot(), cleanup: async () => result() });
+        execution.state.result = executed(); const trade = execution.state.result;
+        await execution.inspect(orderIdentity, true);
+        const before = execution.state.inspection;
+        execution.syncInspectionIdentity({ ...orderIdentity }); expect(execution.state.inspection).toBe(before);
+        execution.syncInspectionIdentity(next); expect(execution.state.inspection).toEqual(emptyInspection());
+        execution.syncInspectionIdentity(orderIdentity); expect(execution.state.inspection).toEqual(emptyInspection());
+        expect(execution.state.result).toBe(trade); expect(client.submitted).toBe(0);
+    }
+});
+
+test('清理在途切品种立即清空显示，仍锁住开仓；晚到结果或错误不重新显示，结束后才解锁', async () => {
+    for (const fail of [false, true]) {
+        const done = deferred<CleanupResult>(), client = tradeClient(); let requests = 0;
+        const execution = new OrderExecution(client, { positions: async () => snapshot(), cleanup: async () => { requests++; return done.promise; } });
+        execution.state.result = executed(); const trade = execution.state.result;
+        const pending = execution.inspect(orderIdentity, true);
+        execution.syncInspectionIdentity({ ...orderIdentity, symbol: 'ETH/USDT:USDT' });
+        expect(execution.state.inspection).toEqual({ ...emptyInspection(), pending: true, cleanup: true });
+        execution.cancelInspection(); execution.syncInspectionIdentity(orderIdentity);
+        await execution.submit(orderRequest()); await execution.check(); await execution.inspect(orderIdentity, true);
+        expect(execution.cleaning).toBe(true); expect(client.submitted).toBe(0); expect(client.checked).toBe(0); expect(requests).toBe(1);
+        if (fail) done.reject(new OrderHttpError('查询失败', 503, 'SERVICE_NOT_READY'));
+        else done.resolve(result());
+        await pending;
+        expect(execution.cleaning).toBe(false); expect(execution.state.inspection).toEqual(emptyInspection());
+        expect(execution.state.result).toBe(trade);
+        await execution.submit(orderRequest()); expect(client.submitted).toBe(1);
+    }
 });
 
 test('入场进行中不能发起清理，明确准入错误会结束单飞且不会自动重试', async () => {

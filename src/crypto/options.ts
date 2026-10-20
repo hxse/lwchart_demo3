@@ -3,6 +3,7 @@ import { validateTimezone } from './timezone';
 import { MAX_INDICATORS_PER_LIST } from '../indicators/parameters';
 import type { IndicatorSpec } from '../indicators/types';
 import { parseIndicators, parseChartIndicators, type ChartIndicatorOverrides } from './chartIndicators';
+import { parseChartTqSeries, type ChartTqSeries } from './chartTqSeries';
 export type { IndicatorSpec } from '../indicators/types';
 export { indicatorListString as indicatorString } from '../indicators/parameters';
 export { parseIndicators } from './chartIndicators';
@@ -36,6 +37,7 @@ interface DisplayOptions {
     symbol: string; layout: Layout; timeframes: Timeframe[]; indicators: IndicatorSpec[];
     refresh_seconds: number; history_bars: number; theme: Theme; timezone: string; dock_position: DockPosition; main_pane_ratio: number;
     chart_indicators: ChartIndicatorOverrides;
+    chart_tq_series: ChartTqSeries;
     order_panel_layout: OrderPanelLayout; order_panel_inline_width: number; order_panel_floating_width: number;
 }
 export interface CcxtOptions extends DisplayOptions, CcxtDefaults { source: 'ccxt' }
@@ -47,7 +49,7 @@ export interface RuntimeOptions { defaults: DashboardSettings }
 export const COMMON_KEYS = ['source','symbol','layout','timeframes','indicators','refresh_seconds','history_bars','theme','timezone','dock_position','main_pane_ratio','order_panel_layout','order_panel_inline_width','order_panel_floating_width'] as const;
 export const CCXT_KEYS = ['exchange_name','market','is_live'] as const;
 export const DASHBOARD_KEYS = COMMON_KEYS.filter(key => key !== 'symbol');
-export function optionKeys(source: Source) { return source === 'ccxt' ? [...COMMON_KEYS, ...CCXT_KEYS, 'chart_indicators'] : [...COMMON_KEYS, 'chart_indicators']; }
+export function optionKeys(source: Source) { return [...COMMON_KEYS, ...(source === 'ccxt' ? CCXT_KEYS : []), 'chart_indicators', 'chart_tq_series']; }
 
 export function record(value: unknown, label: string): Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} 必须是表`);
@@ -122,22 +124,25 @@ export function normalizeOptions(input: unknown): DashboardOptions {
         order_panel_layout: orderLayout as OrderPanelLayout,
         order_panel_inline_width: integer(value.order_panel_inline_width === undefined ? DEFAULT_ORDER_PANEL_WIDTH : value.order_panel_inline_width, 1, Number.MAX_SAFE_INTEGER, '平铺下单面板宽度'),
         order_panel_floating_width: integer(value.order_panel_floating_width === undefined ? DEFAULT_ORDER_PANEL_WIDTH : value.order_panel_floating_width, 1, Number.MAX_SAFE_INTEGER, '悬浮下单面板宽度'),
-        chart_indicators: parseChartIndicators(value.chart_indicators,layoutSlots(layout)) };
+        chart_indicators: parseChartIndicators(value.chart_indicators,layoutSlots(layout)),
+        chart_tq_series: parseChartTqSeries(value.chart_tq_series, layoutSlots(layout)) };
     if (value.source === 'tq') return { ...display, source: 'tq' };
     const identity = normalizeCcxt(Object.fromEntries([...CCXT_KEYS, 'symbol'].map(key => [key, value[key]])));
     return { ...display, ...identity, source: 'ccxt' };
 }
 export function activeOptions(settings: DashboardSettings): DashboardOptions {
     const display = Object.fromEntries(DASHBOARD_KEYS.map(key => [key, settings[key]]));
-    return normalizeOptions({ ...display, ...settings[settings.source], chart_indicators: settings.chart_indicators });
+    return normalizeOptions({ ...display, ...settings[settings.source], chart_indicators: settings.chart_indicators, chart_tq_series: settings.chart_tq_series });
 }
 export function normalizeSettings(input: unknown): DashboardSettings {
     const value = record(input, '页面设置');
-    onlyKeys(value, [...DASHBOARD_KEYS, 'ccxt', 'tq', 'chart_indicators'], '页面设置');
+    onlyKeys(value, [...DASHBOARD_KEYS, 'ccxt', 'tq', 'chart_indicators', 'chart_tq_series'], '页面设置');
     if (value.source !== 'ccxt' && value.source !== 'tq') throw new Error('数据源必须是 ccxt 或 tq');
     const sources = normalizeSources({ ccxt: value.ccxt, tq: value.tq });
-    const active = normalizeOptions({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, value[key]])), ...sources[value.source], chart_indicators: value.chart_indicators });
-    return { ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, active[key]])), ...sources, chart_indicators: active.chart_indicators } as DashboardSettings;
+    const active = normalizeOptions({ ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, value[key]])), ...sources[value.source],
+        chart_indicators: value.chart_indicators, chart_tq_series: value.chart_tq_series });
+    return { ...Object.fromEntries(DASHBOARD_KEYS.map(key => [key, active[key]])), ...sources,
+        chart_indicators: active.chart_indicators, chart_tq_series: active.chart_tq_series } as DashboardSettings;
 }
 export function normalizeRuntime(input: unknown): RuntimeOptions {
     const value = record(input, '运行配置');

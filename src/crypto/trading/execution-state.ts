@@ -3,6 +3,7 @@ import { clientOrderIds, orderLegs } from './identity';
 import { identityOf } from './validation';
 import type { ExecutionResult, LegName, LegResult, TradeIdentity, TradeRequest } from './types';
 import { emptyInspection, type InspectionState } from './inspection';
+import { sameTradeIdentity } from './preview';
 
 export interface ExecutionState { pending: boolean; checking: boolean; result: ExecutionResult | null; error: string; inspection: InspectionState }
 export class OrderExecution {
@@ -29,6 +30,14 @@ export class OrderExecution {
         this.inspectionAbort?.abort(); this.inspectionAbort = undefined;
         this.publish({ inspection: emptyInspection() });
     }
+    syncInspectionIdentity(identity: TradeIdentity | null) {
+        const previous = this.state.inspection.identity;
+        if (!previous || identity && sameTradeIdentity(previous, identity)) return;
+        const cleaning = this.cleaning;
+        if (!cleaning) { this.inspectionAbort?.abort(); this.inspectionAbort = undefined; }
+        // 清空旧品种显示，但已准入清理的单飞状态必须保留到本轮结束。
+        this.publish({ inspection: { ...emptyInspection(), pending: cleaning, cleanup: cleaning } });
+    }
     async inspect(value: TradeIdentity, cleanup: boolean) {
         if (this.state.pending || this.state.checking || this.state.inspection.pending) return;
         const identity = identityOf(value), deadline = performance.now() + 65000;
@@ -37,7 +46,7 @@ export class OrderExecution {
         try {
             if (cleanup) {
                 const result = await this.inspectionClient.cleanup(identity);
-                this.inspection({ result, snapshot: result.snapshot });
+                if (this.state.inspection.identity) this.inspection({ result, snapshot: result.snapshot });
             } else {
                 const snapshot = await this.inspectionClient.positions(identity, abort.signal);
                 if (!abort.signal.aborted) this.inspection({ snapshot });
@@ -45,13 +54,16 @@ export class OrderExecution {
         } catch (error) {
             if (abort.signal.aborted) return;
             const known = error instanceof OrderHttpError && error.status !== 0;
-            this.inspection({ error: known ? error.message : cleanup
+            if (this.state.inspection.identity) this.inspection({ error: known ? error.message : cleanup
                 ? '清理结果未收到，撤单可能已生效；等待执行窗口结束后解锁，请到交易所核对，不会自动重试'
                 : '持仓查询未完成，请到交易所核对' });
             // 丢失响应不代表服务端停止，执行窗口内仍与本页入场互斥。
             if (cleanup && !known) await new Promise(resolve => setTimeout(resolve, Math.max(0, deadline - performance.now())));
         } finally {
-            if (!abort.signal.aborted) { this.inspectionAbort = undefined; this.inspection({ pending: false }); }
+            if (!abort.signal.aborted) {
+                this.inspectionAbort = undefined;
+                this.inspection(this.state.inspection.identity ? { pending: false } : emptyInspection());
+            }
         }
     }
     async submit(input: Omit<TradeRequest, 'request_id'>) {

@@ -3,21 +3,25 @@ import {
     indicatorString, MAX_HISTORY_BARS, type DashboardSettings, type Layout, type RuntimeOptions,
 } from './options';
 import { trimChartIndicators } from './chartIndicators';
+import { trimChartTqSeries } from './chartTqSeries';
 
 const identityKeys = [...CCXT_KEYS, 'symbol'] as const;
 const queryKeys = [...DASHBOARD_KEYS, ...identityKeys.map(key => `ccxt.${key}`), 'tq.symbol'];
 const chartKey = /^chart\.([1-9]\d*)\.indicators$/;
+const tqSeriesKey = /^chart\.([1-9]\d*)\.tq_series$/;
 
 export function parseDashboardQuery(search: string, runtime: RuntimeOptions): DashboardSettings {
     const params = new URLSearchParams(search);
     for (const key of params.keys()) {
-        if ((!queryKeys.includes(key) && !chartKey.test(key)) || params.getAll(key).length !== 1) throw new Error('URL 含有未知或重复参数');
+        if ((!queryKeys.includes(key) && !chartKey.test(key) && !tqSeriesKey.test(key)) || params.getAll(key).length !== 1) throw new Error('URL 含有未知或重复参数');
     }
     const value = normalizeSettings(runtime.defaults);
     const overrides: Record<string,string> = {};
+    const tqSeries: Record<string, string> = {};
     for (const [key, raw] of params) {
         if (!raw) throw new Error('URL 参数不能为空');
         if (chartKey.test(key)) overrides[chartKey.exec(key)![1]!]=raw;
+        else if (tqSeriesKey.test(key)) tqSeries[tqSeriesKey.exec(key)![1]!] = raw;
         else if (key.startsWith('ccxt.')) {
             const field = key.slice(5);
             if (field === 'is_live') {
@@ -39,7 +43,7 @@ export function parseDashboardQuery(search: string, runtime: RuntimeOptions): Da
     } else if (params.has('timeframes') && !params.has('layout') && value.timeframes.length !== runtime.defaults.timeframes.length) {
         value.layout = ({ 1: '1x1', 2: '1x2', 3: '1x3', 4: '2x2' } as Record<number, Layout>)[value.timeframes.length]!;
     }
-    return normalizeSettings({...value,chart_indicators:overrides});
+    return normalizeSettings({...value,chart_indicators:overrides,chart_tq_series:tqSeries});
 }
 export function serializeDashboardQuery(settings: DashboardSettings): string {
     const o = normalizeSettings(settings);
@@ -54,10 +58,13 @@ export function serializeDashboardQuery(settings: DashboardSettings): string {
         order_panel_floating_width: String(o.order_panel_floating_width),
         ...Object.fromEntries(Object.entries(o.chart_indicators).sort(([a],[b]) => Number(a)-Number(b))
             .map(([key,list]) => [`chart.${key}.indicators`,indicatorString(list)])),
+        ...Object.fromEntries(Object.entries(o.chart_tq_series).sort(([a],[b]) => Number(a)-Number(b))
+            .map(([key, series]) => [`chart.${key}.tq_series`, series])),
     }).toString();
 }
 export function changeLayout(options: DashboardSettings, layout: Layout, defaults: DashboardSettings): DashboardSettings {
     const timeframes = options.timeframes.slice(0, layoutSlots(layout));
     while (timeframes.length < layoutSlots(layout)) timeframes.push(defaults.timeframes[timeframes.length % defaults.timeframes.length]!);
-    return { ...options, layout, timeframes, chart_indicators:trimChartIndicators(options.chart_indicators,timeframes.length) };
+    return { ...options, layout, timeframes, chart_indicators:trimChartIndicators(options.chart_indicators,timeframes.length),
+        chart_tq_series: trimChartTqSeries(options.chart_tq_series, timeframes.length) };
 }

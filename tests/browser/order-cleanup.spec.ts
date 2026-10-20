@@ -99,10 +99,10 @@ test('关闭清理后下单自动纯查询，不等待持仓也能确认，手�
     expect(actions).toEqual(Array(2).fill('/api/ccxt/fetch_positions'));
 });
 
-test('清理中取消确认、关闭及切品种后继续并保留原身份，重新打开仍锁住开仓；偏好跨关闭和切换记住', async ({ page, request }) => {
+test('清理中切品种清空显示且不被晚到回包恢复，重新打开仍锁住开仓；偏好跨关闭和切换记住', async ({ page, request }) => {
     const actions = watch(page);
     await page.goto('/?timeframes=30m&refresh_seconds=3600'); await open(page);
-    await request.post(orders, { data: { positions: [], open_orders: [stop()], cancel_delay: 3000 } });
+    await request.post(orders, { data: { positions: [], open_orders: [stop()], cancel_delay: 5000 } });
     await buy(page).click();
     await expect.poll(async () => (await metrics(request)).writes.length).toBe(1);
     await modal(page).getByRole('button', { name: '取消下单' }).click();
@@ -110,10 +110,11 @@ test('清理中取消确认、关闭及切品种后继续并保留原身份，�
     await symbol(page, 'ETH/USDT:USDT');
     await page.getByRole('button', { name: '展开下单面板' }).click();
     await expect(page.locator('[name="order.symbol"]')).toHaveValue('ETH/USDT:USDT');
-    await expect(status(page)).toContainText('BTC/USDT:USDT'); await expect(buy(page)).toBeDisabled();
-    await expect(panel(page)).toContainText('以下为上次操作的品种');
-    await expect(status(page)).toContainText('已确认取消'); await expect(buy(page)).toBeEnabled();
-    await expect(status(page)).toContainText('取消下单不会恢复已撤条件单');
+    await expect(status(page)).toHaveCount(0); await expect(buy(page)).toBeDisabled();
+    await expect(panel(page).getByRole('status', { name: '清理执行状态' })).toContainText('上一品种的清理仍在进行');
+    await expect(buy(page)).toBeEnabled(); await expect(status(page)).toHaveCount(0);
+    await expect(panel(page).getByRole('status', { name: '清理执行状态' })).toHaveCount(0);
+    expect((await metrics(request)).options.open_orders[0].status).toBe('canceled');
     expect(actions).toEqual(['/api/ccxt/manual-order/cleanup']);
     await clean(page).uncheck(); await auto(page).uncheck();
     await expect(panel(page).getByRole('button', { name: '确认', exact: true })).toBeDisabled();
@@ -132,6 +133,39 @@ test('清理中取消确认、关闭及切品种后继续并保留原身份，�
         await expect(clean(another)).toBeChecked(); await expect(auto(another)).toBeChecked();
     } finally { await another.close(); }
     expect((await metrics(request)).writes).toHaveLength(1);
+});
+
+test('已完成查询在同品种重开时保留，手填品种确认、切来源及关闭期间换品种都会清空', async ({ page, request }) => {
+    const actions = watch(page);
+    await page.goto('/?timeframes=30m&refresh_seconds=3600&order_panel_layout=inline'); await open(page);
+    await request.post(orders, { data: { positions: [
+        { symbol: 'BTC/USDT:USDT', side: 'short', contracts: 0.99, entryPrice: 272.5218181818182 },
+        { symbol: 'ETH/USDT:USDT', side: 'long', contracts: 2, entryPrice: 3100 },
+    ] } });
+    await query(page).click(); await expect(status(page)).toContainText('合约数量 0.99');
+    await page.getByRole('button', { name: '关闭下单面板' }).click(); await open(page);
+    await expect(status(page)).toContainText('合约数量 0.99'); expect(actions).toHaveLength(1);
+    await page.locator('[name="order.symbol"]').fill('ETH/USDT:USDT');
+    await panel(page).getByRole('button', { name: '确认', exact: true }).click();
+    await expect(status(page)).toHaveCount(0); await expect(buy(page)).toBeEnabled();
+    await query(page).click(); await expect(status(page)).toContainText('合约数量 2');
+    await page.evaluate(() => {
+        const url = new URL(location.href); url.searchParams.set('source', 'tq');
+        history.pushState(null, '', url); dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(panel(page)).toContainText('待实现');
+    await page.evaluate(() => {
+        const url = new URL(location.href); url.searchParams.set('source', 'ccxt');
+        history.pushState(null, '', url); dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(buy(page)).toBeEnabled(); await expect(status(page)).toHaveCount(0);
+    await query(page).click(); await expect(status(page)).toContainText('合约数量 0.99');
+    await page.getByRole('button', { name: '关闭下单面板' }).click();
+    await symbol(page, 'ETH/USDT:USDT');
+    await expect(page.locator('.crypto-chart .caption strong')).toHaveText('ETH/USDT:USDT');
+    await symbol(page, 'BTC/USDT:USDT'); await open(page);
+    await expect(status(page)).toHaveCount(0); expect(actions).toHaveLength(3);
+    expect((await metrics(request)).writes).toEqual([]);
 });
 
 test('自动清理失败明确展示并解锁，不重试；用户仍可确认有效的新入场', async ({ page, request }) => {

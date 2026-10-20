@@ -88,6 +88,8 @@ local／remote 覆盖共用加载与校验。浏览器设置和 query 只改变�
 不回写文件或保存手动拖动高度；写法见 [看盘说明](../guides/crypto_dashboard.md)。
 逐窗口指标覆盖仅在页面／query 设置，TOML 继续提供公共 indicators，不增加
 chart_indicators 文件字段；服务公开默认值提供空映射，各窗口默认继承公共。
+TQ 逐窗口主连／加权同样只在页面和 query 设置，不增加 chart_tq_series TOML 字段，
+服务默认空映射、全部跟随原始品种；具体写法见看盘规范。
 
 ## 离线验证
 

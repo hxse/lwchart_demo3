@@ -40,9 +40,11 @@
     // 只按已确认身份重建读取；草稿、风险参数及显示配置变化不重复订阅。
     return untrack(() => {
       clearExample(); confirmation = null; snapshot = null;
+      const settings = orderReaderSettings(memory, initial);
+      execution.syncInspectionIdentity(settings.source === 'ccxt' ? settings.ccxt : null);
       let reader: OrderPanelState | undefined, unsubscribe: (() => void) | undefined;
       if (context.source === 'ccxt') {
-        reader = new OrderPanelState(orderReaderSettings(memory, initial), hub, undefined, { ...applied });
+        reader = new OrderPanelState(settings, hub, undefined, { ...applied });
         controller = reader;
         unsubscribe = reader.subscribe(value => { snapshot = value; }); reader.start();
       }
@@ -168,7 +170,7 @@
         {#if view && !matchesChart(chartCurrent, view.identity)}<p class="hint">下单品种或交易身份与当前图表不同，不能画线示例。</p>{/if}
         <p class="reference">当前预览：{view?.identity.symbol ?? applied.symbol} · {view?.parameters.timeframe ?? applied.timeframe} ·
           ATR <span data-testid="order-atr">{view?.atr?.value ?? '等待计算'}</span></p>
-        {#if view}<OrderPositions identity={view.identity} state={progress.inspection} disabled={dirty || busy}
+        {#if view}<OrderPositions state={progress.inspection} disabled={dirty || busy}
           bind:cleanupOnQuery={memory.cleanupOnQuery} bind:inspectBeforeSubmit={memory.inspectBeforeSubmit} onQuery={inspect} />{/if}
         {#if view?.data}<p class="hint">账户 taker：{percent(view.data.trading_fee.taker)} · {view.data.trading_fee.source === 'binance_commission_rate' ? 'Binance 账户费率' : 'Kraken 账户费率'} · {new Date(view.data.trading_fee.updated_at).toLocaleTimeString()}</p>{/if}
         <div class="tabs" role="tablist" aria-label="参考方向">

@@ -69,6 +69,7 @@
   function acceptSettings(value: DashboardSettings, selectIdentity = false) {
     if (selectIdentity || !sameChartIdentity(settings, value)) {
       closeFloatingOrder();
+      execution.syncInspectionIdentity(value.source === 'ccxt' ? value.ccxt : null);
       if (orderMemory) changeOrderIdentity(orderMemory, value);
     }
     if (!settings || serializeDashboardQuery(settings) !== serializeDashboardQuery(value)) settings = value;

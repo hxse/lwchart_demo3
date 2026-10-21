@@ -36,6 +36,7 @@ async function main() {
     const plan = { ...await deploymentPlan(config, 'local'), source_id: manifest.id, source_dir: join(root, '.deploy/sources', manifest.id) };
     const state = join(directory, 'state'); await mkdir(state);
     await writeFile(join(state, 'pending.json'), JSON.stringify(plan));
+    await writeFile(join(state, 'prepared-image'), image + '\n');
     const isolation = ['--pull=never', '--userns=keep-id', '--user', `${process.getuid!()}:${process.getgid!()}`];
     // internal 网络只解析容器名，缺失后端的 DNS 查询不转发到外部。
     await run(['podman', 'network', 'create', '--internal', '--label', `app.fixture=${prefix}`, network]); networkCreated = true;
@@ -58,8 +59,8 @@ async function main() {
     const error = await unavailable.text();
     assert(['BACKEND_UNAVAILABLE', 'BACKEND_TIMEOUT'].includes(JSON.parse(error).error.code) && !error.includes('CONTAINER_PRIVATE_MARKER'), '连接错误不符合既有契约或泄漏凭据');
     await check('/healthz');
-    const offlineAgain = await run(['bash', 'scripts/deploy/engine.sh', state, 'start']);
-    assert(offlineAgain.output.includes('无需重复启动'), '无后端时重复启动失败');
+    const offlineAgain = await run(['bash', 'scripts/deploy/engine.sh', state, 'start'], true);
+    assert(offlineAgain.code === 2 && offlineAgain.errors.includes('实例已运行'), '无后端时重复启动应拒绝');
     const started = await run(['podman', 'run', '-d', ...isolation, '--name', backend, '--network', network,
         '--label', `app.fixture=${prefix}`, '--entrypoint=bun', '--mount', `type=bind,src=${join(root, 'tests/container/backend.ts')},dst=/fixture/backend.ts,ro`, image, '/fixture/backend.ts']);
     ids.push(started.output.trim());
@@ -83,21 +84,26 @@ async function main() {
     const contents = await run(['podman', 'run', '--rm', ...isolation, '--network=none', '--entrypoint=/bin/sh', image, '-c',
         'test -f /app/server.js && test -f /app/public/index.html && test ! -d /app/node_modules && test ! -d /app/src && test ! -f /app/config/config.toml && test ! -d /app/.git && ! command -v gcc']);
     assert(contents.code === 0, '最终镜像含开发环境或配置');
-    const again = await run(['bash', 'scripts/deploy/engine.sh', state, 'start']);
-    assert(again.output.includes('无需重复启动'), '实际容器幂等失败');
+    const again = await run(['bash', 'scripts/deploy/engine.sh', state, 'start'], true);
+    assert(again.code === 2 && again.errors.includes('实例已运行'), '已运行实例的重复 start 未拒绝');
     const blocker = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response('occupied') });
     try {
         await writeFile(overlay, override.replace(`publish_port=${port}`, `publish_port=${blocker.port}`));
         await writeFile(join(state, 'pending.json'), JSON.stringify({ ...await deploymentPlan(config, 'local'), source_id: manifest.id, source_dir: plan.source_dir }));
-        const failed = await run(['bash', 'scripts/deploy/engine.sh', state, 'start'], true);
+        const failed = await run(['bash', 'scripts/deploy/engine.sh', state, 'restart'], true);
         assert(failed.code !== 0, '被占用端口未拒绝');
-        await check('/healthz');
-        assert((await run(['podman', 'inspect', service, '--format', '{{.Id}}'])).output.trim() === serviceId, '失败未恢复原容器');
+        assert((await run(['podman', 'inspect', service, '--format', '{{.Id}}'])).output.trim() === serviceId, '失败未保留原容器');
+        assert((await run(['podman', 'inspect', service, '--format', '{{.State.Running}}'])).output.trim() === 'false', '重启失败不应自动启动旧容器');
     } finally { blocker.stop(true); }
+    await writeFile(overlay, override);
+    await writeFile(join(state, 'pending.json'), JSON.stringify(plan));
+    await run(['bash', 'scripts/deploy/engine.sh', state, 'restart']);
+    ids.push((await run(['podman', 'inspect', service, '--format', '{{.Id}}'])).output.trim());
+    await check('/healthz');
     await run(['bash', 'scripts/deploy/engine.sh', state, 'status']);
     await run(['bash', 'scripts/deploy/engine.sh', state, 'stop']);
     await run(['bash', 'scripts/deploy/engine.sh', state, 'stop']);
-    console.log('离线容器验证通过：无后端独立启动、后端恢复、镜像边界、只读配置、两来源 API、回环发布、幂等与失败恢复');
+    console.log('离线容器验证通过：无后端独立启动、后端恢复、镜像边界、只读配置、两来源 API、回环发布、重复启动拒绝及重启失败保持停止');
 }
 try { await main(); }
 catch (e) { console.error(e instanceof Error ? e.message : '容器验证失败'); process.exitCode = 1; }

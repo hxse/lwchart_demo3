@@ -40,6 +40,7 @@
 * 只有文档、尚未实施的新设计留在 task spec，不提前写成 current spec 的现行行为。实现变更后只同步受影响的 current spec，用户用法变化时同步 guide。
 * 每个正式任务保留 meta、context、spec；不创建独立 execution/review 文档，不维护手工 index 或任务生命周期状态。meta 负责定位与定级，context 负责场景和取舍，spec 负责具体设计；执行安排自行组织，实际结果按回复规范报告。
 * 用户要求保存草稿但未指定目录时使用默认目录；项目可明确指定另一默认目录。用户指定项目外路径时仅本次使用，下次未指定仍回默认目录。
+* 每份草稿按 `YYYYMMDD 简短英文主题/` 建文件夹，例如 `20261017 bot window scheduling/`；不套正式任务编号，不强制 meta/context/spec。内部文件按主题需要拆分，每个文件遵守400行上限；不自动迁移旧草稿。
 * 项目内草稿目录须加入 `.gitignore`。JJ 项目可在足够早的合适 change 中加入规则，再正常重基后代；它只覆盖该 change 及其后代，切到更早 revision 时须确认忽略仍有效，不强制额外维护本地排除规则。
 * 忽略规则不会取消已有文件跟踪，须确认草稿路径未被历史版本跟踪；已有跟踪内容的迁移或取消跟踪须单独明确。忽略目录不是备份，不因切换任务而覆盖或纳入版本控制草稿。
 * 草稿通常短期留存，但只有用户明确要求才删除，不因任务完成或临时文件清理自动删除。
@@ -403,8 +404,12 @@ just build # 构建wheel/二进制等，不构建生产镜像、不启动服务
 
 ```bash
 just deploy --target=local --build         # 准备或复用产物，再装配镜像
-just deploy --target=local --build --start # 再启动本地生产容器
-just deploy --target=local --stop          # 只停止本地实例
+just deploy --target=local --stop          # 停止；已停止则提示已停止
+just deploy --target=local --start         # 启动；已有实例运行则拒绝
+just deploy --target=local --restart       # 停止 → 启动，重新加载配置
+just deploy --target=local --build --start # 构建成功 → 启动；已有实例运行仍拒绝
+just deploy --target=local --build --restart # 构建成功 → 停止 → 启动
+just deploy --target=local --build --stop  # 构建成功 → 停止
 ```
 
 远程生产镜像：
@@ -412,14 +417,19 @@ just deploy --target=local --stop          # 只停止本地实例
 ```bash
 just deploy --target=remote --upload              # 只上传已准备的输入
 just deploy --target=remote --build               # 只在服务器装配已上传输入
-just deploy --target=remote --start               # 只启动已有配套版本
-just deploy --target=remote --upload --build --start # 产物准备 → 同步 → 远端装配 → 启动
-just deploy --target=remote --upload --build --start --skip-config # 保留远端配置
+just deploy --target=remote --start               # 启动已有配套版本；已运行则拒绝
+just deploy --target=remote --restart             # 远端停止 → 启动，不隐式构建或上传
+just deploy --target=remote --upload --build --start # 首次发布：准备 → 上传 → 构建 → 启动
+just deploy --target=remote --upload --build --restart # 更新：准备 → 上传 → 构建 → 停旧启新
+just deploy --target=remote --upload --build --restart --skip-config # 保留远端配置
 just deploy --target=remote --status # 可换成--logs或--stop，只管理远端实例
 ```
 
 * 两种`build`共用程序构建链和缓存，不是Dev/Release之分。已有匹配产物直接复用；本地部署或完整远程发布按需增量准备，无须先手动执行`just build`。仅消费已有产物的单步命令不补做准备。
 * 动作只做显式选择的步骤，失败即停；组合调用同一实现。单独上传不编译，单独构建不隐式上传，构建/上传不隐式启动。
+* `--stop/--start/--restart`三选一：stop停止，已停止则视为完成；start只启动未运行实例，已有实例运行就拒绝，即使镜像或配置已变化也不替换；restart复用停止→启动，已停止则直接启动。缺少已有镜像或交付资料明确报错，不隐式构建。状态/日志查询独立使用，不与构建或启停组合。
+* `--build`是前置准备，可单独使用，也可组合上述任一控制动作；有构建时必须先构建成功，再执行所选控制动作，构建失败保持旧实例原状态。远端先显式上传所需输入，再构建；不带build仅使用已登记镜像控制容器，不因工作区源码变化自动重建。
+* 启动仍重新加载并校验目标端配置；本机修改的远端配置须显式上传。restart不直接用引擎restart绕过正式启动流程，停止→启动保持生命周期互斥；停止失败不启动第二份，停止后启动失败保持停止，不自动回退启动。
 * `--target`只选部署位置。本机开发、构建默认使用本机平台；生产镜像由实际构建机的Podman按原生平台装配，基础镜像须支持该平台，无需为镜像另配平台。
 * `config.toml`的`deploy.remote_platform`仅用于本地准备发往异构远端的wheel/二进制及配套原生依赖；省略表示与本机相同，不另设命令行覆盖，不改变本机开发平台或生产镜像平台。交付前核对产物与远端实际平台，不能只凭配置认定兼容。
 * 缺少目标工具链，或仅消费既有产物时发现过期、CPU/动态库/ABI不兼容，须明确失败，不改标签、不回退、不隐式启用模拟器。状态、日志、停止不重新决定构建平台。

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-target='' config='config.toml' upload=false build=false start=false skip_config=false control_action='' help_requested=false
+target='' config='config.toml' upload=false build=false skip_config=false lifecycle_action='' query_action='' help_requested=false
 seen=()
 help() {
-    echo 'just deploy --target=local|remote [--config=config.toml] [--upload] [--build] [--start] [--skip-config]'
-    echo 'just deploy --target=local|remote --status|--logs|--stop：独立控制，不启用开机自启'
+    echo 'just deploy --target=local|remote [--config=config.toml] [--upload] [--build] [--start|--restart|--stop] [--skip-config]'
+    echo '--build 成功后才启停；--start 拒绝已运行实例；--restart 停止后重新加载配置启动'
+    echo 'just deploy --target=local|remote --status|--logs：独立查询，不启用开机自启'
 }
 fail() { echo "$1" >&2; exit 2; }
 for arg in "$@"; do
@@ -18,48 +19,50 @@ for arg in "$@"; do
         --config=*) config=${arg#--config=}; [[ -n "$config" ]] || fail '配置路径不能为空' ;;
         --upload) upload=true ;;
         --build) build=true ;;
-        --start) start=true ;;
+        --start|--restart|--stop) [[ -z "$lifecycle_action" ]] || fail '--stop、--start、--restart 三选一'; lifecycle_action=${arg#--} ;;
         --skip-config) skip_config=true ;;
-        --status|--logs|--stop) [[ -z "$control_action" ]] || fail '控制动作必须单独使用'; control_action=${arg#--} ;;
+        --status|--logs) [[ -z "$query_action" ]] || fail '状态或日志必须单独查询'; query_action=${arg#--} ;;
         *) fail '部署参数无效，请使用 --help' ;;
     esac
 done
 if [[ "$help_requested" == 'true' ]]; then help; exit 0; fi
-if [[ "$upload$build$start$control_action" == 'falsefalsefalse' ]]; then
+if [[ "$upload$build$lifecycle_action$query_action" == 'falsefalse' ]]; then
     [[ "$skip_config" == 'false' ]] || fail '--skip-config 只能用于远程上传'
     help; exit 0
 fi
 [[ -n "$target" ]] || fail '部署动作必须明确 --target=local 或 remote'
 [[ "$target" == 'remote' || "$upload" == 'false' ]] || fail '--upload 仅用于远程'
 [[ "$skip_config" == 'false' || ( "$target" == 'remote' && "$upload" == 'true' ) ]] || fail '--skip-config 只能用于远程上传'
-[[ -z "$control_action" || "$upload$build$start" == 'falsefalsefalse' ]] || fail '控制动作不能与上传、构建或启动组合'
+[[ -z "$query_action" || "$upload$build$lifecycle_action" == 'falsefalse' ]] || fail '状态或日志不能与上传、构建或启停组合'
 cd -- "$root"
 state="$root/.deploy/$target"
 mkdir -p -- "$state"
-if [[ -n "$control_action" ]]; then
+if [[ -n "$query_action" || ( "$lifecycle_action" == 'stop' && "$upload$build" == 'falsefalse' ) ]]; then
+    control_action=${query_action:-$lifecycle_action}
     if [[ "$target" == 'local' ]]; then exec bash scripts/deploy/engine.sh "$state" "$control_action"; fi
     source scripts/deploy/remote.sh
     remote_control "$control_action"
     exit 0
 fi
-for tool in bun jq flock; do command -v "$tool" >/dev/null || fail "缺少部署工具：$tool"; done
+for tool in jq flock; do command -v "$tool" >/dev/null || fail "缺少部署工具：$tool"; done
 exec 8>"$state/driver.lock"
 flock -n 8 || fail '此目标已有另一项部署操作'
 actions=()
 [[ "$build" == 'false' ]] || actions+=(build)
-[[ "$start" == 'false' ]] || actions+=(start)
+[[ -z "$lifecycle_action" ]] || actions+=("$lifecycle_action")
 if [[ "$target" == 'remote' ]]; then
     source scripts/deploy/remote.sh
-    if [[ "$upload" == 'true' ]]; then remote_upload "${actions[@]}";
+    if [[ "$upload" == 'true' ]]; then
+        command -v bun >/dev/null || fail '缺少部署工具：bun'
+        remote_upload "${actions[@]}";
     else remote_existing "${actions[@]}"; fi
     exit 0
 fi
+command -v bun >/dev/null || fail '缺少部署工具：bun'
 plan_json=$(APP_CONFIG_PROFILE=local bun scripts/deploy/plan.ts "$config" local)
 if [[ "$build" == 'true' ]]; then inputs=$(bun scripts/deploy/inputs.ts);
 else
     [[ -f "$state/pending.json" ]] || fail '未准备本地版本，请先 --build'
-    current=$(bun scripts/deploy/inputs.ts --fingerprint)
-    [[ $(jq -r .id <<< "$current") == $(jq -r .source_id "$state/pending.json") ]] || fail '源码已改变，请先重新 --build'
     inputs=$(jq '{id:.source_id,directory:.source_dir}' "$state/pending.json")
 fi
 jq --arg id "$(jq -r .id <<< "$inputs")" --arg directory "$(jq -r .directory <<< "$inputs")" \

@@ -59,26 +59,36 @@ Containerfile 在依赖安装前复制 patches；源码白名单只包含 packag
 容器执行相同 market build 入口，在编译前核对已安装库版本和完整 DX.js 的固定指纹，
 不匹配就构建失败；校验器随源码白名单传输，最终镜像不保留该源码检查或 node_modules。
 固定白名单和内容清单组成构建上下文，私有文件不进入。发布 ID 来自文件内容及模式，
-相同输入镜像可复用。start 只消费已准备镜像，不隐式拉取、安装或构建。
+相同输入镜像可复用。构建成功后登记 prepared-image；start／restart 只消费与待用
+版本配套的已登记镜像，不隐式拉取、安装或构建。未登记或镜像缺失明确失败。
+本机源码变化不影响已有镜像的启停；显式 build 才准备当前源码，不能只因工作区
+变化阻止已有版本启动，也不能拿旧镜像冒充刚上传但尚未构建的新发布。
 
 ## 本地与远程入口
 
 ```bash
 just deploy --target=local --build --start
+just deploy --target=local --restart
+just deploy --target=local --build --restart
+just deploy --target=local --build --stop
 just deploy --target=local --status
 just deploy --target=local --logs
 just deploy --target=local --stop
 just deploy --target=remote --upload --build --start
-just deploy --target=remote --upload --build --start --skip-config
+just deploy --target=remote --upload --build --restart --skip-config
 just deploy --target=remote --build
 just deploy --target=remote --start
+just deploy --target=remote --restart
+just deploy --target=remote --build --stop
 just deploy --target=remote --status
 just deploy --target=remote --logs
 just deploy --target=remote --stop
 ```
 
 无动作只显示帮助，不加载业务配置。操作须明确 target；upload 只用于远端，skip-config
-只用于远端 upload；上传／构建／启动按顺序组合，控制动作单独使用。未知／重复／非法组合退出 2。
+只用于远端 upload。stop／start／restart 三选一；可单独使用，也可接在显式 upload
+和 build 之后，顺序固定为上传→构建→所选启停动作，失败即停。status／logs 必须
+独立查询，不与准备或启停组合。未知／重复／非法组合在操作前退出 2。
 config 指定基础文件；例如 --config=/path/project.toml 对应 project.local.toml 或 project.remote.toml。
 
 Just 薄编排；Bash 执行参数、Podman、SSH、rsync 与锁，Bun 负责配置及内容清单。
@@ -86,21 +96,35 @@ Just 薄编排；Bash 执行参数、Podman、SSH、rsync 与锁，Bun 负责配
 受管目录在项目 .deploy 下。远端只修改 ~/dev/lwchart_demo3/.deploy 的发布、配置和生成状态，
 不对项目根执行 rsync --delete；删除只限定对应源码发布目录，配置快照不热改运行中版本。
 skip-config 复用已保存的完整远端配置；首次没有完整配置时明确失败。
+远端单独 build／start／restart 使用已上传的引擎与资料，不读取本机配置或计算源码
+指纹，也不隐式上传；控制引擎自身的升级须显式 upload。默认帮助不加载业务配置。
 
 ## 生命周期与失败
 
-变更在目标实例上互斥，后台容器不继承锁；status／logs 可独立查看。
-启动前检查镜像存在、配置一致、网络存在且启用 DNS，不探测或等待后端。
-后端未运行、DNS 暂未注册或无法连接不阻断镜像构建、容器启动、更新及重复启动。
+变更在目标实例上互斥，restart 的停止和启动持有同一把操作锁，后台容器不继承锁；
+status／logs 可独立查看，冲突的变更立即拒绝、不排队。
+build 是前置准备，成功后才执行所选启停；构建失败保留原实例状态。
+start 发现已运行实例就拒绝，即使镜像和配置相同也不视为成功，不替换、不停止。
+stop 对已停止或不存在的实例成功返回，已停止时明确提示；停止失败或仍运行时，
+restart 不得继续启动。restart 复用停止→完整启动，已停止时直接进入启动阶段，
+不调用 Podman restart，也不直接启动原容器绕过配置加载。
+存在性或运行状态查询失败不能当作不存在／已停止；停止后的核对失败也终止启动。
+`container exists` 只有退出码 1 表示不存在，125 等存储错误必须传播，见
+[Podman 存在性检查](https://docs.podman.io/en/latest/markdown/podman-container-exists.1.html)。
+
+启动前检查已登记镜像及发布配套关系，启动阶段重新加载并校验配置、共享网络和 DNS，
+不探测或等待后端。本地重新读取原配置和可选覆盖，远端重新读取目标端已上传快照；
+本机修改远端配置须显式 upload。后端未运行、DNS 暂未注册或无法连接不阻断镜像
+构建、首次启动或显式重启，重复 start 仍按已运行规则拒绝。
 显式后端连通诊断保留有限超时，不属于默认部署流程；真实账号权限由用户后端管理。
-同名但无项目／profile 标签的容器拒绝替换。相同镜像及配置正在运行时重复 start 不创建第二实例。
+同名但无项目／profile 标签的容器拒绝操作，不按端口停止外来服务。
 
 更新先保留旧容器，确认退出后启动候选。候选在有限时间内通过自身 /healthz 才登记为 active。
 健康验收只检查前端自身；无后端时静态页面和 runtime 仍可用，行情请求按既有受控
 错误返回。后端随后可用时正常行情请求恢复，无需重新部署前端。
-失败清理本次候选，恢复保留的旧实例；远端旧实例保持原配置快照。
-本地不复制私有配置，更新前验证旧镜像仍能接受当前文件；内部端口改变或未登记时拒绝原地更新，
-保留旧实例，需另行安排迁移。发布端口独立调整可以恢复旧容器既有映射。
+停止后的配置、网络或候选启动失败保持停止；清理本次候选并保留已停止的旧实例，
+必要时恢复旧名称，不自动启动旧容器。远端旧实例仍持有原配置快照。本地不复制私有
+配置，重启使用新配置；不再用旧镜像回滚校验限制内部端口调整。
 成功后按准确 ID 清理被替代的已退出容器及无引用旧镜像，不执行全局 prune。
 被其它容器／镜像引用的资源保留。后端、共享网络、其它项目镜像与共享构建缓存不清理。
 stop／status／logs 使用已登记元数据，不依赖后端凭据或配置文件当前是否可用。
@@ -112,5 +136,7 @@ just check、just test、just market --build 为正式宿主检查、离线回�
 浏览器生产 fixture 使用独立服务包，默认测试不访问真实后端、registry 或 SSH。
 just test-container 仅使用已经构建的配套缓存镜像及独立本地 fixture／临时网络，不自动拉取镜像。
 该入口证明无后端时前端独立启动、后端恢复后的两来源 API、镜像边界、只读配置、
-回环发布、幂等及失败恢复。
+回环发布、重复启动拒绝、重启及失败保持停止。
+默认离线测试使用外部命令替身运行真实本地入口和模拟 SSH 上传／远端引擎，覆盖
+动作互斥、构建先行、源码变化不强制重建、配置重载、停止失败、候选失败及无隐式上传。
 真实部署验收通过正式 deploy 入口，核对镜像、发布、共享网络和自身健康；不自动测试真实账号权限。

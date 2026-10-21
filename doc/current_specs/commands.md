@@ -17,7 +17,10 @@ just market --stop                         # 停止本项目当前配置的 dev�
 just check
 just test
 just deploy --target=local --build --start
+just deploy --target=local --build --restart
+just deploy --target=local --build --stop
 just deploy --target=remote --upload --build --start
+just deploy --target=remote --upload --build --restart
 just test-container
 just benchmark-memory --baseline=/tmp/lwchart-memory-baseline --runs=3
 ```
@@ -48,9 +51,10 @@ market stop 不读业务配置，不需要有效凭据。按 Linux /proc 匹配�
 package.json 只保留依赖、工具级 dev／build／preview 和原子检查命令。
 check:svelte 检查全部前端；check:ts 检查 Vite／Playwright 配置；check:runtime 严格
 检查 Bun 服务及测试，允许由 Bun 转译的 TypeScript class 语法。
-Just 串行组织检查，均不格式化或改写源码。
-`just check`、`just test` 首先执行共享指标依赖校验；market dev／build 在加载配置、
-监听或编译前执行，legacy build 在构建与复制前执行。校验规则见下节。
+Just 串行组织检查，先检查 Shell 入口及部署脚本语法，均不格式化或改写源码。
+`just check` 在 Shell 语法检查后、Bun 静态检查前执行共享指标依赖校验；
+`just test` 在测试前执行同一校验。market dev／build 在加载配置、监听或编译前执行，
+legacy build 在构建与复制前执行。校验规则见下节。
 
 ## 依赖与构建工具
 

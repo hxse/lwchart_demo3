@@ -25,6 +25,7 @@ if [[ "$1" == 'apply' ]]; then
     shift 2
     if (( $# == 0 )); then echo '完整待用版本已准备'; exit 0; fi
 fi
+if [[ "$1" == 'stop' ]]; then control stop; exit 0; fi
 plan="$deploy_state/pending.json"
 [[ -f "$plan" ]] || { echo '没有完整待用版本，请先准备或上传' >&2; exit 2; }
 profile=$(jq -r .profile "$plan")
@@ -40,9 +41,15 @@ for action in "$@"; do
         if podman image exists "$image"; then echo '复用同内容生产镜像';
         else podman build --layers --label app.owner=lwchart_demo3 --label "app.source=$source_id" -t "$image" -f "$source_dir/Containerfile" "$source_dir"; fi
         printf '%s\n' "$image" > "$deploy_state/prepared-image"
-    elif [[ "$action" == 'start' ]]; then
+    elif [[ "$action" == 'start' || "$action" == 'restart' ]]; then
+        [[ -f "$deploy_state/prepared-image" && $(cat -- "$deploy_state/prepared-image") == "$image" ]] || {
+            echo '待用版本尚未登记配套镜像，请先执行 --build' >&2; exit 2;
+        }
         podman image exists "$image" || { echo '没有配套镜像，请先执行 --build' >&2; exit 2; }
+        if [[ "$action" == 'restart' ]]; then control stop; fi
         start_instance
+    elif [[ "$action" == 'stop' ]]; then
+        control stop
     else echo '部署动作无效' >&2; exit 2
     fi
 done

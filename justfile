@@ -16,6 +16,7 @@ market *args:
 
 # 全部静态检查，不改写源码
 check:
+    @for script in scripts/*.sh scripts/crypto/*.sh scripts/deploy/*.sh; do bash -n "$script"; done
     @bun scripts/indicators/check-dependency.ts
     @bun run check:svelte
     @bun run check:ts
@@ -27,7 +28,7 @@ test:
     @APP_CONFIG_PROFILE=dev bun test tests/unit
     @APP_CONFIG_PROFILE=dev bun --bun node_modules/@playwright/test/cli.js test
 
-# 本地或 SSH 远程生产部署，不启用开机自启
+# 本地或 SSH 远程部署；--build 可前置，--start/--restart/--stop 三选一
 deploy *args:
     @bash scripts/deploy/entry.sh "$@"
 

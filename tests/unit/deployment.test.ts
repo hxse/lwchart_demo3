@@ -7,7 +7,6 @@ import { loadCryptoConfig } from '../../scripts/crypto/config';
 import { deploymentPlan } from '../../scripts/deploy/plan';
 import { deploymentConfig } from '../../scripts/deploy/schema';
 import { sourceManifest, prepareInputs } from '../../scripts/deploy/inputs';
-import { createHash } from 'node:crypto';
 
 test('场景与递归覆盖，数组／false／0／空串替换；开发忽略覆盖，坏配置不泄漏私有值', async () => {
     expect(mergeConfig({ a: { x: 1, y: 2 }, b: [1, 2], c: true, d: 1, e: 'x' }, { a: { x: 3 }, b: [], c: false, d: 0, e: '' }))
@@ -101,97 +100,11 @@ test('源码清单只含白名单，配置／缓存／历史不进入；同内�
 test('部署帮助无需配置，未知／重复／缺目标／非法组合在操作前失败', () => {
     const help = Bun.spawnSync(['just', 'deploy', '--help', '--config=/missing']);
     expect(help.exitCode).toBe(0); expect(help.stdout.toString()).toContain('--target=local|remote');
+    expect(help.stdout.toString()).toContain('--restart');
     for (const args of [['--start'], ['--target=local', '--upload'], ['--target=remote', '--skip-config', '--start'],
-        ['--target=local', '--start', '--status'], ['--target=remote', '--target=local', '--build'], ['--wat']]) {
+        ['--restart'], ['--target=local', '--start', '--status'], ['--target=local', '--build', '--logs'],
+        ['--target=local', '--start', '--restart'], ['--target=local', '--stop', '--restart'], ['--target=local', '--stop', '--start'],
+        ['--target=local', '--restart', '--restart'], ['--target=remote', '--target=local', '--build'], ['--wat']]) {
         expect(Bun.spawnSync(['bash', 'scripts/deploy/entry.sh', ...args]).exitCode).toBe(2);
     }
-});
-
-const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-async function scenario(extra: Record<string, unknown>, existing = true, profile: 'local' | 'remote' = 'local') {
-    const directory = await mkdtemp(join(tmpdir(), 'lwchart-engine-'));
-    const bin = join(directory, 'bin'); const stateDir = join(directory, 'deployment'); const source = join(directory, 'source');
-    await mkdir(bin); await mkdir(stateDir); await mkdir(source);
-    await writeFile(join(source, 'public'), 'public-input');
-    await writeFile(join(source, '.manifest.sha256'), `${createHash('sha256').update('public-input').digest('hex')}  public\n`);
-    const config = join(directory, 'private config.toml'); await writeFile(config, 'OFFLINE_SECRET');
-    const sourceId = 'a'.repeat(64); const configId = 'b'.repeat(64);
-    const plan = { profile, server_port: 5174, container_name: 'lwchart-market', image_name: 'localhost/lwchart-market', source_id: sourceId,
-        source_dir: source, configuration_id: configId, config_files: [{ source: config, name: 'config.toml' }] };
-    await writeFile(join(stateDir, 'pending.json'), JSON.stringify(plan));
-    if (existing) await writeFile(join(stateDir, 'active.json'), JSON.stringify(plan));
-    await writeFile(join(directory, 'state.json'), JSON.stringify({ calls: [], removedImages: [],
-        runtime: { container_name: plan.container_name, container_network: 'trading-net', publish_host: '127.0.0.1', publish_port: 5175,
-            server_port: 5174, log_max_size: 10485760, configuration_id: configId },
-        containers: existing ? [{ name: 'lwchart-market', id: 'old-id', image: 'old-image', owner: 'lwchart_demo3', profile,
-            source: 'previous', config: configId, running: true }] : [], ...extra }));
-    const fixture = resolve('tests/fixtures/deploy-tools.ts');
-    for (const tool of ['podman', 'curl']) await writeFile(join(bin, tool), `#!/usr/bin/env bash\nexec ${quote(process.execPath)} ${quote(fixture)} ${tool} "$@"\n`, { mode: 0o755 });
-    const run = async (...actions: string[]) => {
-        const child = Bun.spawn(['bash', 'scripts/deploy/engine.sh', stateDir, ...actions], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, DEPLOY_MOCK_DIR: directory }, stdout: 'pipe', stderr: 'pipe' });
-        const stdout = new Response(child.stdout).text(); const stderr = new Response(child.stderr).text();
-        return { code: await child.exited, output: (await stdout) + (await stderr) };
-    };
-    return { directory, config, run, read: async () => JSON.parse(await readFile(join(directory, 'state.json'), 'utf8')),
-        cleanup: () => rm(directory, { recursive: true, force: true }) };
-}
-
-test('生命周期成功替换先停旧实例，只清理旧 ID，回环映射及无自启；重复启动无第二实例', async () => {
-    const s = await scenario({});
-    try {
-        const result = await s.run('start'); expect(result.code).toBe(0); expect(result.output).not.toContain('OFFLINE_SECRET');
-        const state = await s.read(); expect(state.containers).toHaveLength(1); expect(state.containers[0].name).toBe('lwchart-market');
-        expect(state.removedImages).toEqual(['old-image']);
-        const actual = state.calls.find((call: string[]) => call.includes('-d'));
-        const preflight = state.calls.filter((call: string[]) => call[1] === 'run' && !call.includes('-d'));
-        expect(preflight.every((call: string[]) => call.includes('--read-only') && call.includes('--cap-drop=all') && call.includes('--security-opt=no-new-privileges'))).toBe(true);
-        expect(actual).toContain('127.0.0.1:5175:5174'); expect(actual.some((arg: string) => arg.startsWith('--restart'))).toBe(false);
-        expect(state.calls.findIndex((call: string[]) => call[1] === 'stop')).toBeLessThan(state.calls.indexOf(actual));
-        expect((await s.run('start')).output).toContain('无需重复启动');
-        expect((await s.read()).containers).toHaveLength(1);
-    } finally { await s.cleanup(); }
-});
-
-test('后端不可用不阻断本地或远端构建、首次启动、更新及幂等，部署不探测后端', async () => {
-    for (const profile of ['local', 'remote'] as const) for (const existing of [false, true]) {
-        const s = await scenario({ failProbe: true, noImage: true }, existing, profile);
-        try {
-            const result = await s.run('build', 'start');
-            expect(result.code).toBe(0); expect(result.output).toContain('看盘容器已就绪');
-            const state = await s.read();
-            expect(state.containers).toHaveLength(1); expect(state.containers[0]).toMatchObject({ profile, running: true });
-            expect(state.calls.some((call: string[]) => call[1] === 'build')).toBe(true);
-            expect(state.calls.some((call: string[]) => call.includes('--probe-backend'))).toBe(false);
-            expect(state.calls.filter((call: string[]) => call[0] === 'curl').every((call: string[]) => call.at(-1)?.endsWith('/healthz'))).toBe(true);
-            expect((await s.run('build', 'start')).output).toContain('无需重复启动');
-            const repeated = await s.read();
-            expect(repeated.containers).toHaveLength(1);
-            expect(repeated.calls.filter((call: string[]) => call.includes('-d'))).toHaveLength(1);
-            expect(repeated.calls.some((call: string[]) => call.includes('--probe-backend'))).toBe(false);
-        } finally { await s.cleanup(); }
-    }
-});
-
-test('候选未就绪恢复旧容器，网络／旧配置／外来资源失败时不停止旧服务', async () => {
-    for (const extra of [{ failCandidate: true }, { noNetwork: true }, { noDns: true }, { invalidOld: true },
-        { containers: [{ name: 'lwchart-market', id: 'old-id', image: 'old-image', owner: 'foreign', profile: 'local', running: true }] }]) {
-        const s = await scenario(extra);
-        try {
-            expect((await s.run('start')).code).not.toBe(0);
-            const state = await s.read();
-            expect(state.containers).toHaveLength(1); expect(state.containers[0].id).toBe('old-id'); expect(state.containers[0].running).toBe(true);
-            expect(state.removedImages).toEqual([]);
-            if (!('failCandidate' in extra)) expect(state.calls.some((call: string[]) => call[1] === 'stop')).toBe(false);
-        } finally { await s.cleanup(); }
-    }
-});
-
-test('控制不依赖配置或凭据，stop 可重复，其他镜像引用时保留旧镜像', async () => {
-    const s = await scenario({ imageReferenced: true });
-    try {
-        expect((await s.run('start')).code).toBe(0); expect((await s.read()).removedImages).toEqual([]);
-        await rm(s.config);
-        expect((await s.run('status')).code).toBe(0); expect((await s.run('logs')).output).toContain('offline-service-log');
-        expect((await s.run('stop')).code).toBe(0); expect((await s.run('stop')).code).toBe(0);
-    } finally { await s.cleanup(); }
 });

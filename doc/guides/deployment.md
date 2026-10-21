@@ -23,14 +23,19 @@ host = "0.0.0.0"
 
 ```bash
 just deploy --target=local --build --start
+just deploy --target=local --restart
+just deploy --target=local --build --restart
+just deploy --target=local --build --stop
 just deploy --target=local --status
 just deploy --target=local --logs
 just deploy --target=local --stop
 ```
 
 本次本地覆盖的页面入口为 http://127.0.0.1:5175。
-build 安装锁定依赖并装配生产镜像，可复用缓存；start 不隐式构建。配置只读挂原文件，改配置后重新 start。
-仅 start 时源码须与已准备版本一致；代码修改后重新 --build --start。
+build 安装锁定依赖并装配生产镜像，可复用缓存；start 仅启动未运行实例，已经运行时
+会报错。配置只读挂原文件，改配置后用 restart 重新加载。代码修改后用 --build --restart
+更新运行中的服务；只想重启现有版本时用 --restart，工作区源码变化不会触发构建。
+--build 可前置于 start／restart／stop，构建成功后才启停；三种启停动作不能同时选择。
 
 ## 远端部署
 
@@ -45,13 +50,17 @@ just deploy --target=remote --upload --build --start
 需要保留远端完整配置时：
 
 ```bash
-just deploy --target=remote --upload --build --start --skip-config
+just deploy --target=remote --upload --build --restart --skip-config
+just deploy --target=remote --restart
 just deploy --target=remote --status
 just deploy --target=remote --logs
 just deploy --target=remote --stop
 ```
 
-单独 upload 不构建，单独 build 不上传，单独 start 消费已上传并构建的版本；可以分别执行。
+更新已经运行的服务用 `just deploy --target=remote --upload --build --restart`。
+单独 upload 不构建，单独 build 不上传，单独 start／restart 消费已上传并登记的镜像。
+远端 restart 不同步本机改动；改了本机远端配置须显式 upload，配置未变则直接 restart。
+start 在实例已运行时拒绝；stop 已停止时成功提示。status／logs 须单独使用。
 首次没有完整配置时不能 skip-config。状态、日志及停止不依赖凭据是否有效。
 远端只发布自身回环地址，浏览器可通过 SSH 隧道访问：
 
@@ -72,9 +81,11 @@ just test-container
 
 普通测试只用离线 fixture。test-container 需要先构建当前配套镜像，使用独立本地假后端和临时网络，
 不会拉取镜像或访问真实行情；不满足准备条件会明确报错。
-部署预检失败保持旧实例；候选未就绪恢复旧实例。成功后只清理本项目被替代且无引用的资源。
+构建失败不改变原实例状态；restart 停止失败时不会继续启动。停止后若新启动失败，
+服务保持停止，旧容器保留但不会自动恢复运行；修正配置或问题后再次显式 start／restart。
+成功后只清理本项目被替代且无引用的资源。
 构建和启动不探测或等待后端；启动验收只检查前端自身 /healthz。
 后端离线时仍能打开页面及设置，行情区显示连接错误；后端恢复后正常轮询即可恢复。
-本地修改内部 server.port 时，原容器映射无法保证恢复，需先安排迁移；通常只修改 publish_port。
+重启会按当前配置重新创建端口映射，可调整 server.port 或 publish_port。
 不会自动停止占端口的其它服务，不删除后端容器或 trading-net。
 完整契约见 [生产部署规范](../current_specs/deployment.md)。
